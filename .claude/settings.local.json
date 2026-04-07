@@ -34,7 +34,8 @@
       "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\photo\")",
       "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\")",
       "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\photo\\\\brand\")",
-      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\\\\brand\")"
+      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\\\\brand\")",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

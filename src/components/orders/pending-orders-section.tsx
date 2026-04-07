@@ -1,11 +1,12 @@
 ﻿"use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { AlertTriangle, CheckCircle2, Loader2, Package2, Truck, X } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, Layers3, Loader2, Package2, Truck, X } from "lucide-react";
 import {
   createDeliveryNoteAction,
+  getBatchStoreDeliveryDataAction,
   getDeliveryFormDataAction,
   getStoreDeliveryDataAction,
 } from "@/app/orders/delivery-actions";
@@ -29,6 +30,65 @@ function formatMoney(value: number) {
 
 function formatPendingLine(item: PendingOrder["pendingItems"][number]) {
   return `ค้างส่ง: ${item.productName} ${formatNum(item.remainingQty)} ${item.saleUnitLabel}`;
+}
+
+type StoreSummaryForBatch = {
+  customerId: string;
+  customerName: string;
+  customerCode: string;
+  orderRounds: number;
+  totalAmount: number;
+};
+
+type GroupedStoreItem = DeliveryItemData & {
+  customerId: string;
+  groupKey: string;
+  orderId: string;
+  orderItems: Array<DeliveryItemData & { customerId: string; groupKey: string; orderId: string }>;
+  totalRemaining: number;
+};
+
+type BatchStoreGroup = StoreSummaryForBatch & {
+  groupedItems: GroupedStoreItem[];
+  orders: DeliveryFormData[];
+};
+
+function toGroupKey(productId: string, saleUnitLabel: string) {
+  return `${productId}::${saleUnitLabel}`;
+}
+
+function buildGroupedItemsForOrders(orders: DeliveryFormData[]): GroupedStoreItem[] {
+  const allItems = orders.flatMap((order) =>
+    order.items.map((item) => ({
+      ...item,
+      customerId: order.customerId,
+      groupKey: toGroupKey(item.productId, item.saleUnitLabel),
+      orderId: order.orderId,
+    })),
+  );
+
+  const grouped = new Map<string, typeof allItems>();
+  for (const item of allItems) {
+    if (!grouped.has(item.groupKey)) {
+      grouped.set(item.groupKey, []);
+    }
+    grouped.get(item.groupKey)?.push(item);
+  }
+
+  return Array.from(grouped.values())
+    .map((items) => {
+      const totalRemaining = items.reduce(
+        (sum, item) =>
+          sum + (item.saleUnitRatio > 0 ? item.remainingBaseQty / item.saleUnitRatio : 0),
+        0,
+      );
+      return {
+        ...items[0],
+        orderItems: items,
+        totalRemaining,
+      };
+    })
+    .sort((a, b) => a.productName.localeCompare(b.productName, "th"));
 }
 
 // Delivery Modal
@@ -801,6 +861,600 @@ function StoreDeliveryModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function AllStoresDeliveryModal({
+  date,
+  groups,
+  onClose,
+}: {
+  date: string;
+  groups: BatchStoreGroup[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [qtysByStore, setQtysByStore] = useState<Record<string, Record<string, string>>>(() => {
+    const init: Record<string, Record<string, string>> = {};
+    for (const group of groups) {
+      const itemQtys: Record<string, string> = {};
+      for (const item of group.groupedItems) {
+        itemQtys[item.groupKey] =
+          item.totalRemaining > 0 ? formatNum(item.totalRemaining, 3).replace(/,/g, "") : "";
+      }
+      init[group.customerId] = itemQtys;
+    }
+    return init;
+  });
+  const [notesByStore, setNotesByStore] = useState<Record<string, string>>({});
+  const [isPending, startTransition] = useTransition();
+  const [results, setResults] = useState<
+    Array<{ customerId: string; customerName: string; state: CreateDeliveryState }>
+  >([]);
+
+  const productStockStatus = useMemo(() => {
+    const selectedBaseByProduct = new Map<string, number>();
+    const pendingBaseByProduct = new Map<string, number>();
+    const availableBaseByProduct = new Map<string, number>();
+
+    for (const group of groups) {
+      const qtyMap = qtysByStore[group.customerId] ?? {};
+      for (const item of group.groupedItems) {
+        const selectedQty = parseFloat(qtyMap[item.groupKey] ?? "0") || 0;
+        const selectedBase = selectedQty * item.saleUnitRatio;
+        if (selectedBase > 0) {
+          selectedBaseByProduct.set(
+            item.productId,
+            (selectedBaseByProduct.get(item.productId) ?? 0) + selectedBase,
+          );
+        }
+
+        const pendingBaseInScope = item.orderItems.reduce(
+          (sum, orderItem) => sum + orderItem.remainingBaseQty,
+          0,
+        );
+        pendingBaseByProduct.set(
+          item.productId,
+          (pendingBaseByProduct.get(item.productId) ?? 0) + pendingBaseInScope,
+        );
+
+        const currentAvailable = availableBaseByProduct.get(item.productId) ?? 0;
+        availableBaseByProduct.set(
+          item.productId,
+          Math.max(currentAvailable, item.availableStock),
+        );
+      }
+    }
+
+    const overProducts = new Set<string>();
+    for (const [productId, selectedBase] of selectedBaseByProduct.entries()) {
+      const pendingBase = pendingBaseByProduct.get(productId) ?? 0;
+      const availableBase = availableBaseByProduct.get(productId) ?? 0;
+      // In this flow, "pending in scope" is often already reserved for these submitted orders.
+      // Allow deliverable pool = available now + pending in the selected scope.
+      const maxDeliverableBase = availableBase + pendingBase;
+      if (selectedBase > maxDeliverableBase + 0.000001) {
+        overProducts.add(productId);
+      }
+    }
+
+    return {
+      overProducts,
+      selectedBaseByProduct,
+    };
+  }, [groups, qtysByStore]);
+
+  const overStockRows = groups.flatMap((group) =>
+    group.groupedItems
+      .filter((item) => {
+        const qty = parseFloat(qtysByStore[group.customerId]?.[item.groupKey] ?? "0");
+        return qty > 0 && productStockStatus.overProducts.has(item.productId);
+      })
+      .map((item) => ({ customerName: group.customerName, item })),
+  );
+
+  const hasOverStock = overStockRows.length > 0;
+  const storesWithQty = groups.filter((group) =>
+    group.groupedItems.some(
+      (item) => parseFloat(qtysByStore[group.customerId]?.[item.groupKey] ?? "0") > 0,
+    ),
+  );
+  const hasAnyQty = storesWithQty.length > 0;
+
+  const unpricedActiveRows = groups.flatMap((group) =>
+    group.groupedItems
+      .filter(
+        (item) =>
+          item.unitPrice === 0 &&
+          parseFloat(qtysByStore[group.customerId]?.[item.groupKey] ?? "0") > 0,
+      )
+      .map((item) => ({ customerName: group.customerName, item })),
+  );
+
+  function setQtyValue(customerId: string, groupKey: string, value: string) {
+    setQtysByStore((prev) => ({
+      ...prev,
+      [customerId]: {
+        ...(prev[customerId] ?? {}),
+        [groupKey]: value,
+      },
+    }));
+  }
+
+  function nudgeQty(customerId: string, groupKey: string, delta: number) {
+    const current = parseFloat(qtysByStore[customerId]?.[groupKey] ?? "0") || 0;
+    const next = Math.max(0, current + delta);
+    setQtyValue(customerId, groupKey, String(next));
+  }
+
+  async function handleSubmit() {
+    if (!hasAnyQty || hasOverStock || isPending) return;
+
+    if (unpricedActiveRows.length > 0) {
+      const lines = unpricedActiveRows
+        .slice(0, 12)
+        .map(({ customerName, item }) => `  • ${customerName}: ${item.productName}`)
+        .join("\n");
+      const moreText =
+        unpricedActiveRows.length > 12
+          ? `\n  • และอีก ${unpricedActiveRows.length - 12} รายการ`
+          : "";
+      const confirmed = window.confirm(
+        `⚠️ มีรายการที่ยังไม่ได้ตั้งราคา ${unpricedActiveRows.length} รายการ\n\n${lines}${moreText}\n\nระบบจะคิดราคาเป็น 0 บาทในรายการเหล่านี้\nต้องการยืนยันต่อหรือไม่?`,
+      );
+      if (!confirmed) return;
+    }
+
+    startTransition(async () => {
+      const nextResults: Array<{ customerId: string; customerName: string; state: CreateDeliveryState }> = [];
+
+      for (const group of groups) {
+        const qtyMap = qtysByStore[group.customerId] ?? {};
+        const toDistribute = new Map<string, number>();
+        for (const item of group.groupedItems) {
+          const qty = parseFloat(qtyMap[item.groupKey] ?? "0") || 0;
+          if (qty > 0) {
+            toDistribute.set(item.groupKey, qty);
+          }
+        }
+
+        if (toDistribute.size === 0) {
+          continue;
+        }
+
+        const itemsPayload: Array<{
+          orderItemId: string;
+          productId: string;
+          productSaleUnitId: string | null;
+          quantityDelivered: number;
+          saleUnitLabel: string;
+          saleUnitRatio: number;
+          unitPrice: number;
+        }> = [];
+
+        for (const order of group.orders) {
+          for (const item of order.items) {
+            const key = toGroupKey(item.productId, item.saleUnitLabel);
+            const remaining = toDistribute.get(key) ?? 0;
+            if (remaining <= 0) continue;
+
+            const itemMax = item.saleUnitRatio > 0 ? item.remainingBaseQty / item.saleUnitRatio : 0;
+            const qty = Math.min(remaining, itemMax);
+            if (qty <= 0) continue;
+
+            toDistribute.set(key, remaining - qty);
+            itemsPayload.push({
+              orderItemId: item.orderItemId,
+              productId: item.productId,
+              productSaleUnitId: item.productSaleUnitId,
+              quantityDelivered: qty,
+              saleUnitLabel: item.saleUnitLabel,
+              saleUnitRatio: item.saleUnitRatio,
+              unitPrice: item.unitPrice,
+            });
+          }
+        }
+
+        if (itemsPayload.length === 0) {
+          continue;
+        }
+
+        const fd = new FormData();
+        fd.set("orderIds", JSON.stringify(group.orders.map((order) => order.orderId)));
+        fd.set("customerId", group.customerId);
+        fd.set("notes", (notesByStore[group.customerId] ?? "").trim());
+        fd.set("items", JSON.stringify(itemsPayload));
+
+        const state = await createDeliveryNoteAction(null, fd);
+        nextResults.push({
+          customerId: group.customerId,
+          customerName: group.customerName,
+          state,
+        });
+      }
+
+      setResults(nextResults);
+      if (nextResults.some((row) => row.state.status === "success")) {
+        router.refresh();
+      }
+      if (nextResults.length > 0 && nextResults.every((row) => row.state.status === "success")) {
+        setTimeout(onClose, 1600);
+      }
+    });
+  }
+
+  const totalSelectedAmount = groups.reduce((sum, group) => {
+    const qtyMap = qtysByStore[group.customerId] ?? {};
+    const subtotal = group.groupedItems.reduce((storeSum, item) => {
+      const qty = parseFloat(qtyMap[item.groupKey] ?? "0") || 0;
+      return storeSum + qty * item.unitPrice;
+    }, 0);
+    return sum + subtotal;
+  }, 0);
+
+  const successRows = results.filter((row) => row.state.status === "success");
+  const errorRows = results.filter((row) => row.state.status === "error");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-h-[94vh] overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-6xl sm:rounded-3xl">
+        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Layers3 className="h-5 w-5 text-[#003366]" strokeWidth={2.2} />
+                <h2 className="truncate text-lg font-bold text-slate-950">สร้างใบส่งของทั้งหมด</h2>
+              </div>
+              <p className="mt-0.5 text-sm text-slate-500">
+                วันที่ {formatDate(date)} · {groups.length} ร้านค้า
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              aria-label="ปิด"
+            >
+              <X className="h-4 w-4" strokeWidth={2.4} />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+              <p className="text-xs font-semibold text-slate-500">ร้านค้าที่เลือกส่ง</p>
+              <p className="mt-1 text-xl font-bold text-[#003366]">{storesWithQty.length}</p>
+            </div>
+            <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+              <p className="text-xs font-semibold text-slate-500">รายการที่สต็อกไม่พอ</p>
+              <p className="mt-1 text-xl font-bold text-red-700">{overStockRows.length}</p>
+            </div>
+            <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+              <p className="text-xs font-semibold text-slate-500">รวมยอดส่งรอบนี้</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">{formatMoney(totalSelectedAmount)}</p>
+            </div>
+            <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+              <p className="text-xs font-semibold text-slate-500">รายการยังไม่ตั้งราคา</p>
+              <p className="mt-1 text-xl font-bold text-amber-700">{unpricedActiveRows.length}</p>
+            </div>
+          </div>
+
+          {hasOverStock && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              มี {overStockRows.length} รายการส่งเกินสต็อกที่พร้อมส่ง กรุณาปรับจำนวนก่อนยืนยัน
+            </div>
+          )}
+
+          {groups.map((group) => {
+            const qtyMap = qtysByStore[group.customerId] ?? {};
+            return (
+              <section key={group.customerId} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-[#003366] px-4 py-3 text-white">
+                  <Building2 className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+                  <p className="text-sm font-bold">
+                    {group.customerCode} {group.customerName}
+                  </p>
+                  <span className="ml-auto inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold">
+                    {group.orderRounds} รอบออเดอร์
+                  </span>
+                </div>
+
+                <div className="space-y-2 p-3 sm:hidden">
+                  {group.groupedItems.map((item) => {
+                    const qty = qtyMap[item.groupKey] ?? "";
+                    const qtyNum = parseFloat(qty) || 0;
+                    const isOver = qtyNum > 0 && productStockStatus.overProducts.has(item.productId);
+                    return (
+                      <div
+                        key={`${group.customerId}-${item.groupKey}`}
+                        className={`rounded-xl border p-3 ${isOver ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {item.imageUrl ? (
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-100">
+                              <Image src={item.imageUrl} alt={item.productName} fill className="object-cover" sizes="40px" />
+                            </div>
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
+                              <Package2 className="h-4 w-4 text-slate-300" strokeWidth={1.8} />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-slate-900">{item.productName}</p>
+                            <p className="font-mono text-xs text-slate-400">{item.productSku}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-500">ออเดอร์</span>
+                            <span className="text-xs text-slate-500">
+                              คงเหลือ {formatNum(item.totalRemaining)} {item.saleUnitLabel}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-[40px_minmax(0,1fr)_40px_auto] items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => nudgeQty(group.customerId, item.groupKey, -1)}
+                              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-700"
+                              aria-label="ลดจำนวน"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={qty}
+                              onChange={(e) => setQtyValue(group.customerId, item.groupKey, e.target.value)}
+                              className={`w-full min-w-0 rounded-lg border px-2 py-1.5 text-center text-sm font-bold outline-none ${isOver ? "border-red-300 text-red-700" : "border-slate-300 text-slate-900"}`}
+                              placeholder="0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => nudgeQty(group.customerId, item.groupKey, 1)}
+                              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-700"
+                              aria-label="เพิ่มจำนวน"
+                            >
+                              +
+                            </button>
+                            <span className="text-xs text-slate-500">{item.saleUnitLabel}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="border-b border-r border-slate-200 px-3 py-2 text-center text-xs font-semibold text-slate-500">
+                          รหัสสินค้า
+                        </th>
+                        <th className="border-b border-r border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-500">
+                          รายการสินค้า
+                        </th>
+                        <th className="border-b border-r border-slate-200 px-3 py-2 text-center text-xs font-semibold text-slate-500">
+                          ออเดอร์
+                        </th>
+                        <th className="border-b border-r border-slate-200 px-3 py-2 text-center text-xs font-semibold text-slate-500">
+                          หน่วย
+                        </th>
+                        <th className="border-b border-r border-slate-200 px-3 py-2 text-right text-xs font-semibold text-slate-500">
+                          ราคา/หน่วย
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-2 text-right text-xs font-semibold text-slate-500">
+                          รวมเงิน
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.groupedItems.map((item, idx) => {
+                        const qty = qtyMap[item.groupKey] ?? "";
+                        const qtyNum = parseFloat(qty) || 0;
+                        const isOver = qtyNum > 0 && productStockStatus.overProducts.has(item.productId);
+                        const rowBorder = idx < group.groupedItems.length - 1 ? "border-b border-slate-200" : "";
+                        return (
+                          <tr key={`${group.customerId}-${item.groupKey}`} className={isOver ? "bg-red-50" : "bg-white"}>
+                            <td className={`border-r border-slate-200 px-3 py-3 text-center ${rowBorder}`}>
+                              <span className="font-mono text-xs font-semibold text-slate-700">{item.productSku}</span>
+                            </td>
+                            <td className={`border-r border-slate-200 px-3 py-3 ${rowBorder}`}>
+                              <div className="flex items-center gap-2.5">
+                                {item.imageUrl ? (
+                                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-100">
+                                    <Image src={item.imageUrl} alt={item.productName} fill className="object-cover" sizes="36px" />
+                                  </div>
+                                ) : (
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
+                                    <Package2 className="h-4 w-4 text-slate-300" strokeWidth={1.8} />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-slate-900">{item.productName}</p>
+                                  <p className="text-xs text-slate-500">คงเหลือออเดอร์ {formatNum(item.totalRemaining)}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className={`border-r border-slate-200 px-3 py-3 text-center ${rowBorder}`}>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={qty}
+                                onChange={(e) => setQtyValue(group.customerId, item.groupKey, e.target.value)}
+                                className={`w-24 rounded-lg border px-2 py-1.5 text-center text-sm font-bold outline-none ${isOver ? "border-red-300 text-red-700" : "border-slate-300 text-slate-900"}`}
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className={`border-r border-slate-200 px-3 py-3 text-center text-sm text-slate-600 ${rowBorder}`}>
+                              {item.saleUnitLabel}
+                            </td>
+                            <td className={`border-r border-slate-200 px-3 py-3 text-right text-sm text-slate-700 ${rowBorder}`}>
+                              {item.unitPrice > 0 ? `${formatMoney(item.unitPrice)} บาท` : "-"}
+                            </td>
+                            <td className={`px-3 py-3 text-right text-sm font-semibold text-slate-900 ${rowBorder}`}>
+                              {qtyNum > 0 ? `${formatMoney(qtyNum * item.unitPrice)} บาท` : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="border-t border-slate-100 p-3">
+                  <label className="mb-1 block text-xs font-semibold text-slate-500">หมายเหตุร้านนี้ (ถ้ามี)</label>
+                  <input
+                    type="text"
+                    value={notesByStore[group.customerId] ?? ""}
+                    onChange={(e) =>
+                      setNotesByStore((prev) => ({
+                        ...prev,
+                        [group.customerId]: e.target.value,
+                      }))
+                    }
+                    placeholder="เช่น ส่งรอบเช้า"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/10"
+                  />
+                </div>
+              </section>
+            );
+          })}
+
+          {errorRows.length > 0 && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorRows.map((row) => (
+                <p key={row.customerId}>
+                  {row.customerName}: {row.state.message}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {successRows.length > 0 && (
+            <div className="space-y-2 rounded-xl bg-emerald-50 px-4 py-3">
+              {successRows.map((row) => (
+                <div key={row.customerId} className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2.4} />
+                    {row.customerName} · {row.state.deliveryNumber}
+                  </div>
+                  {row.state.deliveryId && (
+                    <a
+                      href={`/orders/delivery-notes/${row.state.deliveryId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+                    >
+                      <Truck className="h-3.5 w-3.5" strokeWidth={2.2} />
+                      พิมพ์ใบส่งของ
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="w-full rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!hasAnyQty || hasOverStock || isPending}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#003366] px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-[#002244] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:py-2.5 sm:text-sm"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+                กำลังสร้าง...
+              </>
+            ) : (
+              <>
+                <Layers3 className="h-4 w-4" strokeWidth={2.2} />
+                สร้างใบส่งของทั้งหมด
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AllStoresDeliveryButton({
+  date,
+  stores,
+}: {
+  date: string;
+  stores: StoreSummaryForBatch[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [groups, setGroups] = useState<BatchStoreGroup[] | null>(null);
+
+  async function handleOpen() {
+    setLoading(true);
+    const orderMap = await getBatchStoreDeliveryDataAction(
+      stores.map((store) => store.customerId),
+      date,
+    );
+
+    const nextGroups = stores
+      .map((store) => {
+        const orders = orderMap[store.customerId] ?? [];
+        if (orders.length === 0) return null;
+        return {
+          ...store,
+          groupedItems: buildGroupedItemsForOrders(orders),
+          orders,
+        } satisfies BatchStoreGroup;
+      })
+      .filter((group): group is BatchStoreGroup => group !== null);
+
+    setGroups(nextGroups);
+    setOpen(true);
+    setLoading(false);
+  }
+
+  if (stores.length === 0) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        disabled={loading}
+        className="inline-flex items-center gap-2 rounded-xl bg-[#003366] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#002244] disabled:opacity-60"
+      >
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+        ) : (
+          <Layers3 className="h-4 w-4" strokeWidth={2.2} />
+        )}
+        สร้างใบส่งของทั้งหมด
+      </button>
+      {open && groups && groups.length > 0 && (
+        <AllStoresDeliveryModal date={date} groups={groups} onClose={() => setOpen(false)} />
+      )}
+      {open && groups && groups.length === 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
+          <div className="rounded-2xl bg-white px-8 py-6 text-center shadow-2xl">
+            <p className="text-sm text-slate-500">ไม่มีออเดอร์ที่พร้อมสร้างใบส่งของ</p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

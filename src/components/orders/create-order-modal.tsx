@@ -22,6 +22,7 @@ import {
   createManualOrderAction,
   fetchCustomerYesterdayItemsAction,
   fetchCustomerPricesAction,
+  upsertCustomerPriceFromOrderModalAction,
   type CustomerYesterdaySnapshot,
 } from "@/app/orders/incoming/actions";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
@@ -54,11 +55,12 @@ type ProductSelectModalProps = {
     baseQty: number,
     quantity: number,
     unitPrice: number,
-  ) => void;
+  ) => Promise<void> | void;
   open: boolean;
   priceMap: Record<string, number>;
   products: OrderProductOption[];
   productsLoading: boolean;
+  selectedCustomerLabel: string | null;
 };
 
 type Props = {
@@ -106,6 +108,7 @@ function ProductSelectModal({
   priceMap,
   products,
   productsLoading,
+  selectedCustomerLabel,
 }: ProductSelectModalProps) {
   const [query, setQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("__all__");
@@ -114,6 +117,7 @@ function ProductSelectModal({
   const [quantityInput, setQuantityInput] = useState("1");
   const [priceInput, setPriceInput] = useState("0");
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+  const [saving, setSaving] = useState(false);
 
   // Products are pre-sorted by category sort_order at the data layer.
   // Iterate in order to collect categories by first appearance → preserves sort_order without
@@ -177,6 +181,7 @@ function ProductSelectModal({
       setQuantityInput("1");
       setPriceInput("0");
       setMobileView("list");
+      setSaving(false);
     }
   }
 
@@ -213,20 +218,25 @@ function ProductSelectModal({
     setPriceInput(String(getUnitPrice(selectedProduct.id, nextUnitId, priceMap)));
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!selectedProduct || !selectedUnit) return;
     const quantity = Number(quantityInput);
     const unitPrice = Number(priceInput);
     if (!Number.isFinite(quantity) || quantity <= 0) return;
     if (!Number.isFinite(unitPrice) || unitPrice < 0) return;
-    onConfirm(
-      selectedProduct,
-      selectedUnit.id,
-      selectedUnit.label,
-      selectedUnit.baseUnitQuantity,
-      quantity,
-      unitPrice,
-    );
+    setSaving(true);
+    try {
+      await onConfirm(
+        selectedProduct,
+        selectedUnit.id,
+        selectedUnit.label,
+        selectedUnit.baseUnitQuantity,
+        quantity,
+        unitPrice,
+      );
+    } finally {
+      setSaving(false);
+    }
     setMobileView("list");
     setSelectedId(null);
   }
@@ -259,10 +269,16 @@ function ProductSelectModal({
                 ? "กำหนดจำนวนและราคา แล้วกดเพิ่มสินค้า"
                 : "เลือกจากสินค้าทั้งหมด หรือกรองตามหมวดหมู่"}
             </p>
+            {selectedCustomerLabel ? (
+              <p className="mt-1 text-xs font-semibold text-[#003366]">
+                ร้านค้า: {selectedCustomerLabel}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 active:scale-95"
             aria-label="ปิด"
           >
@@ -352,6 +368,12 @@ function ProductSelectModal({
                   {filteredProducts.map((product) => {
                     const isSelected = product.id === selectedId;
                     const addedCount = getAddedCount(product.id);
+                    const units = getUnits(product);
+                    const defaultUnit = units.find((unit) => unit.isDefault) ?? units[0] ?? null;
+                    const defaultPrice = defaultUnit
+                      ? getUnitPrice(product.id, defaultUnit.id, priceMap)
+                      : 0;
+                    const isUnpriced = !noCustomer && defaultPrice <= 0;
                     return (
                       <button
                         key={product.id}
@@ -383,11 +405,18 @@ function ProductSelectModal({
                             <p className="text-base font-semibold leading-snug text-slate-900">
                               {product.name}
                             </p>
-                            {addedCount > 0 && (
-                              <span className="shrink-0 rounded-full bg-[#003366] px-2.5 py-0.5 text-xs font-bold text-white">
-                                +{addedCount}
-                              </span>
-                            )}
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {isUnpriced ? (
+                                <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                                  ยังไม่ตั้งราคา
+                                </span>
+                              ) : null}
+                              {addedCount > 0 && (
+                                <span className="rounded-full bg-[#003366] px-2.5 py-0.5 text-xs font-bold text-white">
+                                  +{addedCount}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <p className="mt-1 text-sm text-slate-500">
                             {product.sku} · สต็อก {product.stockQuantity.toLocaleString("th-TH")} {product.unit}
@@ -523,6 +552,16 @@ function ProductSelectModal({
                         บาท
                       </span>
                     </div>
+                    {Number(priceInput || "0") <= 0 ? (
+                      <p className="text-xs font-semibold text-rose-700">
+                        สินค้านี้ยังไม่ตั้งราคาสำหรับร้านค้านี้
+                      </p>
+                    ) : null}
+                    {selectedCustomerLabel ? (
+                      <p className="text-xs text-slate-500">
+                        เมื่อกดเพิ่มสินค้า ระบบจะบันทึกราคานี้เข้า “ผูกราคากับร้านค้า” อัตโนมัติ
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="rounded-2xl border border-[#003366]/15 bg-[#003366]/5 px-4 py-4">
@@ -540,9 +579,10 @@ function ProductSelectModal({
                   <button
                     type="button"
                     onClick={handleConfirm}
+                    disabled={saving}
                     className="w-full rounded-2xl bg-[#003366] py-4 text-lg font-bold text-white shadow-sm transition hover:bg-[#002244] active:scale-[0.98]"
                   >
-                    เพิ่มสินค้าเข้ารายการ
+                    {saving ? "กำลังบันทึก..." : "เพิ่มสินค้าเข้ารายการ"}
                   </button>
                 </div>
               </>
@@ -563,7 +603,6 @@ export function CreateOrderModal({ customers, products, today }: Props) {
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [orderDate, setOrderDate] = useState(today);
-  const [notes, setNotes] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -577,6 +616,10 @@ export function CreateOrderModal({ customers, products, today }: Props) {
   const productsById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
     [products],
+  );
+  const selectedCustomer = useMemo(
+    () => customers.find((customer) => customer.id === customerId) ?? null,
+    [customers, customerId],
   );
 
   const filteredCustomers = customerSearch
@@ -703,7 +746,7 @@ export function CreateOrderModal({ customers, products, today }: Props) {
     }
   }
 
-  function addToCart(
+  async function addToCart(
     product: OrderProductOption,
     unitId: string | null,
     unitLabel: string,
@@ -711,6 +754,8 @@ export function CreateOrderModal({ customers, products, today }: Props) {
     quantity: number,
     unitPrice: number,
   ) {
+    const targetCustomerId = customerId;
+
     const existingIndex = cart.findIndex(
       (item) => item.productId === product.id && item.saleUnitId === unitId,
     );
@@ -734,7 +779,29 @@ export function CreateOrderModal({ customers, products, today }: Props) {
         },
       ]);
     }
-    setProductModalOpen(false);
+
+    if (!targetCustomerId) {
+      return;
+    }
+
+    const result = await upsertCustomerPriceFromOrderModalAction({
+      customerId: targetCustomerId,
+      productId: product.id,
+      productSaleUnitId: unitId,
+      salePrice: unitPrice,
+    });
+
+    if ("error" in result) {
+      setError(`เพิ่มสินค้าแล้ว แต่บันทึกราคาไม่สำเร็จ: ${result.error}`);
+      return;
+    }
+
+    const priceKey = unitId ?? product.id;
+    setPriceMap((prev) => ({
+      ...prev,
+      [product.id]: unitPrice,
+      [priceKey]: unitPrice,
+    }));
   }
 
   function updateQty(index: number, delta: number) {
@@ -765,7 +832,6 @@ export function CreateOrderModal({ customers, products, today }: Props) {
     setCustomerSearch("");
     setCustomerOpen(false);
     setOrderDate(today);
-    setNotes("");
     setError(null);
     setSuccess(null);
     setHistoryNotice(null);
@@ -791,7 +857,6 @@ export function CreateOrderModal({ customers, products, today }: Props) {
       formData.set("customerId", customerId);
       formData.set("channel", "created");
       formData.set("orderDate", orderDate);
-      formData.set("notes", notes);
       formData.set("items", JSON.stringify(cart));
       const result = await createManualOrderAction(formData);
       if ("error" in result) {
@@ -1042,9 +1107,14 @@ export function CreateOrderModal({ customers, products, today }: Props) {
                                     <p className="text-base font-semibold leading-snug text-slate-900">
                                       {item.productName}
                                     </p>
-                                    <p className="mt-0.5 text-sm text-slate-400">
-                                      {item.saleUnitLabel}
-                                    </p>
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                      <p className="text-sm text-slate-400">{item.saleUnitLabel}</p>
+                                      {item.unitPrice <= 0 ? (
+                                        <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white">
+                                          ยังไม่ตั้งราคา
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                   <button
                                     type="button"
@@ -1124,20 +1194,6 @@ export function CreateOrderModal({ customers, products, today }: Props) {
                       </div>
                     </section>
 
-                    {/* หมายเหตุ */}
-                    <section>
-                      <label className="mb-2 block text-base font-semibold text-slate-800">
-                        หมายเหตุ
-                        <span className="ml-2 text-sm font-normal text-slate-400">(ถ้ามี)</span>
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        placeholder="หมายเหตุเพิ่มเติม เช่น ข้อความพิเศษ หรือรายละเอียดการจัดส่ง"
-                        className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base text-slate-700 outline-none transition focus:border-[#003366]/50 focus:ring-2 focus:ring-[#003366]/10 placeholder:text-slate-400"
-                      />
-                    </section>
                   </>
                 ) : (
                   <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -1274,6 +1330,9 @@ export function CreateOrderModal({ customers, products, today }: Props) {
         priceMap={priceMap}
         products={products}
         productsLoading={pricesLoading}
+        selectedCustomerLabel={
+          selectedCustomer ? `${selectedCustomer.code} ${selectedCustomer.name}` : null
+        }
       />
     </>
   );

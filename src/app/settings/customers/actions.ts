@@ -225,6 +225,58 @@ export async function createCustomerAction(
   };
 }
 
+export async function updateCustomerDefaultVehicleAction(
+  customerId: string,
+  defaultVehicleId: string | null,
+): Promise<{ error?: string }> {
+  const session = await requireAppRole("admin");
+  const admin = getSupabaseAdmin();
+
+  const { data: customer, error: customerLookupError } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", customerId)
+    .eq("organization_id", session.organizationId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (customerLookupError || !customer) {
+    return { error: "ไม่พบร้านค้าที่ต้องการอัปเดต" };
+  }
+
+  if (defaultVehicleId) {
+    const { data: vehicle, error: vehicleLookupError } = await admin
+      .from("vehicles")
+      .select("id")
+      .eq("id", defaultVehicleId)
+      .eq("organization_id", session.organizationId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (vehicleLookupError || !vehicle) {
+      return { error: "ไม่พบรถที่เลือก กรุณาลองเลือกใหม่อีกครั้ง" };
+    }
+  }
+
+  const { error: updateError } = await admin
+    .from("customers")
+    .update({
+      default_vehicle_id: defaultVehicleId,
+    })
+    .eq("id", customerId)
+    .eq("organization_id", session.organizationId);
+
+  if (updateError) {
+    return { error: "อัปเดตรถประจำร้านไม่สำเร็จ กรุณาลองอีกครั้ง" };
+  }
+
+  revalidatePath("/settings/customers");
+  revalidatePath("/settings/vehicles");
+  revalidatePath("/delivery");
+
+  return {};
+}
+
 export async function deleteCustomerAction(customerId: string): Promise<{ error?: string }> {
   const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin();

@@ -39,8 +39,15 @@ type ProductStockRow = { reserved_quantity: number | string; stock_quantity: num
 type PriceRow = { product_id: string; product_sale_unit_id: string | null; sale_price: number | string };
 type OrderIdRow = { id: string };
 type NewOrderRow = { id: string };
+type ProductSaleUnitRow = {
+  base_unit_quantity: number | string;
+  id: string;
+  is_default: boolean;
+  product_id: string;
+  unit_label: string;
+};
 type SelectChain<T> = {
-  eq: (col: string, val: string) => SelectChain<T>;
+  eq: (col: string, val: string | number | boolean) => SelectChain<T>;
   in: (col: string, vals: string[]) => ManyResult<T>;
   single: () => SingleResult<T>;
 };
@@ -73,9 +80,13 @@ type ActionsAdmin = ReturnType<typeof getSupabaseAdmin> & {
   };
   from(table: "customer_product_prices"): {
     select: (cols: string) => SelectChain<PriceRow>;
+    upsert: (
+      vals: Record<string, unknown>,
+      opts: { onConflict: string },
+    ) => Promise<{ error: { message?: string } | null }>;
   };
   from(table: "product_sale_units"): {
-    select: (cols: string) => SelectChain<{ id: string; unit_label: string; base_unit_quantity: number | string }>;
+    select: (cols: string) => SelectChain<ProductSaleUnitRow>;
   };
   rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };
@@ -354,6 +365,74 @@ export async function fetchCustomerPricesAction(
     result[key] = Number(row.sale_price);
   }
   return result;
+}
+
+export async function upsertCustomerPriceFromOrderModalAction(input: {
+  customerId: string;
+  productId: string;
+  productSaleUnitId: string | null;
+  salePrice: number;
+}): Promise<{ success: true } | { error: string }> {
+  const session = await requireAppRole("admin");
+  const admin = getSupabaseAdmin() as unknown as ActionsAdmin;
+
+  const customerId = String(input.customerId ?? "").trim();
+  const productId = String(input.productId ?? "").trim();
+  const salePrice = Number(input.salePrice);
+
+  if (!customerId || !productId || !Number.isFinite(salePrice) || salePrice < 0) {
+    return { error: "ข้อมูลราคาไม่ถูกต้อง" };
+  }
+
+  let productSaleUnitId = String(input.productSaleUnitId ?? "").trim();
+
+  if (!productSaleUnitId) {
+    const { data: defaultUnit, error: defaultUnitError } = await admin
+      .from("product_sale_units")
+      .select("id, product_id, unit_label, base_unit_quantity, is_default")
+      .eq("organization_id", session.organizationId)
+      .eq("product_id", productId)
+      .eq("is_default", true)
+      .single();
+
+    if (defaultUnitError || !defaultUnit?.id) {
+      return { error: "ไม่พบหน่วยขายหลักของสินค้า" };
+    }
+
+    productSaleUnitId = defaultUnit.id;
+  }
+
+  const { data: saleUnit, error: saleUnitError } = await admin
+    .from("product_sale_units")
+    .select("id, product_id, unit_label, base_unit_quantity, is_default")
+    .eq("organization_id", session.organizationId)
+    .eq("id", productSaleUnitId)
+    .single();
+
+  if (saleUnitError || !saleUnit) {
+    return { error: "ไม่พบหน่วยขายที่ต้องการบันทึกราคา" };
+  }
+
+  const { error } = await admin.from("customer_product_prices").upsert(
+    {
+      customer_id: customerId,
+      organization_id: session.organizationId,
+      product_id: saleUnit.product_id,
+      product_sale_unit_id: saleUnit.id,
+      sale_price: salePrice,
+    },
+    {
+      onConflict: "organization_id,customer_id,product_sale_unit_id",
+    },
+  );
+
+  if (error) {
+    return { error: error.message ?? "บันทึกราคาไม่สำเร็จ" };
+  }
+
+  revalidatePath("/orders/incoming");
+  revalidatePath("/settings/customers/pricing");
+  return { success: true };
 }
 
 export async function fetchCustomerYesterdayItemsAction(

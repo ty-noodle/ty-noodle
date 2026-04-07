@@ -23,6 +23,33 @@ export async function getStoreDeliveryDataAction(
   return getStoreOrdersForDelivery(session.organizationId, customerId, orderDate);
 }
 
+export async function getBatchStoreDeliveryDataAction(
+  customerIds: string[],
+  orderDate: string,
+): Promise<Record<string, DeliveryFormData[]>> {
+  const session = await requireAppRole("admin");
+  const uniqueCustomerIds = Array.from(
+    new Set(customerIds.map((id) => id.trim()).filter(Boolean)),
+  );
+
+  if (uniqueCustomerIds.length === 0) {
+    return {};
+  }
+
+  const rows = await Promise.all(
+    uniqueCustomerIds.map(async (customerId) => {
+      const orders = await getStoreOrdersForDelivery(
+        session.organizationId,
+        customerId,
+        orderDate,
+      );
+      return [customerId, orders] as const;
+    }),
+  );
+
+  return Object.fromEntries(rows);
+}
+
 // ─── Create delivery note ──────────────────────────────────────────────────────
 
 export type CreateDeliveryState = {

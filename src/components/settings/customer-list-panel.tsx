@@ -1,31 +1,33 @@
-import { ListTree, Store, Truck } from "lucide-react";
-import type { SettingsCustomer } from "@/lib/settings/admin";
+import { ListTree, Store } from "lucide-react";
+import type { SettingsCustomer, SettingsVehicle } from "@/lib/settings/admin";
 import {
   SettingsEmptyState,
   SettingsPanel,
   SettingsPanelBody,
 } from "@/components/settings/settings-ui";
 import { CustomerDeleteButton } from "@/components/settings/customer-delete-button";
+import { CustomerVehicleSelect } from "@/components/settings/customer-vehicle-select";
 
 type CustomerListPanelProps = {
   customers: SettingsCustomer[];
+  vehicles: SettingsVehicle[];
 };
 
-export function CustomerListPanel({ customers }: CustomerListPanelProps) {
+export function CustomerListPanel({ customers, vehicles }: CustomerListPanelProps) {
   return (
     <SettingsPanel>
       <div className="border-b border-slate-100 px-5 py-4 md:px-6 md:py-5">
         <div className="flex items-center gap-2">
           <ListTree className="h-5 w-5 text-[#003366]" strokeWidth={2.2} />
           <h2 className="text-xl font-bold text-slate-950">รายการร้านค้า</h2>
-          {customers.length > 0 && (
+          {customers.length > 0 ? (
             <span className="ml-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-semibold tabular-nums text-slate-500">
               {customers.length}
             </span>
-          )}
+          ) : null}
         </div>
         <p className="mt-1 text-sm leading-6 text-slate-500">
-          ร้านค้าที่บันทึกแล้วจะแสดงในรายการนี้ทันที พร้อมรถประจำร้านหากมีการกำหนดไว้
+          ร้านค้าที่บันทึกแล้วจะแสดงในรายการนี้ทันที พร้อมเลือกรถประจำร้านได้จากคอลัมน์รถประจำร้าน
         </p>
       </div>
 
@@ -38,7 +40,6 @@ export function CustomerListPanel({ customers }: CustomerListPanelProps) {
           </div>
         ) : (
           <>
-            {/* ── Mobile: card list ── */}
             <div className="divide-y divide-slate-100 sm:hidden">
               {customers.map((customer) => (
                 <div key={customer.id} className="flex items-start gap-4 px-4 py-5">
@@ -52,21 +53,23 @@ export function CustomerListPanel({ customers }: CustomerListPanelProps) {
                       <p className="font-mono text-sm text-slate-400">{customer.code}</p>
                     </div>
 
-                    {customer.address && (
+                    {customer.address ? (
                       <p className="mt-1.5 text-sm leading-6 text-slate-500">{customer.address}</p>
-                    )}
+                    ) : null}
 
                     <div className="mt-2.5 flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">
                         ผูกราคา {customer.pricingCount} รายการ
                       </span>
-                      {customer.defaultVehicleName && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">
-                          <Truck className="h-3.5 w-3.5 text-[#003366]" strokeWidth={2.2} />
-                          {customer.defaultVehicleName}
-                        </span>
-                      )}
                     </div>
+
+                    <CustomerVehicleSelect
+                      className="mt-3"
+                      customerId={customer.id}
+                      currentVehicleId={customer.defaultVehicleId}
+                      currentVehicleName={customer.defaultVehicleName}
+                      vehicles={vehicles}
+                    />
                   </div>
 
                   <div className="shrink-0 pt-1">
@@ -80,7 +83,6 @@ export function CustomerListPanel({ customers }: CustomerListPanelProps) {
               ))}
             </div>
 
-            {/* ── Desktop: table ── */}
             <div className="hidden overflow-x-auto sm:block">
               <table className="min-w-full border-collapse text-left">
                 <thead>
@@ -123,15 +125,13 @@ export function CustomerListPanel({ customers }: CustomerListPanelProps) {
                           {customer.pricingCount} รายการ
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {customer.defaultVehicleName ? (
-                          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
-                            <Truck className="h-3.5 w-3.5 text-[#003366]" strokeWidth={2.2} />
-                            {customer.defaultVehicleName}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">ยังไม่ได้กำหนด</span>
-                        )}
+                      <td className="min-w-[220px] px-5 py-4 text-sm text-slate-600">
+                        <CustomerVehicleSelect
+                          customerId={customer.id}
+                          currentVehicleId={customer.defaultVehicleId}
+                          currentVehicleName={customer.defaultVehicleName}
+                          vehicles={vehicles}
+                        />
                       </td>
                       <td className="px-4 py-4 text-right">
                         <CustomerDeleteButton

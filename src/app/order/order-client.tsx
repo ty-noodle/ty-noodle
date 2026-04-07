@@ -348,16 +348,18 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
   favorites,
   onOpenProduct,
   onToggleFavorite,
+  priorityCount = 0,
 }: {
   products: ProductWithImage[];
   cart: Record<string, number>;
   favorites: Record<string, boolean>;
   onOpenProduct: (productId: string) => void;
   onToggleFavorite: (productId: string) => void;
+  priorityCount?: number;
 }) {
   return (
     <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-3.5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-5 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5 2xl:grid-cols-6">
-      {products.map((product) => {
+      {products.map((product, productIndex) => {
         const qty = cart[product.id] || 0;
         const imageUrl =
           product.product_images?.[0]?.public_url || "/placeholders/product-placeholder.svg";
@@ -367,6 +369,11 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
             key={product.id}
             className="flex flex-col overflow-hidden rounded-2xl transition-transform active:scale-98 md:rounded-[1.35rem]"
             onClick={() => onOpenProduct(product.id)}
+            onTouchStart={() => {
+              if (imageUrl.startsWith("/")) return;
+              const img = new window.Image();
+              img.src = `/_next/image?url=${encodeURIComponent(imageUrl)}&w=828&q=75`;
+            }}
             style={{ contain: "layout paint" }}
           >
             <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 md:rounded-[1.35rem]">
@@ -376,6 +383,7 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
                 fill
                 sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, (max-width: 1535px) 25vw, 17vw"
                 className="absolute inset-0 h-full w-full object-cover object-center"
+                priority={productIndex < priorityCount}
               />
 
               {qty > 0 && (
@@ -389,7 +397,7 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
                   e.stopPropagation();
                   onToggleFavorite(product.id);
                 }}
-                className={`absolute right-2 top-2 rounded-xl bg-white/90 p-2 shadow-sm backdrop-blur-sm transition-colors active:scale-90 md:p-1.5 ${
+                className={`absolute right-2 top-2 rounded-xl bg-white/95 p-2 shadow-sm transition-colors active:scale-90 md:p-1.5 ${
                   favorites[product.id]
                     ? "text-amber-500"
                     : "text-slate-400 hover:text-amber-400"
@@ -510,7 +518,7 @@ export default function OrderClient({
   const [selectedProductCategory, setSelectedProductCategory] = useState<"all" | string>("all");
 
   // View state
-  const [currentView, setCurrentView] = useState<ViewState>("loading");
+  const [currentView, setCurrentView] = useState<ViewState>("catalog");
   const [activeCategory, setActiveCategory] = useState<"all" | "favorites" | "recent">("all");
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
@@ -523,6 +531,7 @@ export default function OrderClient({
   const [modalRecommendationPageCount, setModalRecommendationPageCount] = useState(1);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
+  const [isModalImageLoaded, setIsModalImageLoaded] = useState(false);
 
   const modalCartBtnRef = useRef<HTMLButtonElement>(null);
   const modalStepperRef = useRef<HTMLDivElement>(null);
@@ -607,9 +616,10 @@ export default function OrderClient({
     };
   }, []);
 
-  // Reset pending qty to 0 when swiping to a different product in the modal
+  // Reset pending qty and image load state when switching products in the modal
   useEffect(() => {
     setPendingModalQty(0);
+    setIsModalImageLoaded(false);
   }, [selectedProductIndex]);
 
   useEffect(() => {
@@ -1579,16 +1589,6 @@ export default function OrderClient({
 
   // Render
 
-  // 1. LIFF initialising
-  if (currentView === "loading" || (!isReady)) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-gray-500 min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin mb-4 text-blue-500" />
-        <p>กำลังเตรียมระบบ...</p>
-      </div>
-    );
-  }
-
   // 2. Not logged in
   if (currentView === "login") {
     return (
@@ -2056,13 +2056,19 @@ export default function OrderClient({
           {/* pt-14 = 56px ≈ half of 88px avatar + a little breathing room */}
           <div className="bg-white px-4 pb-5 pt-14 md:pt-16">
             <div className="text-center">
-              {linkedCustomer && (
-                <p className="text-[1.15rem] font-extrabold leading-snug tracking-tight text-slate-900 md:text-xl">
-                  {linkedCustomer.name}
-                </p>
-              )}
-              {profile?.displayName && (
-                <p className="mt-1 text-sm text-slate-400">{profile.displayName}</p>
+              {!isReady && !linkedCustomer ? (
+                <p className="text-sm text-slate-400 animate-pulse">กำลังโหลดข้อมูล...</p>
+              ) : (
+                <>
+                  {linkedCustomer && (
+                    <p className="text-[1.15rem] font-extrabold leading-snug tracking-tight text-slate-900 md:text-xl">
+                      {linkedCustomer.name}
+                    </p>
+                  )}
+                  {profile?.displayName && (
+                    <p className="mt-1 text-sm text-slate-400">{profile.displayName}</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2116,7 +2122,7 @@ export default function OrderClient({
 
       {/* ── Sticky search + category pills + tabs (catalog only) ── */}
       {currentView === "catalog" && (
-        <div className="sticky top-0 z-30 bg-white shadow-sm">
+        <div className="sticky top-0 z-30 bg-white shadow-sm" style={{ willChange: "transform" }}>
           {/* Order status banner */}
           <OrderStatusBanner isOpen={isOrderOpen} />
           {/* Search bar */}
@@ -2259,7 +2265,7 @@ export default function OrderClient({
                           >
                             <div className="absolute inset-y-0 left-[2.3rem] right-8 rounded-lg bg-slate-100/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]" />
                             <div className="relative z-10 h-[5.1rem] w-[5.1rem] shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                              <div className="absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full bg-[#003366]/92 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-[0_8px_16px_rgba(0,51,102,0.22)] backdrop-blur-sm">
+                              <div className="absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-full bg-[#003366] px-1.5 py-0.5 text-[8px] font-bold text-white shadow-[0_8px_16px_rgba(0,51,102,0.22)]">
                                 <Star className="h-2.5 w-2.5 fill-current" strokeWidth={2.3} />
                                 {"\u0e0b\u0e37\u0e49\u0e2d\u0e1a\u0e48\u0e2d\u0e22"}
                               </div>
@@ -2310,6 +2316,7 @@ export default function OrderClient({
                 favorites={favorites}
                 onOpenProduct={openProductModal}
                 onToggleFavorite={toggleFavorite}
+                priorityCount={4}
               />
 
             </div>
@@ -2978,14 +2985,19 @@ export default function OrderClient({
                 <div className="mx-auto flex max-w-[520px] flex-col gap-3">
                   {/* Image */}
                   <div className="relative overflow-hidden rounded-[1.5rem]">
-                    <div className="relative aspect-square w-full">
+                    <div className="relative aspect-square w-full bg-slate-100">
+                      {!isModalImageLoaded && (
+                        <div className="absolute inset-0 animate-pulse bg-slate-200" />
+                      )}
                       <Image
+                        key={selectedProductImageUrl}
                         src={selectedProductImageUrl}
                         alt={`${selectedProduct.name} - ${selectedProductImageIndex + 1}`}
                         fill
                         priority
                         sizes="(max-width: 767px) 100vw, 520px"
-                        className="object-contain"
+                        className={`object-contain transition-opacity duration-300 ${isModalImageLoaded ? "opacity-100" : "opacity-0"}`}
+                        onLoad={() => setIsModalImageLoaded(true)}
                       />
                     </div>
 

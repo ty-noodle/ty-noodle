@@ -29,13 +29,13 @@ export default async function SettingsCustomersPage({
       current="customers"
       title="จัดการร้านค้า"
       titleIcon={Store}
-      description="เพิ่มร้านค้า กำหนดที่อยู่ ผูกราคาขายเฉพาะราย และเลือกตั้งค่ารถประจำร้านได้จากหน้านี้"
+      description="เพิ่มร้านค้า กำหนดที่อยู่ ผูกราคาขายเฉพาะราย และเลือกรถประจำร้านได้จากหน้านี้"
       floatingSubmit={false}
     >
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6">
         <CustomerSettingsTabs current="customers" />
 
-        <CustomerListPanel customers={data.customers} />
+        <CustomerListPanel customers={data.customers} vehicles={data.vehicles} />
       </div>
 
       <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-end px-4 md:bottom-6 md:px-6">

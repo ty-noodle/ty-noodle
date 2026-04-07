@@ -13,9 +13,8 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { OrderDailyData, OrderStoreDetail } from "@/lib/orders/admin";
-import { PrintDailyDeliveryButton } from "./print-daily-delivery-button";
 import { UnpricedItemsDialog } from "./unpriced-items-dialog";
-import { StoreDeliveryButton } from "./pending-orders-section";
+import { AllStoresDeliveryButton, StoreDeliveryButton } from "./pending-orders-section";
 import { DateNav } from "@/components/ui/date-nav";
 import { OrderSearchForm } from "./order-search-form";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
@@ -133,18 +132,11 @@ function StoreDetailPanel({ date, detail }: { date: string; detail: OrderStoreDe
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
               <span>
-                สั่ง{" "}
+                ออเดอร์{" "}
                 <span className="font-medium text-slate-700">
                   {item.orderedQuantity.toLocaleString("th-TH")}
                 </span>
                 <span className="ml-0.5 text-xs text-slate-400">{item.productUnit}</span>
-              </span>
-              <span>·</span>
-              <span>
-                ส่งแล้ว{" "}
-                <span className="font-medium text-emerald-700">
-                  {item.deliveredQuantity.toLocaleString("th-TH")}
-                </span>
               </span>
               <span>·</span>
               <span>
@@ -196,7 +188,7 @@ function StoreDetailPanel({ date, detail }: { date: string; detail: OrderStoreDe
         <table className="min-w-full border-collapse text-left text-sm">
           <thead>
             <tr style={{ backgroundColor: "#003366" }}>
-              {(["รหัสสินค้า", "รายการสินค้า", "สั่ง", "ส่งแล้ว", "หน่วย", "สต็อก", "ขาด", "ราคา/หน่วย", "จำนวนเงินรวม"] as const).map(
+              {(["รหัสสินค้า", "รายการสินค้า", "ออเดอร์", "หน่วย", "สต็อก", "ขาด", "ราคา/หน่วย", "จำนวนเงินรวม"] as const).map(
                 (col, i, arr) => (
                   <th
                     key={col}
@@ -240,14 +232,9 @@ function StoreDetailPanel({ date, detail }: { date: string; detail: OrderStoreDe
                   </div>
                 </td>
 
-                {/* สั่ง */}
+                {/* ออเดอร์ */}
                 <td className="border-r border-slate-300 px-4 py-3 text-center font-bold tabular-nums text-slate-900">
                   {item.orderedQuantity.toLocaleString("th-TH")}
-                </td>
-
-                {/* ส่งแล้ว */}
-                <td className="border-r border-slate-300 px-4 py-3 text-center font-bold tabular-nums text-emerald-700">
-                  {item.deliveredQuantity.toLocaleString("th-TH")}
                 </td>
 
                 {/* หน่วย */}
@@ -303,7 +290,7 @@ function StoreDetailPanel({ date, detail }: { date: string; detail: OrderStoreDe
           <tfoot>
             <tr style={{ backgroundColor: "#f8fafc" }}>
               <td
-                colSpan={8}
+                colSpan={7}
                 className="border-r border-t border-slate-300 px-4 py-3 text-right text-sm font-semibold text-slate-600"
               >
                 ยอดเงินรวมทุกรายการ
@@ -338,7 +325,7 @@ export function OrderDailyTable({ data, date, expanded, q, deliveredToday }: Pro
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <PrintDailyDeliveryButton date={date} />
+          <AllStoresDeliveryButton date={date} stores={stores} />
         </div>
       </div>
 
