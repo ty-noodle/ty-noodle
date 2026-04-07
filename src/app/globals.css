@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7fbff;
+  --foreground: #111111;
+  --surface: #ffffff;
+  --surface-strong: #eef0ff;
+  --accent-50: #f0f2ff;
+  --accent-100: #dfe3ff;
+  --accent-200: #c3caff;
+  --accent-300: #9da8ff;
+  --accent-400: #6f7fff;
+  --accent-500: #2f49ff;
+  --accent-600: #0000ff;
+  --accent-700: #0000cc;
+  --stone-650: #55708f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-stone-650: var(--stone-650);
+  --font-sans: var(--font-sarabun);
+  --font-mono: var(--font-ibm-plex-mono);
+  --text-xs: 0.82rem;
+  --text-sm: 0.95rem;
+  --text-base: 1.08rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.48rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.05rem;
+  --font-apple-ui:
+    "SF Pro Display",
+    "SF Pro Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: clamp(16px, 0.22vw + 15.5px, 17px);
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sarabun), "Sarabun", "Noto Sans Thai", sans-serif;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.35;
+  background-image:
+    linear-gradient(180deg, rgba(240, 244, 255, 0.96) 0%, rgba(247, 251, 255, 0.98) 24%, #ffffff 100%),
+    radial-gradient(circle at top right, rgba(0, 0, 255, 0.1), transparent 30%);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a,
+button {
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+a:hover,
+button:hover {
+  transform: translateY(-1px);
+}
+
+::selection {
+  background: rgba(0, 0, 255, 0.18);
+}
+
+.font-apple-ui {
+  font-family:
+    "SF Pro Display",
+    "SF Pro Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:where(
+  .text-slate-300,
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600,
+  .text-slate-700,
+  .text-slate-800,
+  .text-slate-900,
+  .text-gray-500,
+  .text-gray-600,
+  .text-stone-650
+) {
+  color: #111111 !important;
+}
+
+@layer base {
+  :where(h1, h2, h3, h4, h5, h6, th, label, strong, b) {
+    color: #111111;
+    font-weight: 600;
+  }
+}
+
+@keyframes slide-down-full {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down-full {
+  animation: slide-down-full 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+@keyframes gentle-drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-72px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-gentle-drop-in {
+  animation: gentle-drop-in 1.9s cubic-bezier(0.16, 0.84, 0.22, 1) both;
+}
+
+.animate-gentle-drop-in-delay-1 {
+  animation: gentle-drop-in 2.15s cubic-bezier(0.16, 0.84, 0.22, 1) 0.28s both;
+}
+
+.animate-gentle-drop-in-delay-2 {
+  animation: gentle-drop-in 2.35s cubic-bezier(0.16, 0.84, 0.22, 1) 0.56s both;
+}

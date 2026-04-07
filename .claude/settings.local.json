@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Users/Riew/Desktop/TYNoodle/src -path *pricing* -o -path *price*)",
+      "Bash(xargs ls:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(cd:*)",
+      "Bash(rm -f \"src/app/orders/incoming/[orderId]/page.tsx\")",
+      "Bash(rmdir \"src/app/orders/incoming/[orderId]\")",
+      "Bash(find /c/Users/Riew/Desktop/TYNoodle -name .env* -o -name env.example)",
+      "Bash(npx supabase:*)",
+      "Bash(function)",
+      "Bash(returns)",
+      "Bash(select)",
+      "Bash(join \")",
+      "WebSearch",
+      "Bash(grep -r \"print\\\\|Print\" /c/Users/Riew/Desktop/TYNoodle/src --include=*.css --include=*.scss)",
+      "Bash(find /c/Users/Riew/Desktop/TYNoodle -name tailwind.config.* -type f)",
+      "Bash(find C:UsersRiewDesktopTYNoodlesrccomponentsui -type f -name *.tsx)",
+      "Bash(npx eslint:*)",
+      "Bash(grep -E \"\\\\.json|\\\\.config|\\\\.mjs|\\\\.ts$\")",
+      "Bash(grep -r \"public_url\\\\|imageUrl\" /c/Users/Riew/Desktop/TYNoodle/src/components --include=*.tsx --include=*.ts)",
+      "Bash(npm install:*)",
+      "Bash(find /c/Users/Riew/Desktop/TYNoodle/src/lib -type f -name \"*.ts\" -exec grep -l \"^export \" {})",
+      "Bash(grep -n \"next_billing_number\\\\|get_order_daily\" C:/Users/Riew/Desktop/TYNoodle/supabase/migrations/*.sql)",
+      "Bash(npx tsc:*)",
+      "Bash(ls C:/Users/Riew/Desktop/TYNoodle/public/*.png)",
+      "Bash(python tmp/patch_delivery_board.py)",
+      "Bash(grep -v \"^$\")",
+      "Bash(sed:*)",
+      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\photo\")",
+      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\")",
+      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\photo\\\\brand\")",
+      "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\\\\brand\")"
+    ]
+  }
+}

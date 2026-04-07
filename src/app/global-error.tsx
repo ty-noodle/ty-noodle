@@ -1,0 +1,38 @@
+"use client";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <html lang="th">
+      <body className="bg-slate-50">
+        <main className="flex min-h-screen items-center justify-center px-6">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rose-500">
+              System Error
+            </p>
+            <h1 className="mt-3 text-2xl font-bold text-slate-900">
+              ระบบไม่สามารถแสดงผลได้ชั่วคราว
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              กรุณารีเฟรชหรือลองใหม่อีกครั้งในภายหลัง
+            </p>
+            <button
+              onClick={() => reset()}
+              className="mt-6 rounded-2xl bg-[#003366] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#002244]"
+            >
+              ลองใหม่
+            </button>
+            {error.digest ? (
+              <p className="mt-4 text-xs text-slate-400">Ref: {error.digest}</p>
+            ) : null}
+          </div>
+        </main>
+      </body>
+    </html>
+  );
+}

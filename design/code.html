@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html lang="th"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Executive Insight - Product Sales Ranking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb59d",
+              "on-secondary": "#ffffff",
+              "surface-container": "#efecf5",
+              "inverse-on-surface": "#f2eff8",
+              "primary-container": "#1a237e",
+              "error": "#ba1a1a",
+              "secondary-container": "#759efd",
+              "surface-dim": "#dbd9e1",
+              "error-container": "#ffdad6",
+              "inverse-primary": "#bdc2ff",
+              "inverse-surface": "#303036",
+              "on-tertiary-fixed": "#390c00",
+              "secondary-fixed": "#d9e2ff",
+              "surface-container-low": "#f5f2fb",
+              "on-secondary-fixed": "#001945",
+              "on-tertiary": "#ffffff",
+              "on-surface": "#1b1b21",
+              "on-primary-fixed-variant": "#343d96",
+              "on-secondary-container": "#00337c",
+              "tertiary-fixed": "#ffdbd0",
+              "secondary-fixed-dim": "#b0c6ff",
+              "primary-fixed-dim": "#bdc2ff",
+              "surface-container-high": "#eae7ef",
+              "on-error": "#ffffff",
+              "on-primary-container": "#8690ee",
+              "surface-variant": "#e4e1ea",
+              "surface-container-lowest": "#ffffff",
+              "on-surface-variant": "#454652",
+              "on-primary": "#ffffff",
+              "on-primary-fixed": "#000767",
+              "surface-container-highest": "#e4e1ea",
+              "on-tertiary-fixed-variant": "#7b2e12",
+              "secondary": "#2b5bb5",
+              "background": "#fbf8ff",
+              "on-tertiary-container": "#e17c5a",
+              "primary-fixed": "#e0e0ff",
+              "tertiary": "#380b00",
+              "surface": "#fbf8ff",
+              "on-error-container": "#93000a",
+              "surface-bright": "#fbf8ff",
+              "outline": "#767683",
+              "primary": "#000666",
+              "on-background": "#1b1b21",
+              "outline-variant": "#c6c5d4",
+              "tertiary-container": "#5c1800",
+              "surface-tint": "#4c56af",
+              "on-secondary-fixed-variant": "#00429c"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .rank-badge-1 { background: linear-gradient(135deg, #FFD700 0%, #B8860B 100%); }
+        .rank-badge-2 { background: linear-gradient(135deg, #C0C0C0 0%, #708090 100%); }
+        .rank-badge-3 { background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%); }
+        .no-borders { border: none !important; }
+        .glass-header { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- TopNavBar (JSON Execution) -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-8 py-3 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-sm dark:shadow-none font-sans Inter antialiased">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tight text-blue-900 dark:text-white">Executive Insight</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-blue-700 transition-colors" href="#">Dashboard</a>
+<a class="text-blue-900 dark:text-blue-400 border-b-2 border-blue-900 font-semibold transition-colors" href="#">Reports</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-blue-700 transition-colors" href="#">Strategy</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-500 cursor-pointer active:opacity-70 transition-all">notifications</button>
+<button class="material-symbols-outlined text-slate-500 cursor-pointer active:opacity-70 transition-all">settings</button>
+<img alt="Executive User Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/10" data-alt="portrait of a confident business executive in a sharp navy suit with soft office lighting background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGGWmBK6HZbY80MGEMY34B2Dg9IwViIElDO6z_HaAHJZFOWOlPMxKclJ3AYkn_3PS0e7DC8_DfcYBq_Ril8A3jBeox-_7ZnvOQ9Av_L_zHpKBAQfjsD0sM2Bo5K2KeW58g05KOmd6OAH5mdhFpTjn8TDQf5kuSiPQbEjzvf8wAhWpa2pAkx4TDjahOrERBG3cs8WprQsHSKscPfOUN475rdeYgg7jJVoXXQwrOF8OIz8GN3B3gRntdC6r0rs8OZcj96ukJycTy-69D"/>
+</div>
+</nav>
+<!-- SideNavBar (JSON Execution) -->
+<aside class="h-screen w-64 fixed left-0 top-0 pt-16 flex flex-col bg-slate-50 dark:bg-slate-900 no-borders z-40 hidden md:flex">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-1">
+<span class="text-lg font-black text-blue-900 dark:text-white">Sales Core</span>
+</div>
+<p class="text-xs text-slate-500 font-medium">Q3 Performance</p>
+</div>
+<div class="flex-1 px-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg mx-2 mb-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">trending_up</span>
+<span class="text-sm font-medium">Sales Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg mx-2 mb-1 bg-white dark:bg-blue-950 text-blue-900 dark:text-blue-300 shadow-sm font-bold hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="text-sm font-medium">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg mx-2 mb-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="text-sm font-medium">Team Ranking</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg mx-2 mb-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-sm font-medium">Inventory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg mx-2 mb-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">storefront</span>
+<span class="text-sm font-medium">Store View</span>
+</a>
+</div>
+<div class="p-4 border-t border-slate-100 dark:border-slate-800">
+<button class="w-full py-2 bg-primary text-on-primary rounded-xl font-semibold text-sm hover:bg-primary-container transition-colors mb-4">
+                Export Report
+            </button>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-500 text-sm" href="#">
+<span class="material-symbols-outlined text-lg">help</span>
+<span>Help Center</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-500 text-sm" href="#">
+<span class="material-symbols-outlined text-lg">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="md:ml-64 pt-20 px-8 pb-12 min-h-screen">
+<!-- Header & Breadcrumbs -->
+<header class="mb-10">
+<nav aria-label="Breadcrumb" class="flex text-on-surface-variant text-sm mb-2 font-medium tracking-tight">
+<ol class="inline-flex items-center space-x-1 md:space-x-2">
+<li class="inline-flex items-center">Analytics</li>
+<li><span class="mx-2 material-symbols-outlined text-sm leading-none">chevron_right</span></li>
+<li class="text-primary font-semibold">Product Sales Ranking</li>
+</ol>
+</nav>
+<h1 class="text-3xl font-extrabold text-primary tracking-tight">รายงานยอดขายตามอันดับสินค้า</h1>
+</header>
+<!-- Filter Bar -->
+<section class="mb-10 p-6 bg-surface-container-low rounded-xl shadow-sm flex flex-wrap items-end gap-6">
+<div class="flex-1 min-w-[240px]">
+<label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-widest">ค้นหาสินค้า</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-lowest border-none rounded-xl focus:ring-2 focus:ring-secondary/30 text-sm text-on-surface" placeholder="ชื่อหรือรหัสสินค้า..." type="text"/>
+</div>
+</div>
+<div class="flex-1 min-w-[240px]">
+<label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-widest">ค้นหาร้านค้า</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">store</span>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-lowest border-none rounded-xl focus:ring-2 focus:ring-secondary/30 text-sm text-on-surface" placeholder="เลือกสาขาหรือร้านค้า..." type="text"/>
+</div>
+</div>
+<div class="flex-1 min-w-[240px]">
+<label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-widest">ช่วงวันที่ (เริ่มต้น - สิ้นสุด)</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">calendar_today</span>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-lowest border-none rounded-xl focus:ring-2 focus:ring-secondary/30 text-sm text-on-surface" placeholder="01/08/2023 - 31/08/2023" type="text"/>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-primary-container transition-all active:scale-95">
+<span class="material-symbols-outlined text-sm">filter_alt</span>
+                Apply
+            </button>
+</section>
+<!-- Top Metric Cards -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] hover:shadow-[0_12px_40px_rgba(27,27,33,0.08)] transition-all">
+<div class="flex justify-between items-start mb-4">
+<p class="text-on-surface-variant text-sm font-semibold">ยอดขายรวม</p>
+<span class="text-secondary text-xs font-bold bg-secondary-fixed px-2 py-1 rounded-full">+12.5%</span>
+</div>
+<h2 class="text-2xl font-black text-primary tracking-tight">฿2,450,800</h2>
+<div class="mt-4 h-1 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[75%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] hover:shadow-[0_12px_40px_rgba(27,27,33,0.08)] transition-all">
+<div class="flex justify-between items-start mb-4">
+<p class="text-on-surface-variant text-sm font-semibold">จำนวนชิ้นที่ขาย</p>
+<span class="text-secondary text-xs font-bold bg-secondary-fixed px-2 py-1 rounded-full">+8.2%</span>
+</div>
+<h2 class="text-2xl font-black text-primary tracking-tight">18,420</h2>
+<div class="mt-4 h-1 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[60%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] hover:shadow-[0_12px_40px_rgba(27,27,33,0.08)] transition-all">
+<div class="flex justify-between items-start mb-4">
+<p class="text-on-surface-variant text-sm font-semibold">ต้นทุนรวม</p>
+<span class="text-on-surface-variant text-xs font-bold bg-surface-container px-2 py-1 rounded-full">+2.1%</span>
+</div>
+<h2 class="text-2xl font-black text-primary tracking-tight">฿1,840,000</h2>
+<div class="mt-4 h-1 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-outline-variant w-[80%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] hover:shadow-[0_12px_40px_rgba(27,27,33,0.08)] transition-all">
+<div class="flex justify-between items-start mb-4">
+<p class="text-on-surface-variant text-sm font-semibold">กำไรสุทธิ</p>
+<span class="text-error text-xs font-bold bg-error-container px-2 py-1 rounded-full">-1.5%</span>
+</div>
+<h2 class="text-2xl font-black text-primary tracking-tight">฿610,800</h2>
+<div class="mt-4 h-1 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-container w-[45%]"></div>
+</div>
+</div>
+</section>
+<!-- Main Data Table (Product Ranking) -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] overflow-hidden">
+<div class="px-8 py-6 border-b border-surface-container-low flex justify-between items-center">
+<h3 class="text-lg font-bold text-primary">ตารางอันดับสินค้าตามยอดขาย</h3>
+<div class="flex gap-2">
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-colors">download</button>
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-colors">more_vert</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-8 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest">No.</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest">รหัสสินค้า</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest">สินค้า</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest">หน่วย</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest text-right">จำนวนที่ขาย</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest text-right">ต้นทุน/หน่วย</th>
+<th class="px-6 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest text-right">ราคา/หน่วย</th>
+<th class="px-8 py-4 text-[11px] font-black text-on-surface-variant uppercase tracking-widest text-right bg-primary/5">ยอดขายรวม</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<!-- Rank 1 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-8 py-5">
+<span class="rank-badge-1 w-8 h-8 flex items-center justify-center rounded-lg text-white font-bold text-xs shadow-md">1</span>
+</td>
+<td class="px-6 py-5 font-mono text-xs text-on-surface-variant">PROD-X-9921</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<img alt="Premium Smart Watch" class="w-10 h-10 rounded-lg object-cover bg-surface-container" data-alt="minimalist studio shot of a sleek modern smartwatch on a white background with soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlgEdAs5BdmlJNxuLBMTqLZxEwDCSiOyKIbX3Io-vw-RtbGNpvyZTNmcFKndUgSYDu0sIPRdW9NFpOi9Amd8b74XBnnOZa4k0Yc4FbyKRex0TEA66_Anw5Rof6WF1r47_HEET2YNU8ptHQTicRhMlzrKICMqvDGbFYtiK_ipxsUqTkyJnOk5yeOmK1NPLHINwOJEEUg6EhgRioqTCLdC_ikWZpcCMC5DXRP2Cnc9DPg1h1seIZ1u0h9LpplAwCu1Ep79RGmXKxumnQ"/>
+<div>
+<p class="font-bold text-sm text-on-surface">Premium Smart Watch Gen 5</p>
+<p class="text-[10px] text-on-surface-variant">Electronics • Wearables</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">เรือน</td>
+<td class="px-6 py-5 text-sm font-medium text-on-surface text-right">4,200</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿1,200</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿2,450</td>
+<td class="px-8 py-5 text-right bg-primary/5">
+<span class="font-black text-primary">฿10,290,000</span>
+</td>
+</tr>
+<!-- Rank 2 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-8 py-5">
+<span class="rank-badge-2 w-8 h-8 flex items-center justify-center rounded-lg text-white font-bold text-xs shadow-md">2</span>
+</td>
+<td class="px-6 py-5 font-mono text-xs text-on-surface-variant">PROD-K-8812</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<img alt="Noise Cancelling Headphones" class="w-10 h-10 rounded-lg object-cover bg-surface-container" data-alt="high-quality studio photograph of matte black professional headphones on a clean gray surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7TJtcs4-AvkMfPMCKohogZ7XIaALbfqxvi5PhvudSLWgmOQ5in7aXaxBDS5WSbVqUwpwVqUMIxfnKqsyckUOSjJeqqF6XcwpzVMvSMxKMPR9Y0baDEE46C-a2vYv64QvwoqzAIWgCoXTSFr36OL2lSklgBKnGPuO859WrebQruWH5r8qbWAV23fEnAcRhHYi-fGHeoxrDJKJKPyLNmPKcwO53Fw7O_owSblmOIaMfL2Ol6czvPTnmCcrhvo3U8rAHkXW7nwSctFC2"/>
+<div>
+<p class="font-bold text-sm text-on-surface">Wireless Noise Cancelling v2</p>
+<p class="text-[10px] text-on-surface-variant">Electronics • Audio</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">กล่อง</td>
+<td class="px-6 py-5 text-sm font-medium text-on-surface text-right">3,150</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿2,500</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿5,900</td>
+<td class="px-8 py-5 text-right bg-primary/5">
+<span class="font-black text-primary">฿8,585,000</span>
+</td>
+</tr>
+<!-- Rank 3 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-8 py-5">
+<span class="rank-badge-3 w-8 h-8 flex items-center justify-center rounded-lg text-white font-bold text-xs shadow-md">3</span>
+</td>
+<td class="px-6 py-5 font-mono text-xs text-on-surface-variant">PROD-A-1104</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<img alt="Classic Coffee Maker" class="w-10 h-10 rounded-lg object-cover bg-surface-container" data-alt="modern chrome coffee maker with elegant steam in a minimalist designer kitchen setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA50wHJ0SJwcCo9Sc6Dlv1u1XacTqMharhV0GzNrNO6OU1nOj18H8PEVBiIjZpPtVxhAls8_IRxG2L9oZzj3xxLYJpMZEzTRi4uuO3Bha0QKqq5agrfR7paVBfpROl7LqJ4g9cNlH4MK8I_4RMr-Q3yUfvcWPjBO9a-QhbH6s90MqeAxXzTSWet_ovt4sjDRvKa5kTCE1HSseFsFOtRWPDrLXh9JrldvQEYEkCgL1j7VCUzAvSY8-9mTDNOMfY9A175kPFP-UkALE9F"/>
+<div>
+<p class="font-bold text-sm text-on-surface">Artisan Espresso Machine</p>
+<p class="text-[10px] text-on-surface-variant">Home Appliances • Kitchen</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">เครื่อง</td>
+<td class="px-6 py-5 text-sm font-medium text-on-surface text-right">820</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿4,200</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿9,800</td>
+<td class="px-8 py-5 text-right bg-primary/5">
+<span class="font-black text-primary">฿8,036,000</span>
+</td>
+</tr>
+<!-- Rank 4 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-8 py-5">
+<span class="bg-surface-container-high w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant font-bold text-xs">4</span>
+</td>
+<td class="px-6 py-5 font-mono text-xs text-on-surface-variant">PROD-M-5520</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<img alt="Sport Running Shoes" class="w-10 h-10 rounded-lg object-cover bg-surface-container" data-alt="vibrant red running shoes isolated on white background with dynamic angle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuALsNGPAq7Z-5lT87MsAWFnO6ZQP1LluDIpEfohK3tJ86HS-S8OEPQF3nl_90B58LgBrvZQRy5n-Zeajvmur1jvnRv2v6HqOcHczbotnR4hCVqioS8GHUW8MNNZxO7D2PS4ikRm3O0j1xfb-7k-bAxq28ReOtFflcQeD3EBsfA4Hzx-HvYd8X98aNzaHBET_Wd0Fr2HqBb3fFwQGeXmhdoADqSqcMNKTS9KPk6A4CHsryN5r1KhSUQLu09TOvpdecB8_GnRlE85gOBV"/>
+<div>
+<p class="font-bold text-sm text-on-surface">Ultra-Light Pro Runner</p>
+<p class="text-[10px] text-on-surface-variant">Lifestyle • Apparel</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">คู่</td>
+<td class="px-6 py-5 text-sm font-medium text-on-surface text-right">2,400</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿1,500</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿3,200</td>
+<td class="px-8 py-5 text-right bg-primary/5">
+<span class="font-black text-primary">฿7,680,000</span>
+</td>
+</tr>
+<!-- Rank 5 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-8 py-5">
+<span class="bg-surface-container-high w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant font-bold text-xs">5</span>
+</td>
+<td class="px-6 py-5 font-mono text-xs text-on-surface-variant">PROD-L-2291</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<img alt="Smart Home Speaker" class="w-10 h-10 rounded-lg object-cover bg-surface-container" data-alt="contemporary smart home speaker with textile finish in a brightly lit modern living room" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0IFPHPhLKjy0V5Z9RhNL0OyQ46_wPC8RQvd8sh50E87ZguxVxiHllrBMzQ5Ybt_bo9gZPaqYDQsxTQqLXtsLoWf8bSu9VyJR4DU0WQMKhJmXFgEpOgwS0xmeVBHpj0IqolkVDp_AxQ_j1NVwF6qs6wrdSvSeCkke39Yppqb6art6TXpHXOgxeignJQScxaY_l6ez3Fwb78XjmiOJOFJ3FWLGHpXMSF4gDXyBIvqE99dKnwi1A3ikq4Gn_bo6FJkqpotNKT3S_JyK0"/>
+<div>
+<p class="font-bold text-sm text-on-surface">Nexus Home Hub Pro</p>
+<p class="text-[10px] text-on-surface-variant">Electronics • Smart Home</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">กล่อง</td>
+<td class="px-6 py-5 text-sm font-medium text-on-surface text-right">1,800</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿2,200</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant text-right">฿4,150</td>
+<td class="px-8 py-5 text-right bg-primary/5">
+<span class="font-black text-primary">฿7,470,000</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-8 py-4 bg-surface-container-low/20 flex justify-between items-center text-sm text-on-surface-variant">
+<p>Showing 1 - 5 of 250 products</p>
+<div class="flex items-center gap-2">
+<button class="p-1 rounded hover:bg-surface-container-low disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary text-on-primary font-bold">1</button>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low">2</button>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low">3</button>
+<span class="px-1">...</span>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low">50</button>
+<button class="p-1 rounded hover:bg-surface-container-low">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</body></html>

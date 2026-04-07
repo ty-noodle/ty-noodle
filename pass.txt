@@ -1,0 +1,27 @@
+สีประจำapp
+Blue #0000FF
+- ขาวหลักของพื้นผิว/card คือ #FFFFFF
+- ขาวอมฟ้าอ่อนของพื้นหลังระบบ คือ #F7FBFF
+-----------------------------------------------
+Gmail
+username : punchfolk@gmail.com
+password : punchfolk2625
+-----------------------------------------------
+Supabase : ใช้ GitHub login
+project name : ty-noodle
+password : punchfolk2625
+-----------------------------------------------
+Hosting: Vercel (ใช้ Github ในการ login)
+-----------------------------------------------
+Github ใช้ gmail ในการ Login
+-----------------------------------------------
+LineOa
+username : punchfolk@gmail.com
+password : punch&folk2625
+-----------------------------------------------
+PIN admin webapp : 160369
+-----------------------------------------------
+LIFF ID : "2009483953-UNr3JsWj"
+LIFF URL : "https://liff.line.me/2009483953-UNr3JsWj"
+Channel access token : "22xTVjH1IuSrcPPhibfcPYehxuYiFj0gQVqDkffLMlYCBETbyNL+8VLJvpXMdGJrBVcDjNTc57Qu6DmUm4CdZt6ehZrYzrnUYAk729U98RK6KS8Y5NDk5N3njeJCm0uKXUAoRj16KS9d0AYDz/c67QdB04t89/1O/w1cDnyilFU="
+groupId: "Cc80d6ba4dd5412b5e89fed6cb083a206",

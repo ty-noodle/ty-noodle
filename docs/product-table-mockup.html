@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Table Mockup v2 — T&YNoodle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f1f5f9;
+      padding: 2rem;
+      color: #0f172a;
+      font-size: 16px;
+    }
+
+    .page-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ─── Panel ─── */
+    .panel {
+      background: white;
+      border-radius: 1.25rem;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(15,23,42,0.06);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.4rem 1.75rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .panel-header h2 { font-size: 1.3rem; font-weight: 800; color: #0f172a; }
+    .panel-header p  { margin-top: 0.2rem; font-size: 0.875rem; color: #64748b; }
+
+    .btn-add {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: #137fec;
+      color: white;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 0.65rem 1.3rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(19,127,236,0.28);
+    }
+
+    /* ─── Table ─── */
+    table { width: 100%; border-collapse: collapse; }
+
+    thead tr { background: #137fec; }
+
+    thead th {
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      padding: 1rem 1.25rem;
+      border-right: 1px solid rgba(255,255,255,0.15);
+      white-space: nowrap;
+    }
+
+    thead th:first-child  { text-align: center; }
+    thead th.th-center    { text-align: center; }
+    thead th:last-child   { border-right: none; text-align: center; }
+
+    /* ─── Body rows ─── */
+    tbody tr.product-row {
+      border-bottom: 2px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    tbody tr.product-row:last-child { border-bottom: none; }
+    tbody tr.product-row:hover { background: #f8fafc; }
+    tbody tr.product-row.inactive { opacity: 0.55; }
+
+    td { padding: 0; }
+
+    /* Shared cell inner padding */
+    .cell { padding: 1.1rem 1.25rem; }
+
+    /* ─── SKU ─── */
+    .td-sku {
+      border-right: 1px solid #f1f5f9;
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .sku-text {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #137fec;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── Product ─── */
+    .td-product {
+      border-right: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .product-cell { display: flex; align-items: center; gap: 0.9rem; }
+    .product-img {
+      width: 3rem; height: 3rem;
+      border-radius: 0.75rem;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .product-name { font-size: 1rem; font-weight: 700; color: #0f172a; line-height: 1.35; }
+
+    /* ─── Units ─── */
+    .td-units {
+      border-right: 1px solid #f1f5f9;
+      vertical-align: middle;
+      min-width: 140px;
+    }
+
+    /* ─── Cost ─── */
+    .td-cost {
+      border-right: 1px solid #f1f5f9;
+      vertical-align: middle;
+      min-width: 160px;
+    }
+
+    /*
+      KEY DESIGN:
+      หน่วยขาย + ต้นทุน ยังคงเป็น 2 คอลัมน์แยก
+      แต่แต่ละแถวย่อย (per sale unit) จะถูก "จัดเรียงแนวตั้ง"
+      และ "ขอบ" แนวนอนของแถวย่อยตรงกันทั้งสองคอลัมน์
+    */
+    .unit-stack, .cost-stack {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* แต่ละ slot ใน stack ต้องมีความสูงเท่ากัน (min-height) */
+    .unit-slot, .cost-slot {
+      min-height: 3rem;
+      display: flex;
+      align-items: center;
+      padding: 0.6rem 1.25rem;
+    }
+
+    /* เส้นคั่นระหว่าง unit rows (ถ้ามีมากกว่า 1) */
+    .unit-slot + .unit-slot,
+    .cost-slot + .cost-slot {
+      border-top: 1px dashed #e2e8f0;
+    }
+
+    /* หน่วยค่าเริ่มต้น — highlight ด้วย bg อ่อน */
+    .unit-slot.is-default,
+    .cost-slot.is-default {
+      background: #f0f7ff;
+    }
+
+    .unit-slot:last-child { border-bottom: none; }
+
+    /* ชื่อหน่วย */
+    .unit-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .badge-default {
+      font-size: 0.65rem;
+      font-weight: 700;
+      background: #137fec;
+      color: white;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .unit-ratio {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    /* ราคา */
+    .cost-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #0f172a;
+      display: block;
+    }
+
+    .cost-note {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-weight: 500;
+      display: block;
+      margin-top: 0.1rem;
+    }
+
+    /* ─── Stock ─── */
+    .td-stock {
+      border-right: 1px solid #f1f5f9;
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .stock-num  { font-size: 1.15rem; font-weight: 800; color: #0f172a; }
+    .stock-unit { font-size: 0.8rem; color: #64748b; font-weight: 500; }
+    .stock-warn {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      font-size: 0.72rem; font-weight: 700;
+      color: #d97706;
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 999px; padding: 0.15rem 0.55rem;
+      margin-top: 0.3rem;
+    }
+
+    /* ─── Status ─── */
+    .td-status {
+      border-right: 1px solid #f1f5f9;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .badge-on {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: #ecfdf5; color: #059669;
+      font-size: 0.9rem; font-weight: 700;
+      padding: 0.45rem 1rem; border-radius: 999px;
+      border: 1px solid #a7f3d0;
+    }
+    .badge-off {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: #f8fafc; color: #94a3b8;
+      font-size: 0.9rem; font-weight: 700;
+      padding: 0.45rem 1rem; border-radius: 999px;
+      border: 1px solid #e2e8f0;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* ─── Actions ─── */
+    .td-actions { text-align: center; vertical-align: middle; }
+    .action-group { display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0 1.25rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: white; border: 1.5px solid #e2e8f0;
+      border-radius: 0.6rem; padding: 0.55rem 0.9rem;
+      font-family: inherit; font-size: 0.875rem; font-weight: 700;
+      color: #334155; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { background: #f8fafc; }
+    .btn-danger { color: #dc2626; }
+    .btn-danger:hover { background: #fff5f5; border-color: #fecaca; }
+
+    /* ─── Notes ─── */
+    .notes {
+      margin-top: 1.25rem;
+      display: flex; flex-wrap: wrap; gap: 0.65rem;
+      font-size: 0.82rem; color: #64748b;
+    }
+    .note { display: inline-flex; align-items: center; gap: 0.4rem; background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.3rem 0.7rem; font-weight: 600; }
+    .sw { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<p class="page-label">Mockup v2 — ตารางรายการสินค้า (หน่วยขาย + ต้นทุน แยกคอลัมน์)</p>
+
+<div class="panel">
+
+  <!-- Header -->
+  <div class="panel-header">
+    <div>
+      <h2>รายการสินค้า</h2>
+      <p>ดูสินค้าและจัดการสินค้าได้ที่นี่ · 3 รายการ</p>
+    </div>
+    <button class="btn-add">+ เพิ่มสินค้า</button>
+  </div>
+
+  <!-- Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>รหัส</th>
+        <th>สินค้า</th>
+        <th>หน่วยขาย</th>
+        <th>ต้นทุน / หน่วย</th>
+        <th class="th-center">สต็อก</th>
+        <th class="th-center">สถานะ</th>
+        <th class="th-center">จัดการ</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- ═══ Product A: 2 sale units (กก. + ลัง) ═══ -->
+      <tr class="product-row">
+
+        <td class="td-sku">
+          <div class="cell">
+            <span class="sku-text">TYN001</span>
+          </div>
+        </td>
+
+        <td class="td-product">
+          <div class="cell">
+            <div class="product-cell">
+              <div class="product-img">🍜</div>
+              <div class="product-name">เส้นบะหมี่ไข่<br>พรีเมียม</div>
+            </div>
+          </div>
+        </td>
+
+        <!-- หน่วยขาย column — stack 2 slots -->
+        <td class="td-units" style="padding:0;">
+          <div class="unit-stack">
+            <div class="unit-slot is-default">
+              <div>
+                <div class="unit-name">
+                  กก.
+                  <span class="badge-default">ค่าเริ่มต้น</span>
+                </div>
+                <div class="unit-ratio">1 กก. = 1 หน่วยฐาน</div>
+              </div>
+            </div>
+            <div class="unit-slot">
+              <div>
+                <div class="unit-name">ลัง</div>
+                <div class="unit-ratio">1 ลัง = 20 กก.</div>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <!-- ต้นทุน column — stack 2 slots (ตรงกับ unit) -->
+        <td class="td-cost" style="padding:0;">
+          <div class="cost-stack">
+            <div class="cost-slot is-default">
+              <div>
+                <span class="cost-value">฿45.00</span>
+                <span class="cost-note">ต้นทุนฐาน</span>
+              </div>
+            </div>
+            <div class="cost-slot">
+              <div>
+                <span class="cost-value">฿850.00</span>
+                <span class="cost-note">กำหนดต้นทุนเอง</span>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-stock">
+          <div class="cell">
+            <div class="stock-num">500</div>
+            <div class="stock-unit">กก.</div>
+          </div>
+        </td>
+
+        <td class="td-status">
+          <div class="cell">
+            <span class="badge-on"><span class="dot"></span>ใช้งาน</span>
+          </div>
+        </td>
+
+        <td class="td-actions">
+          <div class="action-group">
+            <button class="btn">✏️ แก้ไข</button>
+            <button class="btn">⏻ ปิด</button>
+          </div>
+        </td>
+      </tr>
+
+      <!-- ═══ Product B: 1 sale unit ═══ -->
+      <tr class="product-row">
+
+        <td class="td-sku">
+          <div class="cell">
+            <span class="sku-text">TYN002</span>
+          </div>
+        </td>
+
+        <td class="td-product">
+          <div class="cell">
+            <div class="product-cell">
+              <div class="product-img">🥡</div>
+              <div class="product-name">เส้นเซี่ยงไฮ้แห้ง</div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-units" style="padding:0;">
+          <div class="unit-stack">
+            <div class="unit-slot is-default">
+              <div>
+                <div class="unit-name">
+                  กก.
+                  <span class="badge-default">ค่าเริ่มต้น</span>
+                </div>
+                <div class="unit-ratio">1 กก. = 1 หน่วยฐาน</div>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-cost" style="padding:0;">
+          <div class="cost-stack">
+            <div class="cost-slot is-default">
+              <div>
+                <span class="cost-value">฿38.00</span>
+                <span class="cost-note">ต้นทุนฐาน</span>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-stock">
+          <div class="cell">
+            <div class="stock-num">1,200</div>
+            <div class="stock-unit">กก.</div>
+            <div><span class="stock-warn">⚠ สต็อกเหลือน้อย</span></div>
+          </div>
+        </td>
+
+        <td class="td-status">
+          <div class="cell">
+            <span class="badge-on"><span class="dot"></span>ใช้งาน</span>
+          </div>
+        </td>
+
+        <td class="td-actions">
+          <div class="action-group">
+            <button class="btn">✏️ แก้ไข</button>
+            <button class="btn">⏻ ปิด</button>
+          </div>
+        </td>
+      </tr>
+
+      <!-- ═══ Product C: 3 sale units — inactive ═══ -->
+      <tr class="product-row inactive">
+
+        <td class="td-sku">
+          <div class="cell">
+            <span class="sku-text">TYN003</span>
+          </div>
+        </td>
+
+        <td class="td-product">
+          <div class="cell">
+            <div class="product-cell">
+              <div class="product-img">📦</div>
+              <div class="product-name">เส้นก๋วยเตี๋ยวเซ็ต</div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-units" style="padding:0;">
+          <div class="unit-stack">
+            <div class="unit-slot is-default">
+              <div>
+                <div class="unit-name">
+                  แพ็ก
+                  <span class="badge-default">ค่าเริ่มต้น</span>
+                </div>
+                <div class="unit-ratio">1 แพ็ก = 1 หน่วยฐาน</div>
+              </div>
+            </div>
+            <div class="unit-slot">
+              <div>
+                <div class="unit-name">ลัง</div>
+                <div class="unit-ratio">1 ลัง = 12 แพ็ก</div>
+              </div>
+            </div>
+            <div class="unit-slot">
+              <div>
+                <div class="unit-name">กก.</div>
+                <div class="unit-ratio">1 กก. = 0.5 แพ็ก</div>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-cost" style="padding:0;">
+          <div class="cost-stack">
+            <div class="cost-slot is-default">
+              <div>
+                <span class="cost-value">฿120.00</span>
+                <span class="cost-note">ต้นทุนฐาน</span>
+              </div>
+            </div>
+            <div class="cost-slot">
+              <div>
+                <span class="cost-value">฿1,400.00</span>
+                <span class="cost-note">กำหนดต้นทุนเอง</span>
+              </div>
+            </div>
+            <div class="cost-slot">
+              <div>
+                <span class="cost-value">฿60.00</span>
+                <span class="cost-note">คำนวณอัตโนมัติ</span>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td class="td-stock">
+          <div class="cell">
+            <div class="stock-num">48</div>
+            <div class="stock-unit">แพ็ก</div>
+          </div>
+        </td>
+
+        <td class="td-status">
+          <div class="cell">
+            <span class="badge-off"><span class="dot"></span>ปิดใช้งาน</span>
+          </div>
+        </td>
+
+        <td class="td-actions">
+          <div class="action-group">
+            <button class="btn">✏️ แก้ไข</button>
+            <button class="btn">⏻ เปิด</button>
+          </div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+</div>
+
+<!-- Notes -->
+<div class="notes">
+  <span class="note"><span class="sw" style="background:#f0f7ff;border:1px solid #bfdbfe;"></span>พื้นน้ำเงินอ่อน = หน่วยค่าเริ่มต้น</span>
+  <span class="note">เส้นประ = คั่นระหว่างหน่วยขายของสินค้าเดียวกัน</span>
+  <span class="note">สินค้าปิดใช้งาน → แถวจางลง 55%</span>
+  <span class="note">⚠ เตือนสต็อกต่ำ</span>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html lang="th"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Executive Insight - Store Sales Ranking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-on-surface": "#f2eff8",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#343d96",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1b1b21",
+                        "on-secondary-container": "#00337c",
+                        "surface-bright": "#fbf8ff",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "secondary-fixed": "#d9e2ff",
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#4c56af",
+                        "inverse-primary": "#bdc2ff",
+                        "surface-variant": "#e4e1ea",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "primary": "#000666",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#1a237e",
+                        "outline-variant": "#c6c5d4",
+                        "on-primary-container": "#8690ee",
+                        "inverse-surface": "#303036",
+                        "surface-container-high": "#eae7ef",
+                        "on-tertiary-fixed-variant": "#7b2e12",
+                        "on-tertiary-fixed": "#390c00",
+                        "surface-container": "#efecf5",
+                        "primary-fixed": "#e0e0ff",
+                        "background": "#fbf8ff",
+                        "surface-container-low": "#f5f2fb",
+                        "secondary-container": "#759efd",
+                        "on-background": "#1b1b21",
+                        "tertiary-container": "#5c1800",
+                        "secondary-fixed-dim": "#b0c6ff",
+                        "outline": "#767683",
+                        "on-tertiary-container": "#e17c5a",
+                        "tertiary-fixed": "#ffdbd0",
+                        "tertiary": "#380b00",
+                        "on-error": "#ffffff",
+                        "on-surface-variant": "#454652",
+                        "error-container": "#ffdad6",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#000767",
+                        "surface-container-highest": "#e4e1ea",
+                        "surface": "#fbf8ff",
+                        "on-secondary-fixed-variant": "#00429c",
+                        "surface-dim": "#dbd9e1",
+                        "secondary": "#2b5bb5",
+                        "on-secondary-fixed": "#001945"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-glass {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl flex justify-between items-center h-16 px-8 w-full max-w-full shadow-[0_4px_20px_rgba(27,27,33,0.04)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#000666] dark:text-white tracking-tight">Executive Insight</span>
+<div class="hidden md:flex ml-8 items-center bg-surface-container-highest/50 rounded-full px-4 py-1.5 gap-2 border border-outline-variant/15">
+<span class="material-symbols-outlined text-on-surface-variant text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-on-surface-variant" placeholder="ค้นหาร้านค้า" type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-sm font-medium text-on-surface-variant">
+<span class="material-symbols-outlined">calendar_today</span>
+<span>ช่วงวันที่</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors p-2 rounded-full active:scale-95 duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors p-2 rounded-full active:scale-95 duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img class="w-8 h-8 rounded-full border border-outline-variant/20" data-alt="Professional headshot of a senior business executive with warm neutral lighting and modern office background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRXeGPiI2woGjCqmlWndEnPmylv9RT_HSMy_xjMHvdVXiDR4FognyspmI7u6rb37brgEg9J5qrtUku4uz3zE1zIu3O1yD0HJvApCbEhIXrfIX27VfL0bFzYdnB_ykQzGlJl5RrNsl-Enyg41IbyD6EkJ_Vr_3NvHa0RtnmqPO7KxVCfJ76PndgGNtd5Vdu5gwxLH9ccaFW_c0WWhqx3YmfGuEMaT68NCw64LN7gUj2DOi-8j2ixJGPomDd0YVlx_jsu2i3uuZ9sMdd"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#f5f2fb] dark:bg-[#1b1b21] flex flex-col py-6 space-y-2">
+<div class="px-6 mb-8">
+<div class="text-lg font-bold text-[#1A237E] dark:text-white">Sales Core</div>
+<div class="text-xs font-['Inter'] text-[#454652] dark:text-slate-400 tracking-wide uppercase">Management Suite</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3">trending_up</span>
+<span class="font-['Inter'] text-sm tracking-wide">Sales Performance</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3">insights</span>
+<span class="font-['Inter'] text-sm tracking-wide">Analytics</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3">groups</span>
+<span class="font-['Inter'] text-sm tracking-wide">Team Ranking</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+<span class="font-['Inter'] text-sm tracking-wide">Inventory</span>
+</a>
+<a class="flex items-center px-4 py-3 bg-white dark:bg-[#2b2b31] text-[#1A237E] dark:text-white font-semibold rounded-lg shadow-sm mx-4 transition-all" href="#">
+<span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">storefront</span>
+<span class="font-['Inter'] text-sm tracking-wide">Store View</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant/10 pt-4">
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined mr-3">help</span>
+<span class="font-['Inter'] text-sm tracking-wide">Support</span>
+</a>
+<a class="flex items-center px-4 py-3 text-[#454652] dark:text-slate-400 mx-4 hover:bg-white/50 dark:hover:bg-white/10 transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined mr-3 text-error">logout</span>
+<span class="font-['Inter'] text-sm tracking-wide">Log out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 pt-24 px-8 pb-12 min-h-screen">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-10">
+<div>
+<h1 class="text-4xl font-extrabold text-on-surface tracking-tight mb-2">รายงานอันดับยอดขายตามร้านค้า</h1>
+<p class="text-on-surface-variant font-medium">ภาพรวมการดำเนินงานรายสาขาประจำไตรมาส</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-low px-6 py-3 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">filter_list</span>
+<span class="text-sm font-semibold">เลือกสาขา: ทั้งหมด</span>
+</div>
+<button class="bg-primary text-on-primary px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined">download</span>
+<span>ส่งออกรายงาน</span>
+</button>
+</div>
+</div>
+<!-- KPI Summary Grid -->
+<div class="grid grid-cols-4 gap-6 mb-10">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary-fixed rounded-lg">
+<span class="material-symbols-outlined text-primary">payments</span>
+</div>
+<span class="text-secondary font-bold text-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +12.5%
+                    </span>
+</div>
+<div class="text-on-surface-variant text-sm font-semibold mb-1">ยอดขายรวม</div>
+<div class="text-2xl font-black text-on-surface">฿42,580,000</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-secondary-fixed rounded-lg">
+<span class="material-symbols-outlined text-secondary">store</span>
+</div>
+<span class="text-on-surface-variant font-bold text-sm">Active Now</span>
+</div>
+<div class="text-on-surface-variant text-sm font-semibold mb-1">จำนวนร้านค้าทั้งหมด</div>
+<div class="text-2xl font-black text-on-surface">148 สาขา</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-tertiary-fixed rounded-lg">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant">query_stats</span>
+</div>
+<span class="text-secondary font-bold text-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +4.2%
+                    </span>
+</div>
+<div class="text-on-surface-variant text-sm font-semibold mb-1">ยอดขายเฉลี่ยต่อร้าน</div>
+<div class="text-2xl font-black text-on-surface">฿287,700</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_4px_20px_rgba(27,27,33,0.04)] border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined text-primary">emoji_events</span>
+</div>
+<span class="text-primary font-bold text-sm">Best Performance</span>
+</div>
+<div class="text-on-surface-variant text-sm font-semibold mb-1">สาขาที่ทำยอดขายสูงสุด</div>
+<div class="text-2xl font-black text-on-surface">Siam Paragon</div>
+</div>
+</div>
+<!-- Main Table Container -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_12px_40px_rgba(27,27,33,0.08)] overflow-hidden">
+<div class="px-8 py-6 border-b border-outline-variant/10 flex justify-between items-center">
+<h3 class="font-bold text-lg">รายการอันดับร้านค้า (Top 10)</h3>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-8 py-4 text-sm font-bold text-on-surface-variant uppercase tracking-wider w-24 text-center">อันดับ</th>
+<th class="px-8 py-4 text-sm font-bold text-on-surface-variant uppercase tracking-wider">รหัสร้าน</th>
+<th class="px-8 py-4 text-sm font-bold text-on-surface-variant uppercase tracking-wider">ชื่อร้าน</th>
+<th class="px-8 py-4 text-sm font-bold text-on-surface-variant uppercase tracking-wider text-right">ยอดขายรวม</th>
+<th class="px-8 py-4 text-sm font-bold text-on-surface-variant uppercase tracking-wider text-center">สถานะ</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<!-- Rank 1 -->
+<tr class="group hover:bg-primary/5 transition-colors">
+<td class="px-8 py-5 text-center">
+<span class="w-8 h-8 rounded-full bg-[#FFD700] text-[#000] font-black text-xs inline-flex items-center justify-center shadow-md">1</span>
+</td>
+<td class="px-8 py-5 font-mono text-sm font-medium">ST-00124</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-bold text-primary">SP</div>
+<span class="font-bold text-on-surface">Siam Paragon Shopping Center</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right font-black text-on-surface">฿12,450,000</td>
+<td class="px-8 py-5 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container/20 text-on-secondary-fixed-variant text-xs font-bold uppercase">Leading</span>
+</td>
+</tr>
+<!-- Rank 2 -->
+<tr class="group hover:bg-primary/5 transition-colors">
+<td class="px-8 py-5 text-center">
+<span class="w-8 h-8 rounded-full bg-[#C0C0C0] text-[#000] font-black text-xs inline-flex items-center justify-center shadow-md">2</span>
+</td>
+<td class="px-8 py-5 font-mono text-sm font-medium">ST-00452</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-bold text-primary">CQ</div>
+<span class="font-bold text-on-surface">CentralWorld Plaza</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right font-black text-on-surface">฿9,820,000</td>
+<td class="px-8 py-5 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container/20 text-on-secondary-fixed-variant text-xs font-bold uppercase">Leading</span>
+</td>
+</tr>
+<!-- Rank 3 -->
+<tr class="group hover:bg-primary/5 transition-colors">
+<td class="px-8 py-5 text-center">
+<span class="w-8 h-8 rounded-full bg-[#CD7F32] text-[#fff] font-black text-xs inline-flex items-center justify-center shadow-md">3</span>
+</td>
+<td class="px-8 py-5 font-mono text-sm font-medium">ST-00891</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-bold text-primary">EQ</div>
+<span class="font-bold text-on-surface">EmQuartier Sukhumvit</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right font-black text-on-surface">฿8,140,500</td>
+<td class="px-8 py-5 text-center">
+<span class="px-3 py-1 rounded-full bg-secondary-container/20 text-on-secondary-fixed-variant text-xs font-bold uppercase">Stable</span>
+</td>
+</tr>
+<!-- Rank 4 -->
+<tr class="group hover:bg-primary/5 transition-colors">
+<td class="px-8 py-5 text-center">
+<span class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant font-bold text-xs inline-flex items-center justify-center">4</span>
+</td>
+<td class="px-8 py-5 font-mono text-sm font-medium">ST-00331</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-bold text-primary">IC</div>
+<span class="font-bold text-on-surface">ICONSIAM Riverfront</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right font-black text-on-surface">฿7,900,200</td>
+<td class="px-8 py-5 text-center">
+<span class="px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-bold uppercase">Stable</span>
+</td>
+</tr>
+<!-- Rank 5 -->
+<tr class="group hover:bg-primary/5 transition-colors">
+<td class="px-8 py-5 text-center">
+<span class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant font-bold text-xs inline-flex items-center justify-center">5</span>
+</td>
+<td class="px-8 py-5 font-mono text-sm font-medium">ST-01054</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-bold text-primary">MG</div>
+<span class="font-bold text-on-surface">Mega Bangna</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right font-black text-on-surface">฿6,320,800</td>
+<td class="px-8 py-5 text-center">
+<span class="px-3 py-1 rounded-full bg-error-container text-on-error-container text-xs font-bold uppercase">Review</span>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="px-8 py-4 bg-surface-container-low/30 border-t border-outline-variant/10 flex justify-between items-center">
+<span class="text-sm font-medium text-on-surface-variant">แสดง 1 ถึง 5 จาก 148 สาขา</span>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg hover:bg-surface-container-high disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="px-3 py-1 rounded-lg bg-primary text-on-primary font-bold text-sm">1</button>
+<button class="px-3 py-1 rounded-lg hover:bg-surface-container-high font-bold text-sm">2</button>
+<button class="px-3 py-1 rounded-lg hover:bg-surface-container-high font-bold text-sm">3</button>
+<button class="p-2 rounded-lg hover:bg-surface-container-high">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</body></html>
