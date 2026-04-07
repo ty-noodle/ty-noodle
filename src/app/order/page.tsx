@@ -177,7 +177,7 @@ function getProductShareMetadata(productId: string | undefined, products: Catalo
       title: "สั่งสินค้า",
       description: "ระบบสั่งสินค้าสำหรับลูกค้า T&Y Noodle",
       url: `${siteUrl}/order`,
-      image: `${siteUrl}/ty-noodles-logo-cropped.png`,
+      image: `${siteUrl}/brand/1200x630.png`,
     };
   }
 
@@ -194,7 +194,7 @@ function getProductShareMetadata(productId: string | undefined, products: Catalo
     url: `${siteUrl}/order?product=${encodeURIComponent(selectedProduct.id)}`,
     image:
       selectedProduct.product_images[0]?.public_url ||
-      `${siteUrl}/placeholders/product-placeholder.svg`,
+      `${siteUrl}/brand/1200x630.png`,
   };
 }
 

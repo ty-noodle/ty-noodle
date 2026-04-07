@@ -1,5 +1,12 @@
-const CACHE_NAME = "tynoodle-v1";
-const APP_SHELL = ["/", "/offline", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "T&Y Noodle-v2";
+const APP_SHELL = [
+  "/",
+  "/offline",
+  "/manifest.webmanifest",
+  "/brand/192x192.png",
+  "/brand/512x512.png",
+  "/brand/1200x630.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
