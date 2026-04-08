@@ -91,6 +91,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th">
+      <head>
+        {/* Preconnect to LINE profile CDN — speeds up user avatar loading */}
+        <link rel="preconnect" href="https://profile.line-scdn.net" crossOrigin="anonymous" />
+      </head>
       <body
         className={`${sarabun.variable} ${ibmPlexMono.variable} ${instrumentSans.variable} bg-background text-foreground antialiased`}
       >

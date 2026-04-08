@@ -55,10 +55,13 @@
 html {
   font-size: clamp(16px, 0.22vw + 15.5px, 17px);
   scroll-behavior: smooth;
+  /* Prevent iOS rubber-band bounce from pulling sticky headers off-screen */
+  overscroll-behavior-y: none;
 }
 
 body {
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sarabun), "Sarabun", "Noto Sans Thai", sans-serif;

@@ -3,6 +3,10 @@ import { cache } from "react";
 import OrderClient from "./order-client";
 import { getSiteUrl } from "@/lib/site-url";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+
+// Cache product catalog for 60 seconds — product data changes infrequently
+// Dramatically reduces TTFB and LCP for repeat requests
+export const revalidate = 60;
 import type { Database } from "@/types/database";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];

@@ -35,7 +35,7 @@ export function StockList({ products, baseHref = "/settings/stock" }: StockListP
 
         <Link
           href={`${baseHref}?receive=1`}
-          className="inline-flex items-center gap-2 rounded-full bg-[#003366] px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(0,51,102,0.22)] transition hover:bg-[#002244]"
+          className="hidden items-center gap-2 rounded-full bg-[#003366] px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(0,51,102,0.22)] transition hover:bg-[#002244] sm:inline-flex"
         >
           <Plus className="h-4 w-4" strokeWidth={2.2} />
           รับสินค้าเข้า
@@ -322,5 +322,18 @@ export function StockList({ products, baseHref = "/settings/stock" }: StockListP
         )}
       </SettingsPanelBody>
     </SettingsPanel>
+  );
+}
+
+export function StockMobileReceiveButton({ baseHref = "/settings/stock" }: { baseHref?: string }) {
+  return (
+    <Link
+      href={`${baseHref}?receive=1`}
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-[60] inline-flex items-center gap-2 rounded-full bg-[#003366] px-4 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(0,51,102,0.35)] transition hover:bg-[#002244] sm:hidden"
+      aria-label="รับสินค้าเข้า"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.2} />
+      รับสินค้าเข้า
+    </Link>
   );
 }

@@ -1,6 +1,6 @@
 import { Warehouse } from "lucide-react";
 import { StockReceiveForm } from "@/components/settings/stock-receive-form";
-import { StockList } from "@/components/settings/stock-list";
+import { StockList, StockMobileReceiveButton } from "@/components/settings/stock-list";
 import { StockSummaryCards } from "@/components/settings/stock-summary-cards";
 import { StockTabs } from "@/components/settings/stock-tabs";
 import { SettingsShell } from "@/components/settings/settings-shell";
@@ -45,6 +45,9 @@ export default async function StockPage({ searchParams }: StockPageProps) {
           <StockList products={data.products} baseHref="/stock" />
         </div>
       </div>
+
+      <StockMobileReceiveButton baseHref="/stock" />
+      <div className="h-20 sm:hidden" />
 
       {params.receive === "1" ? (
         <StockReceiveForm

@@ -69,7 +69,7 @@ function MobileTopBar() {
   const title = getPageTitle(pathname);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur md:hidden">
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur md:hidden">
       <div className="flex h-[68px] items-center gap-3 px-4">
         {/* Logo */}
         <Link href="/dashboard" className="block shrink-0">
@@ -408,7 +408,7 @@ export function AppSidebarLayout({ children }: { children: React.ReactNode }) {
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div
         className={`${collapsed ? "md:pl-16" : "md:pl-60"} ${
-          ordersTabsActive || reportsTabsActive ? "pt-12 md:pt-0" : ""
+          ordersTabsActive || reportsTabsActive ? "pt-[116px] md:pt-0" : "pt-[68px] md:pt-0"
         } transition-[padding-left] duration-200 ease-in-out`}
       >
         {children}

@@ -100,7 +100,7 @@ function OrderStatusBanner({ isOpen }: { isOpen: boolean }) {
           </p>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold" style={{ background: "#dcfce7", color: "#15803d" }}>
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" style={{ boxShadow: "0 0 6px #22c55e" }} />
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" style={{ boxShadow: "0 0 6px #22c55e", willChange: "transform" }} />
           เปิด
         </span>
       </div>
@@ -369,11 +369,6 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
             key={product.id}
             className="flex flex-col overflow-hidden rounded-2xl transition-transform active:scale-98 md:rounded-[1.35rem]"
             onClick={() => onOpenProduct(product.id)}
-            onTouchStart={() => {
-              if (imageUrl.startsWith("/")) return;
-              const img = new window.Image();
-              img.src = `/_next/image?url=${encodeURIComponent(imageUrl)}&w=828&q=75`;
-            }}
             style={{ contain: "layout paint" }}
           >
             <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 md:rounded-[1.35rem]">
@@ -542,7 +537,7 @@ export default function OrderClient({
   const touchCurrentXRef = useRef<number | null>(null);
 
   // Swipe logic for modal images
-  const minSwipeDistance = 32;
+  const minSwipeDistance = 24;
 
   const onTouchStart = (e: React.TouchEvent) => {
     const startX = e.targetTouches[0].clientX;
@@ -1097,7 +1092,10 @@ export default function OrderClient({
     [gridProducts, selectedProductIndex],
   );
 
-  const selectedProductImages = selectedProduct?.product_images ?? [];
+  const selectedProductImages = useMemo(
+    () => selectedProduct?.product_images ?? [],
+    [selectedProduct],
+  );
   const selectedProductImageIndex = selectedProduct
     ? Math.min(
         modalImageIndexes[selectedProduct.id] ?? 0,
@@ -1107,6 +1105,26 @@ export default function OrderClient({
   const selectedProductImageUrl =
     selectedProductImages[selectedProductImageIndex]?.public_url ??
     "/placeholders/product-placeholder.svg";
+
+  useEffect(() => {
+    if (!selectedProduct || selectedProductImages.length <= 1) {
+      return;
+    }
+
+    const imageCount = selectedProductImages.length;
+    const nextIndex = (selectedProductImageIndex + 1) % imageCount;
+    const prevIndex = (selectedProductImageIndex - 1 + imageCount) % imageCount;
+    const urlsToPreload = [
+      selectedProductImages[nextIndex]?.public_url,
+      selectedProductImages[prevIndex]?.public_url,
+    ].filter((url): url is string => Boolean(url));
+
+    for (const imageUrl of urlsToPreload) {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.src = imageUrl;
+    }
+  }, [selectedProduct, selectedProductImageIndex, selectedProductImages]);
 
   const buildProductShareUrl = useCallback((productId: string) => {
     if (typeof window === "undefined") return "";
@@ -1977,6 +1995,14 @@ export default function OrderClient({
         .animate-slide-in-right {
           animation: slideInRight 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
+        @keyframes modalSlideIn {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes modalSlideOut {
+          from { transform: translateY(0); }
+          to { transform: translateY(100%); }
+        }
       `}</style>
 
       <div key={currentView} className="flex-1 flex flex-col animate-slide-in-right overflow-x-clip">
@@ -2072,6 +2098,8 @@ export default function OrderClient({
               )}
             </div>
           </div>
+          {/* Order status banner — scrolls away with header, not pinned */}
+          <OrderStatusBanner isOpen={isOrderOpen} />
         </header>
       ) : currentView === "cart" ? (
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 bg-white/80 px-4 py-3 backdrop-blur-md">
@@ -2123,8 +2151,6 @@ export default function OrderClient({
       {/* ── Sticky search + category pills + tabs (catalog only) ── */}
       {currentView === "catalog" && (
         <div className="sticky top-0 z-30 bg-white shadow-sm" style={{ willChange: "transform" }}>
-          {/* Order status banner */}
-          <OrderStatusBanner isOpen={isOrderOpen} />
           {/* Search bar */}
           <div className="px-4 pt-3 pb-2">
             <div className="relative">
@@ -2876,8 +2902,16 @@ export default function OrderClient({
         </nav>
       </div>
 
-      {isModalOpen && selectedProduct && (
-        <div className="fixed inset-0 z-[100] flex min-h-0 flex-col bg-white">
+      {selectedProduct && (
+        <div
+          className="fixed inset-0 z-[100] flex min-h-0 flex-col bg-white"
+          style={{
+            animation: isModalOpen
+              ? "modalSlideIn 320ms cubic-bezier(0.25,1,0.5,1) forwards"
+              : "modalSlideOut 280ms cubic-bezier(0.4,0,1,1) forwards",
+            willChange: "transform",
+          }}
+        >
           {/* Top Navigation Bar - Formal & Clean */}
           <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[#00264d] bg-[#003366] px-4 py-3 text-white shadow-[0_10px_30px_rgba(0,51,102,0.22)]">
             <button 
@@ -2985,7 +3019,7 @@ export default function OrderClient({
                 <div className="mx-auto flex max-w-[520px] flex-col gap-3">
                   {/* Image */}
                   <div className="relative overflow-hidden rounded-[1.5rem]">
-                    <div className="relative aspect-square w-full bg-slate-100">
+                    <div className="relative aspect-square w-full">
                       {!isModalImageLoaded && (
                         <div className="absolute inset-0 animate-pulse bg-slate-200" />
                       )}

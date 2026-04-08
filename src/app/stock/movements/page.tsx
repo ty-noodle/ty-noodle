@@ -1,4 +1,5 @@
 import { Warehouse } from "lucide-react";
+import { StockMobileReceiveButton } from "@/components/settings/stock-list";
 import { StockMovementTable } from "@/components/settings/stock-movement-table";
 import { StockReceiveForm } from "@/components/settings/stock-receive-form";
 import { StockSummaryCards } from "@/components/settings/stock-summary-cards";
@@ -44,6 +45,9 @@ export default async function StockMovementsPage({
       <div className="mt-8">
         <StockMovementTable movementRows={data.movementRows} />
       </div>
+
+      <StockMobileReceiveButton baseHref="/stock/movements" />
+      <div className="h-20 sm:hidden" />
 
       {params.receive === "1" ? (
         <StockReceiveForm products={data.products} returnHref="/stock/movements" />
