@@ -282,6 +282,7 @@ function getConstraintError(qty: number, min: number, step: number | null): stri
 }
 
 type Customer = { id: string; name: string; customer_code: string | null };
+type SessionCustomer = { id: string; name: string; customerCode: string | null };
 type FrequentProductSummary = {
   productId: string;
   productSaleUnitId: string | null;
@@ -475,14 +476,18 @@ const ModalQuantityStepper = memo(function ModalQuantityStepper({
 
 export default function OrderClient({
   initialProducts,
+  initialSessionCustomer,
+  initialSessionLineUserId,
   organizationId,
   orgPhone,
 }: {
   initialProducts: ProductWithImage[];
+  initialSessionCustomer: SessionCustomer | null;
+  initialSessionLineUserId: string | null;
   organizationId: string;
   orgPhone: string;
 }) {
-  const { isReady, profile, login, logout } = useLiff();
+  const { isReady, liffToken, profile, login, logout } = useLiff();
   const cartButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Order window state — updates every minute
@@ -513,7 +518,9 @@ export default function OrderClient({
   const [selectedProductCategory, setSelectedProductCategory] = useState<"all" | string>("all");
 
   // View state
-  const [currentView, setCurrentView] = useState<ViewState>("catalog");
+  const [currentView, setCurrentView] = useState<ViewState>(
+    initialSessionCustomer ? "catalog" : "loading",
+  );
   const [activeCategory, setActiveCategory] = useState<"all" | "favorites" | "recent">("all");
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
@@ -631,7 +638,19 @@ export default function OrderClient({
   }, [isShareMenuOpen]);
 
   // Customer state
-  const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(null);
+  const [linkedCustomer, setLinkedCustomer] = useState<Customer | null>(
+    initialSessionCustomer
+      ? {
+          customer_code: initialSessionCustomer.customerCode,
+          id: initialSessionCustomer.id,
+          name: initialSessionCustomer.name,
+        }
+      : null,
+  );
+  const [sessionLineUserId, setSessionLineUserId] = useState<string | null>(
+    initialSessionLineUserId,
+  );
+  const hasResolvedAuthRef = useRef(false);
 
   // Self-registration form state
   const [regName, setRegName] = useState("");
@@ -661,28 +680,70 @@ export default function OrderClient({
   const [editCart, setEditCart] = useState<Record<string, number>>({});
   const [highlightedHistoryOrderId, setHighlightedHistoryOrderId] = useState<string | null>(null);
 
-  // Auto-detect login and linked customer
-
+  // Sync server session cookie after LIFF login.
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !profile?.userId || !liffToken) return;
+
+    let isActive = true;
+    void (async () => {
+      try {
+        const response = await fetch("/api/order/session", {
+          body: JSON.stringify({
+            displayName: profile.displayName ?? "",
+            idToken: liffToken,
+            lineUserId: profile.userId,
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        });
+        if (!response.ok || !isActive) return;
+        setSessionLineUserId(profile.userId);
+      } catch (error) {
+        console.error("[order-session:sync]", error);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isReady, liffToken, profile?.displayName, profile?.userId]);
+
+  // Resolve auth state once on boot with session-first fallback.
+  useEffect(() => {
+    if (!isReady || hasResolvedAuthRef.current) return;
+
+    if (linkedCustomer) {
+      hasResolvedAuthRef.current = true;
+      setCurrentView("catalog");
+      return;
+    }
+
+    const lineUserId = profile?.userId ?? sessionLineUserId;
+    if (!lineUserId) {
+      hasResolvedAuthRef.current = true;
+      setCurrentView("login");
+      return;
+    }
 
     startTransition(async () => {
-      if (!profile) {
+      try {
+        const result = await getCustomerByLineId(lineUserId);
+
+        if (result.success && result.data) {
+          setLinkedCustomer(result.data as Customer);
+          setCurrentView("catalog");
+        } else {
+          setRegFormOpen(false);
+          setCurrentView("register");
+        }
+      } catch (error) {
+        console.error("[order-auth:bootstrap]", error);
         setCurrentView("login");
-        return;
-      }
-
-      const result = await getCustomerByLineId(profile.userId);
-
-      if (result.success && result.data) {
-        setLinkedCustomer(result.data as Customer);
-        setCurrentView("catalog");
-      } else {
-        setRegFormOpen(false);
-        setCurrentView("register");
+      } finally {
+        hasResolvedAuthRef.current = true;
       }
     });
-  }, [isReady, profile]);
+  }, [isReady, linkedCustomer, profile?.userId, sessionLineUserId]);
 
   // Geography cascade: load provinces when entering register view
   useEffect(() => {
@@ -1427,7 +1488,11 @@ export default function OrderClient({
   // Handlers
 
   const handleRegister = () => {
-    if (!profile) return;
+    const lineUserId = profile?.userId ?? sessionLineUserId;
+    if (!lineUserId) {
+      login();
+      return;
+    }
     setRegError("");
 
     if (!regName.trim()) { setRegError("กรุณากรอกชื่อร้านค้า"); return; }
@@ -1438,7 +1503,7 @@ export default function OrderClient({
     startTransition(async () => {
       const result = await registerLineCustomer({
         organizationId,
-        lineUserId: profile.userId,
+        lineUserId,
         name: regName,
         phone: regPhone || undefined,
         address: regAddress || undefined,
@@ -1449,6 +1514,7 @@ export default function OrderClient({
       });
       if (result.success) {
         setLinkedCustomer(result.data as Customer);
+        setSessionLineUserId(lineUserId);
         setCurrentView("catalog");
       } else {
         setRegError(result.error);
@@ -1465,7 +1531,14 @@ export default function OrderClient({
   };
 
   const handleCheckout = () => {
-    if (!profile || !linkedCustomer) { login(); return; }
+    if (!linkedCustomer) {
+      if (!profile && !sessionLineUserId) {
+        login();
+        return;
+      }
+      setCurrentView("register");
+      return;
+    }
     if (totalItems === 0) { alert("กรุณาเลือกสินค้าก่อนยืนยันสั่งซื้อ"); return; }
 
     const items = Object.entries(cart)
@@ -1601,11 +1674,32 @@ export default function OrderClient({
   };
 
   const handleLogout = () => {
-    logout();
-    window.location.reload();
+    startTransition(async () => {
+      try {
+        await fetch("/api/order/session", { method: "DELETE" });
+      } catch (error) {
+        console.error("[order-session:clear]", error);
+      }
+
+      setLinkedCustomer(null);
+      setSessionLineUserId(null);
+      logout();
+      window.location.reload();
+    });
   };
 
   // Render
+
+  if (currentView === "loading") {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-white px-6">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin text-[#003366]" />
+          <span className="text-sm font-semibold">กำลังตรวจสอบข้อมูลการเข้าสู่ระบบ...</span>
+        </div>
+      </div>
+    );
+  }
 
   // 2. Not logged in
   if (currentView === "login") {

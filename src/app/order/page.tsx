@@ -3,6 +3,7 @@ import { cache } from "react";
 import OrderClient from "./order-client";
 import { getSiteUrl } from "@/lib/site-url";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getOrderCustomerSession } from "@/lib/auth/order-session";
 
 // Cache product catalog for 60 seconds — product data changes infrequently
 // Dramatically reduces TTFB and LCP for repeat requests
@@ -40,6 +41,17 @@ type CatalogProduct = ProductWithRelations & {
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
+
+type InitialOrderCustomer = {
+  customerCode: string | null;
+  id: string;
+  name: string;
+};
+
+type InitialOrderAuth = {
+  customer: InitialOrderCustomer | null;
+  lineUserId: string | null;
+};
 
 const siteUrl = getSiteUrl();
 
@@ -171,6 +183,44 @@ function getSearchParamValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+async function getInitialOrderAuth(
+  organizationId: string,
+): Promise<InitialOrderAuth> {
+  const session = await getOrderCustomerSession();
+
+  if (!session?.lineUserId) {
+    return { customer: null, lineUserId: null };
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data } = await supabaseAdmin
+    .from("customers")
+    .select("id, name, customer_code, organization_id")
+    .eq("line_user_id", session.lineUserId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!data) {
+    return {
+      customer: null,
+      lineUserId: session.lineUserId,
+    };
+  }
+
+  if (organizationId && data.organization_id !== organizationId) {
+    return { customer: null, lineUserId: null };
+  }
+
+  return {
+    customer: {
+      customerCode: data.customer_code,
+      id: data.id,
+      name: data.name,
+    },
+    lineUserId: session.lineUserId,
+  };
+}
+
 function getProductShareMetadata(productId: string | undefined, products: CatalogProduct[]) {
   const selectedProduct = productId
     ? products.find((product) => product.id === productId)
@@ -243,11 +293,14 @@ export async function generateMetadata({
 
 export default async function OrderPage() {
   const { catalogProducts, organizationId, orgPhone } = await getCatalogData();
+  const initialAuth = await getInitialOrderAuth(organizationId);
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       <OrderClient
         initialProducts={catalogProducts}
+        initialSessionCustomer={initialAuth.customer}
+        initialSessionLineUserId={initialAuth.lineUserId}
         organizationId={organizationId}
         orgPhone={orgPhone}
       />
