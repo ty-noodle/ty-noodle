@@ -3,6 +3,7 @@
 import Image from "next/image";
 import {
   memo,
+  type MutableRefObject,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -343,6 +344,84 @@ function getBangkokOrderEditMeta(orderDate: string) {
   };
 }
 
+const CatalogProductCard = memo(function CatalogProductCard({
+  isFavorite,
+  onOpenProduct,
+  onToggleFavorite,
+  priority,
+  product,
+  qty,
+}: {
+  isFavorite: boolean;
+  onOpenProduct: (productId: string) => void;
+  onToggleFavorite: (productId: string) => void;
+  priority: boolean;
+  product: ProductWithImage;
+  qty: number;
+}) {
+  const imageUrl =
+    product.product_images?.[0]?.public_url || "/placeholders/product-placeholder.svg";
+
+  return (
+    <article
+      className="flex flex-col overflow-hidden rounded-2xl transition-transform active:scale-98 md:rounded-[1.35rem]"
+      onClick={() => onOpenProduct(product.id)}
+      style={{
+        contain: "layout paint",
+        contentVisibility: "auto",
+        containIntrinsicSize: "320px 420px",
+      }}
+    >
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 md:rounded-[1.35rem]">
+        <Image
+          src={imageUrl}
+          alt={product.name}
+          fill
+          sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, (max-width: 1535px) 25vw, 17vw"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          priority={priority}
+        />
+
+        {qty > 0 && (
+          <div className="absolute left-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-[#003366] px-1.5 text-[10px] font-bold text-white shadow-lg ring-2 ring-white md:h-[1.65rem] md:min-w-[1.65rem]">
+            {qty}
+          </div>
+        )}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(product.id);
+          }}
+          className={`absolute right-2 top-2 rounded-xl bg-white/95 p-2 shadow-sm transition-colors active:scale-90 md:p-1.5 ${
+            isFavorite
+              ? "text-amber-500"
+              : "text-slate-400 hover:text-amber-400"
+          }`}
+          aria-label={`สลับรายการโปรด ${product.name}`}
+        >
+          <Star
+            className="h-4 w-4 md:h-3.5 md:w-3.5"
+            fill={isFavorite ? "currentColor" : "none"}
+            strokeWidth={2}
+          />
+        </button>
+      </div>
+
+      <div className="flex min-w-0 flex-grow items-start justify-between gap-2 px-0 pb-3 pt-3 pr-0 md:gap-2.5 md:pt-3.5">
+        <div className="min-h-[2.5rem] flex-1 md:min-h-[2.75rem]">
+          <h3 className="text-left text-[0.84rem] font-bold leading-5 text-slate-900 line-clamp-2 md:text-[0.82rem] md:leading-[1.35rem]">
+            {product.name}
+          </h3>
+        </div>
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#003366] text-white shadow-md transition-transform active:scale-90 md:h-8 md:w-8">
+          <Plus className="h-4 w-4 md:h-4 md:w-4" strokeWidth={3} />
+        </div>
+      </div>
+    </article>
+  );
+});
+
 const CatalogProductGrid = memo(function CatalogProductGrid({
   products,
   cart,
@@ -360,67 +439,17 @@ const CatalogProductGrid = memo(function CatalogProductGrid({
 }) {
   return (
     <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-3.5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-5 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5 2xl:grid-cols-6">
-      {products.map((product, productIndex) => {
-        const qty = cart[product.id] || 0;
-        const imageUrl =
-          product.product_images?.[0]?.public_url || "/placeholders/product-placeholder.svg";
-
-        return (
-          <article
-            key={product.id}
-            className="flex flex-col overflow-hidden rounded-2xl transition-transform active:scale-98 md:rounded-[1.35rem]"
-            onClick={() => onOpenProduct(product.id)}
-            style={{ contain: "layout paint" }}
-          >
-            <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 md:rounded-[1.35rem]">
-              <Image
-                src={imageUrl}
-                alt={product.name}
-                fill
-                sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, (max-width: 1535px) 25vw, 17vw"
-                className="absolute inset-0 h-full w-full object-cover object-center"
-                priority={productIndex < priorityCount}
-              />
-
-              {qty > 0 && (
-                <div className="absolute left-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-[#003366] px-1.5 text-[10px] font-bold text-white shadow-lg ring-2 ring-white md:h-[1.65rem] md:min-w-[1.65rem]">
-                  {qty}
-                </div>
-              )}
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(product.id);
-                }}
-                className={`absolute right-2 top-2 rounded-xl bg-white/95 p-2 shadow-sm transition-colors active:scale-90 md:p-1.5 ${
-                  favorites[product.id]
-                    ? "text-amber-500"
-                    : "text-slate-400 hover:text-amber-400"
-                }`}
-                aria-label={`สลับรายการโปรด ${product.name}`}
-              >
-                <Star
-                  className="h-4 w-4 md:h-3.5 md:w-3.5"
-                  fill={favorites[product.id] ? "currentColor" : "none"}
-                  strokeWidth={2}
-                />
-              </button>
-            </div>
-
-            <div className="flex min-w-0 flex-grow items-start justify-between gap-2 px-0 pb-3 pt-3 pr-0 md:gap-2.5 md:pt-3.5">
-              <div className="min-h-[2.5rem] flex-1 md:min-h-[2.75rem]">
-                <h3 className="text-left text-[0.84rem] font-bold leading-5 text-slate-900 line-clamp-2 md:text-[0.82rem] md:leading-[1.35rem]">
-                  {product.name}
-                </h3>
-              </div>
-              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#003366] text-white shadow-md transition-transform active:scale-90 md:h-8 md:w-8">
-                <Plus className="h-4 w-4 md:h-4 md:w-4" strokeWidth={3} />
-              </div>
-            </div>
-          </article>
-        );
-      })}
+      {products.map((product, productIndex) => (
+        <CatalogProductCard
+          key={product.id}
+          product={product}
+          qty={cart[product.id] || 0}
+          isFavorite={Boolean(favorites[product.id])}
+          priority={productIndex < priorityCount}
+          onOpenProduct={onOpenProduct}
+          onToggleFavorite={onToggleFavorite}
+        />
+      ))}
     </div>
   );
 });
@@ -468,6 +497,141 @@ const ModalQuantityStepper = memo(function ModalQuantityStepper({
       >
         <Plus className="h-5 w-5" strokeWidth={2.5} />
       </button>
+    </div>
+  );
+});
+
+const ModalAddToCartFooter = memo(function ModalAddToCartFooter({
+  isOrderOpen,
+  modalCartBtnRef,
+  modalStepperRef,
+  onAddToCart,
+  selectedProduct,
+}: {
+  isOrderOpen: boolean;
+  modalCartBtnRef: MutableRefObject<HTMLButtonElement | null>;
+  modalStepperRef: MutableRefObject<HTMLDivElement | null>;
+  onAddToCart: (productId: string, quantity: number) => void;
+  selectedProduct: ProductWithImage;
+}) {
+  const [pendingQty, setPendingQty] = useState(0);
+
+  const handleDecrease = useCallback(() => {
+    const minQty = selectedProduct.min_order_qty ?? 1;
+    const stepQty = selectedProduct.step_order_qty ?? 1;
+    setPendingQty((prev) => {
+      if (prev <= minQty) return 0;
+      return prev - stepQty;
+    });
+  }, [selectedProduct.min_order_qty, selectedProduct.step_order_qty]);
+
+  const handleIncrease = useCallback(() => {
+    if (!isOrderOpen) return;
+    const minQty = selectedProduct.min_order_qty ?? 1;
+    const stepQty = selectedProduct.step_order_qty ?? 1;
+    setPendingQty((prev) => (prev === 0 ? minQty : prev + stepQty));
+  }, [isOrderOpen, selectedProduct.min_order_qty, selectedProduct.step_order_qty]);
+
+  const handleAddToCart = useCallback(() => {
+    if (!isOrderOpen || pendingQty === 0) return;
+    onAddToCart(selectedProduct.id, pendingQty);
+    setPendingQty(0);
+
+    const stepperEl = modalStepperRef.current;
+    const cartEl = modalCartBtnRef.current;
+    if (!stepperEl || !cartEl) return;
+
+    const stepperRect = stepperEl.getBoundingClientRect();
+    const cartRect = cartEl.getBoundingClientRect();
+    const size = 48;
+    const startX = stepperRect.left + stepperRect.width / 2 - size / 2;
+    const startY = stepperRect.top + stepperRect.height / 2 - size / 2;
+    const endX = cartRect.left + cartRect.width / 2 - size / 2;
+    const endY = cartRect.top + cartRect.height / 2 - size / 2;
+
+    const flyEl = document.createElement("div");
+    flyEl.style.cssText = [
+      "position:fixed",
+      `left:${startX}px`,
+      `top:${startY}px`,
+      `width:${size}px`,
+      `height:${size}px`,
+      "border-radius:14px",
+      "overflow:hidden",
+      "box-shadow:0 12px 32px rgba(0,0,0,0.25)",
+      "pointer-events:none",
+      "z-index:9999",
+    ].join(";");
+
+    const imageNode = document.createElement("img");
+    imageNode.src =
+      selectedProduct.product_images?.[0]?.public_url ??
+      "/placeholders/product-placeholder.svg";
+    imageNode.style.cssText = "width:100%;height:100%;object-fit:cover";
+    flyEl.appendChild(imageNode);
+    document.body.appendChild(flyEl);
+
+    const dx = endX - startX;
+    const dy = endY - startY;
+    flyEl
+      .animate(
+        [
+          { transform: "translate(0,0) scale(1)", opacity: "1", offset: 0 },
+          {
+            transform: `translate(${dx * 0.6}px,${dy * 0.4}px) scale(0.85)`,
+            opacity: "1",
+            offset: 0.4,
+          },
+          {
+            transform: `translate(${dx}px,${dy}px) scale(0.2)`,
+            opacity: "0",
+            offset: 1,
+          },
+        ],
+        { duration: 550, easing: "cubic-bezier(0.4,0,0.2,1)", fill: "forwards" },
+      )
+      .addEventListener("finish", () => {
+        document.body.removeChild(flyEl);
+      });
+  }, [isOrderOpen, modalCartBtnRef, modalStepperRef, onAddToCart, pendingQty, selectedProduct]);
+
+  return (
+    <div className="z-30 border-t border-slate-100 bg-white px-5 pb-8 pt-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+      <div className="mx-auto max-w-lg">
+        <div className="flex items-center gap-3">
+          <div ref={modalStepperRef}>
+            <ModalQuantityStepper
+              quantity={pendingQty}
+              unitLabel={getDisplayUnit(selectedProduct.sale_unit_label)}
+              onDecrease={handleDecrease}
+              onIncrease={handleIncrease}
+            />
+          </div>
+
+          <button
+            disabled={!isOrderOpen || pendingQty === 0}
+            onClick={handleAddToCart}
+            className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-2xl font-bold transition-all active:scale-95 ${
+              !isOrderOpen
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : pendingQty > 0
+                ? "bg-[#003366] text-white shadow-md shadow-blue-900/20"
+                : "bg-slate-100 text-slate-300 cursor-not-allowed"
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              {!isOrderOpen ? (
+                <Lock className="h-4 w-4" strokeWidth={2} />
+              ) : (
+                <ShoppingCart className="h-4.5 w-4.5" strokeWidth={2} />
+              )}
+              <span className="text-[14px] font-bold">
+                {!isOrderOpen ? "ปิดรับออเดอร์" : "เพิ่มเข้าตะกร้า"}
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
   );
 });
@@ -527,7 +691,6 @@ export default function OrderClient({
   // Product detail modal state
   const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pendingModalQty, setPendingModalQty] = useState(0);
   const [modalImageIndexes, setModalImageIndexes] = useState<Record<string, number>>({});
   const [modalRecommendationIndex, setModalRecommendationIndex] = useState(0);
   const [modalRecommendationPageCount, setModalRecommendationPageCount] = useState(1);
@@ -540,11 +703,51 @@ export default function OrderClient({
   const modalRecommendationsRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const closeModalTimerRef = useRef<number | null>(null);
+  const recommendationRafRef = useRef<number | null>(null);
+  const recommendationScrollElementRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchCurrentXRef = useRef<number | null>(null);
 
   // Swipe logic for modal images
   const minSwipeDistance = 24;
+
+  const closeProductModal = () => {
+    setIsModalOpen(false);
+    setIsShareMenuOpen(false);
+    setShareFeedback("");
+    if (closeModalTimerRef.current !== null) {
+      window.clearTimeout(closeModalTimerRef.current);
+    }
+    // Don't reset selectedProductIndex immediately to avoid content jump during exit animation
+    closeModalTimerRef.current = window.setTimeout(() => {
+      setSelectedProductIndex(null);
+      closeModalTimerRef.current = null;
+    }, 500);
+  };
+
+  const setModalImageIndex = useCallback((productId: string, nextIndex: number) => {
+    setModalImageIndexes((prev) => ({
+      ...prev,
+      [productId]: Math.max(0, nextIndex),
+    }));
+  }, []);
+
+  const navigateModalImage = useCallback((productId: string, imageCount: number, direction: "prev" | "next") => {
+    if (imageCount <= 1) return;
+
+    setModalImageIndexes((prev) => {
+      const currentIndex = prev[productId] ?? 0;
+      const nextIndex =
+        direction === "next"
+          ? (currentIndex + 1) % imageCount
+          : (currentIndex - 1 + imageCount) % imageCount;
+
+      return {
+        ...prev,
+        [productId]: nextIndex,
+      };
+    });
+  }, []);
 
   const onTouchStart = (e: React.TouchEvent) => {
     const startX = e.targetTouches[0].clientX;
@@ -572,55 +775,19 @@ export default function OrderClient({
     touchCurrentXRef.current = null;
   };
 
-  const closeProductModal = () => {
-    setIsModalOpen(false);
-    setIsShareMenuOpen(false);
-    setShareFeedback("");
-    if (closeModalTimerRef.current !== null) {
-      window.clearTimeout(closeModalTimerRef.current);
-    }
-    // Don't reset selectedProductIndex immediately to avoid content jump during exit animation
-    closeModalTimerRef.current = window.setTimeout(() => {
-      setSelectedProductIndex(null);
-      closeModalTimerRef.current = null;
-    }, 500);
-  };
-
-  const setModalImageIndex = (productId: string, nextIndex: number) => {
-    setModalImageIndexes((prev) => ({
-      ...prev,
-      [productId]: Math.max(0, nextIndex),
-    }));
-  };
-
-  const navigateModalImage = (productId: string, imageCount: number, direction: "prev" | "next") => {
-    if (imageCount <= 1) return;
-
-    setModalImageIndexes((prev) => {
-      const currentIndex = prev[productId] ?? 0;
-      const nextIndex =
-        direction === "next"
-          ? (currentIndex + 1) % imageCount
-          : (currentIndex - 1 + imageCount) % imageCount;
-
-      return {
-        ...prev,
-        [productId]: nextIndex,
-      };
-    });
-  };
-
   useEffect(() => {
     return () => {
       if (closeModalTimerRef.current !== null) {
         window.clearTimeout(closeModalTimerRef.current);
       }
+      if (recommendationRafRef.current !== null) {
+        window.cancelAnimationFrame(recommendationRafRef.current);
+      }
     };
   }, []);
 
-  // Reset pending qty and image load state when switching products in the modal
+  // Reset image load state when switching products in the modal
   useEffect(() => {
-    setPendingModalQty(0);
     setIsModalImageLoaded(false);
   }, [selectedProductIndex]);
 
@@ -1042,6 +1209,17 @@ export default function OrderClient({
     animateProductToCart(sourceImage ?? null);
   }, [animateProductToCart, isOrderOpen]);
 
+  const addModalItemsToCart = useCallback(
+    (productId: string, quantityToAdd: number) => {
+      if (!isOrderOpen || quantityToAdd <= 0) return;
+      setCart((prev) => ({
+        ...prev,
+        [productId]: (prev[productId] || 0) + quantityToAdd,
+      }));
+    },
+    [isOrderOpen],
+  );
+
   const addPendingSelectionToCart = (
     productId: string,
     sourceImage?: HTMLImageElement | null,
@@ -1203,7 +1381,6 @@ export default function OrderClient({
       closeModalTimerRef.current = null;
     }
 
-    setPendingModalQty(0);
     setIsShareMenuOpen(false);
     setShareFeedback("");
     setSelectedProductIndex(index);
@@ -1355,7 +1532,13 @@ export default function OrderClient({
   }, [selectedProduct?.id, syncRecommendationIndicator]);
 
   const handleRecommendationScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    syncRecommendationIndicator(event.currentTarget);
+    recommendationScrollElementRef.current = event.currentTarget;
+    if (recommendationRafRef.current !== null) return;
+
+    recommendationRafRef.current = window.requestAnimationFrame(() => {
+      recommendationRafRef.current = null;
+      syncRecommendationIndicator(recommendationScrollElementRef.current);
+    });
   }, [syncRecommendationIndicator]);
 
   const copyShareLink = useCallback(async () => {
@@ -2099,7 +2282,12 @@ export default function OrderClient({
         }
       `}</style>
 
-      <div key={currentView} className="flex-1 flex flex-col animate-slide-in-right overflow-x-clip">
+      <div
+        key={currentView}
+        className={`flex-1 flex flex-col overflow-x-clip ${
+          currentView === "catalog" ? "" : "animate-slide-in-right"
+        }`}
+      >
         {/* Header */}
       {currentView === "catalog" ? (
         <header className="relative bg-white shadow-sm">
@@ -2244,7 +2432,7 @@ export default function OrderClient({
 
       {/* ── Sticky search + category pills + tabs (catalog only) ── */}
       {currentView === "catalog" && (
-        <div className="sticky top-0 z-30 bg-white shadow-sm" style={{ willChange: "transform" }}>
+        <div className="sticky top-0 z-30 bg-white shadow-sm">
           {/* Search bar */}
           <div className="px-4 pt-3 pb-2">
             <div className="relative">
@@ -3331,111 +3519,14 @@ export default function OrderClient({
           </div>
 
           {/* Footer - Stepper + Add to Cart */}
-          <div className="z-30 border-t border-slate-100 bg-white px-5 pb-8 pt-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-            <div className="mx-auto max-w-lg">
-              <div className="flex items-center gap-3">
-                <div ref={modalStepperRef}>
-                  <ModalQuantityStepper
-                    quantity={pendingModalQty}
-                    unitLabel={getDisplayUnit(selectedProduct.sale_unit_label)}
-                    onDecrease={() => {
-                      const minQty = selectedProduct.min_order_qty ?? 1;
-                      const stepQty = selectedProduct.step_order_qty ?? 1;
-                      setPendingModalQty((prev) => {
-                        if (prev <= minQty) return 0;
-                        return prev - stepQty;
-                      });
-                    }}
-                    onIncrease={() => {
-                      if (!isOrderOpen) return;
-                      const minQty = selectedProduct.min_order_qty ?? 1;
-                      const stepQty = selectedProduct.step_order_qty ?? 1;
-                      setPendingModalQty((prev) => (prev === 0 ? minQty : prev + stepQty));
-                    }}
-                  />
-                </div>
-
-              <button
-                disabled={!isOrderOpen || pendingModalQty === 0}
-                onClick={() => {
-                  if (!isOrderOpen) return;
-                  setCart((prev) => ({
-                    ...prev,
-                    [selectedProduct.id]: (prev[selectedProduct.id] || 0) + pendingModalQty,
-                  }));
-                  setPendingModalQty(0);
-
-                  const stepperEl = modalStepperRef.current;
-                  const cartEl = modalCartBtnRef.current;
-                  if (!stepperEl || !cartEl) return;
-
-                  const stepperRect = stepperEl.getBoundingClientRect();
-                  const cartRect = cartEl.getBoundingClientRect();
-                  const SIZE = 48;
-                  const startX = stepperRect.left + stepperRect.width / 2 - SIZE / 2;
-                  const startY = stepperRect.top + stepperRect.height / 2 - SIZE / 2;
-                  const endX = cartRect.left + cartRect.width / 2 - SIZE / 2;
-                  const endY = cartRect.top + cartRect.height / 2 - SIZE / 2;
-
-                  const flyEl = document.createElement("div");
-                  flyEl.style.cssText = [
-                    "position:fixed",
-                    `left:${startX}px`,
-                    `top:${startY}px`,
-                    `width:${SIZE}px`,
-                    `height:${SIZE}px`,
-                    "border-radius:14px",
-                    "overflow:hidden",
-                    "box-shadow:0 12px 32px rgba(0,0,0,0.25)",
-                    "pointer-events:none",
-                    "z-index:9999",
-                  ].join(";");
-
-                  const imgNode = document.createElement("img");
-                  imgNode.src =
-                    selectedProduct.product_images?.[0]?.public_url ??
-                    "/placeholders/product-placeholder.svg";
-                  imgNode.style.cssText = "width:100%;height:100%;object-fit:cover";
-                  flyEl.appendChild(imgNode);
-                  document.body.appendChild(flyEl);
-
-                  const dx = endX - startX;
-                  const dy = endY - startY;
-                  flyEl
-                    .animate(
-                      [
-                        { transform: "translate(0,0) scale(1)", opacity: "1", offset: 0 },
-                        { transform: `translate(${dx * 0.6}px,${dy * 0.4}px) scale(0.85)`, opacity: "1", offset: 0.4 },
-                        { transform: `translate(${dx}px,${dy}px) scale(0.2)`, opacity: "0", offset: 1 },
-                      ],
-                      { duration: 550, easing: "cubic-bezier(0.4,0,0.2,1)", fill: "forwards" }
-                    )
-                    .addEventListener("finish", () => {
-                      document.body.removeChild(flyEl);
-                    });
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-2xl font-bold transition-all active:scale-95 ${
-                  !isOrderOpen
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : pendingModalQty > 0
-                    ? "bg-[#003366] text-white shadow-md shadow-blue-900/20"
-                    : "bg-slate-100 text-slate-300 cursor-not-allowed"
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  {!isOrderOpen ? (
-                    <Lock className="h-4 w-4" strokeWidth={2} />
-                  ) : (
-                    <ShoppingCart className="h-4.5 w-4.5" strokeWidth={2} />
-                  )}
-                  <span className="text-[14px] font-bold">
-                    {!isOrderOpen ? "ปิดรับออเดอร์" : "เพิ่มเข้าตะกร้า"}
-                  </span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
+          <ModalAddToCartFooter
+            key={selectedProduct.id}
+            isOrderOpen={isOrderOpen}
+            selectedProduct={selectedProduct}
+            modalStepperRef={modalStepperRef}
+            modalCartBtnRef={modalCartBtnRef}
+            onAddToCart={addModalItemsToCart}
+          />
       </div>
       )}
 
