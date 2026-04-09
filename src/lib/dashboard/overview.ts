@@ -41,6 +41,7 @@ export type TopProduct = {
   productId: string;
   productName: string;
   totalAmount: number;
+  imageUrl: string | null;
 };
 
 export type DashboardOverview = {
@@ -154,7 +155,7 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
         total_amount,
         customer_id,
         customers!inner(name),
-        order_items(product_id, line_total, products(name))
+        order_items(product_id, line_total, products(name, product_images(public_url, sort_order)))
       `)
       .eq("organization_id", organizationId)
       .in("status", ["submitted", "confirmed"])
@@ -186,7 +187,7 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
     order_items: Array<{
       product_id: string;
       line_total: unknown;
-      products: { name: string } | null;
+      products: { name: string; product_images?: Array<{ public_url: string; sort_order: number }> | null } | null;
     }>;
   }[];
 
@@ -246,21 +247,32 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
 
   // ── Top 5 products (by line_total this month) ─────────────────────────────
 
-  const productMap = new Map<string, { name: string; total: number }>();
+  const productMap = new Map<string, { name: string; total: number; imageUrl: string | null }>();
   for (const order of monthRaw) {
     for (const item of order.order_items ?? []) {
+      const sortedImages = [...(item.products?.product_images ?? [])].sort(
+        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+      );
+      const firstImageUrl = sortedImages[0]?.public_url ?? null;
       const prev = productMap.get(item.product_id) ?? {
         name: item.products?.name ?? "—",
         total: 0,
+        imageUrl: firstImageUrl,
       };
       productMap.set(item.product_id, {
         name: prev.name,
         total: prev.total + toNum(item.line_total),
+        imageUrl: prev.imageUrl ?? firstImageUrl,
       });
     }
   }
   const topProducts: TopProduct[] = [...productMap.entries()]
-    .map(([id, v]) => ({ productId: id, productName: v.name, totalAmount: v.total }))
+    .map(([id, v]) => ({
+      productId: id,
+      productName: v.name,
+      totalAmount: v.total,
+      imageUrl: v.imageUrl,
+    }))
     .sort((a, b) => b.totalAmount - a.totalAmount)
     .slice(0, 5);
 

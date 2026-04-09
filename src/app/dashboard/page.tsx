@@ -1,510 +1,642 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import {
-  AlertCircle,
   ArrowRight,
   Boxes,
   CheckCircle2,
-  ChevronRight,
   ClipboardCheck,
   ClipboardList,
   FileText,
   Package,
   Store,
-  TrendingDown,
   TrendingUp,
   Truck,
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { AppSidebarLayout } from "@/components/app-sidebar";
 import { requireAppSession, roleHomePage } from "@/lib/auth/authorization";
-import { getDashboardOverview, type WeeklyBar } from "@/lib/dashboard/overview";
+import { getDashboardOverview, type RecentOrder, type WeeklyBar } from "@/lib/dashboard/overview";
 import { getTodayInBangkok } from "@/lib/orders/date";
 
 export const metadata = { title: "ภาพรวม" };
 
-// ─── Formatters ───────────────────────────────────────────────────────────────
-
-function fmt(n: number) {
+function fmtNumber(n: number) {
   return n.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function fmtMoney(n: number) {
-  if (n >= 1_000_000) return `฿${(n / 1_000_000).toLocaleString("th-TH", { maximumFractionDigits: 1 })}M`;
-  if (n >= 10_000) return `฿${(n / 1_000).toLocaleString("th-TH", { maximumFractionDigits: 1 })}K`;
-  return `฿${fmt(n)}`;
+  if (n >= 1_000_000) {
+    return `฿${(n / 1_000_000).toLocaleString("th-TH", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    })}M`;
+  }
+  return `฿${fmtNumber(n)}`;
 }
 
-function fmtDate(iso: string) {
+function fmtMoneyNoSymbol(n: number) {
+  if (n >= 1_000_000) {
+    return `${(n / 1_000_000).toLocaleString("th-TH", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    })}M`;
+  }
+  return fmtNumber(n);
+}
+
+function fmtThaiDateLong(iso: string) {
   return new Intl.DateTimeFormat("th-TH-u-ca-buddhist", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
     timeZone: "Asia/Bangkok",
-  }).format(new Date(iso + "T00:00:00+07:00"));
+  }).format(new Date(`${iso}T00:00:00+07:00`));
 }
 
-// ─── SVG Area Chart ───────────────────────────────────────────────────────────
+function fmtThaiShortDate(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year + 543}`;
+}
 
-function buildCurve(pts: { x: number; y: number }[]): string {
-  if (pts.length < 2) return pts.length === 1 ? `M ${pts[0].x} ${pts[0].y}` : "";
-  let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1];
-    const b = pts[i];
-    const cx = (b.x - a.x) * 0.42;
-    d += ` C ${(a.x + cx).toFixed(2)} ${a.y.toFixed(2)} ${(b.x - cx).toFixed(2)} ${b.y.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+function fmtThaiWeekdayShort(iso: string) {
+  return new Intl.DateTimeFormat("th-TH", {
+    weekday: "short",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date(`${iso}T00:00:00+07:00`));
+}
+
+function fmtChangePercent(value: number | null) {
+  if (value === null || Number.isNaN(value) || !Number.isFinite(value)) return "-";
+  const rounded = Math.abs(value) < 0.05 ? 0 : Math.round(value * 10) / 10;
+  if (rounded > 0) return `+${rounded.toLocaleString("th-TH", { maximumFractionDigits: 1 })}%`;
+  if (rounded < 0) return `${rounded.toLocaleString("th-TH", { maximumFractionDigits: 1 })}%`;
+  return "0%";
+}
+
+function buildCurve(points: Array<{ x: number; y: number }>) {
+  if (points.length < 2) {
+    return points.length === 1 ? `M ${points[0].x} ${points[0].y}` : "";
   }
-  return d;
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const handleX = (b.x - a.x) * 0.42;
+    path += ` C ${(a.x + handleX).toFixed(2)} ${a.y.toFixed(2)} ${(b.x - handleX).toFixed(2)} ${b.y.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+  }
+  return path;
 }
 
-function AreaChart({ bars }: { bars: WeeklyBar[] }) {
-  const W = 600;
-  const H = 160;
-  const p = { t: 28, r: 60, b: 28, l: 8 };
-  const pw = W - p.l - p.r;
-  const ph = H - p.t - p.b;
-  const n = bars.length;
-  const maxVal = Math.max(...bars.map((b) => b.amount), 1);
-  const baseY = p.t + ph;
-
-  const pts = bars.map((b, i) => ({
-    x: p.l + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw),
-    y: p.t + (1 - b.amount / maxVal) * ph,
+function TrendChart({ bars }: { bars: WeeklyBar[] }) {
+  const width = 620;
+  const height = 178;
+  const padding = { top: 44, right: 22, bottom: 30, left: 12 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(...bars.map((bar) => bar.amount), 1);
+  const points = bars.map((bar, index) => ({
+    x: padding.left + (bars.length <= 1 ? plotWidth / 2 : (index / (bars.length - 1)) * plotWidth),
+    y: padding.top + (1 - bar.amount / maxValue) * plotHeight,
   }));
-
-  const curve = buildCurve(pts);
-  const area = pts.length >= 2
-    ? `${curve} L ${pts[n - 1].x.toFixed(2)} ${baseY} L ${pts[0].x.toFixed(2)} ${baseY} Z`
-    : "";
+  const linePath = buildCurve(points);
+  const areaPath =
+    points.length > 1
+      ? `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${padding.top + plotHeight} L ${points[0].x.toFixed(2)} ${padding.top + plotHeight} Z`
+      : "";
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" aria-label="กราฟยอดขาย 7 วัน">
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" aria-label="แนวโน้มยอดขาย 7 วันล่าสุด">
       <defs>
-        <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#003366" stopOpacity="0.13" />
-          <stop offset="100%" stopColor="#003366" stopOpacity="0" />
+        <linearGradient id="dashboardTrendArea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1a237e" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#1a237e" stopOpacity="0.02" />
         </linearGradient>
       </defs>
-
-      {[0.5, 1.0].map((r, i) => (
-        <g key={i}>
-          <line
-            x1={p.l} y1={p.t + ph * (1 - r)}
-            x2={W - p.r} y2={p.t + ph * (1 - r)}
-            stroke="#eef0f4" strokeWidth="1"
-          />
-          <text x={W - p.r + 8} y={p.t + ph * (1 - r) + 4}
-            fontSize="9.5" fill="#c0c8d4" textAnchor="start">
-            {fmtMoney(maxVal * r)}
+      {areaPath && <path d={areaPath} fill="url(#dashboardTrendArea)" />}
+      {linePath && (
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#000666"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {points.map((point, index) => (
+        <g key={bars[index].date}>
+          <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 4.5 : 3.3} fill="#000666" />
+          {(() => {
+            const levelOffset = index % 3 === 0 ? 0 : index % 3 === 1 ? 20 : 40;
+            const labelY = Math.max(16, point.y - 24 - levelOffset);
+            const isZero = bars[index].amount <= 0;
+            return (
+              <>
+                <line
+                  className="sm:hidden"
+                  x1={point.x}
+                  y1={point.y - 4}
+                  x2={point.x}
+                  y2={labelY + 4}
+                  stroke={isZero ? "#cbd5e1" : "#94a3b8"}
+                  strokeWidth="1.2"
+                />
+                <text
+                  className="sm:hidden"
+                  x={point.x}
+                  y={labelY}
+                  textAnchor="middle"
+                  fontSize="14.5"
+                  fill={isZero ? "#64748b" : "#000666"}
+                  fontWeight="800"
+                >
+                  {fmtMoneyNoSymbol(bars[index].amount)}
+                </text>
+              </>
+            );
+          })()}
+          <text
+            x={point.x}
+            y={height - 8}
+            textAnchor="middle"
+            fontSize="12"
+            fill={index === points.length - 1 ? "#000666" : "#6b7280"}
+            fontWeight={index === points.length - 1 ? "700" : "500"}
+          >
+            {bars[index].label}
           </text>
         </g>
       ))}
-
-      <line x1={p.l} y1={baseY} x2={W - p.r} y2={baseY} stroke="#e8ecf2" strokeWidth="1" />
-
-      {area && <path d={area} fill="url(#aGrad)" />}
-      {curve && <path d={curve} fill="none" stroke="#003366" strokeWidth="2.2"
-        strokeLinecap="round" strokeLinejoin="round" />}
-
-      {pts.map((pt, i) => {
-        const isToday = i === n - 1;
-        const bar = bars[i];
-        return (
-          <g key={bar.date}>
-            {isToday && <circle cx={pt.x} cy={pt.y} r="11" fill="#003366" fillOpacity="0.08" />}
-            <circle cx={pt.x} cy={pt.y} r={isToday ? 5 : 3}
-              fill={isToday ? "#003366" : "white"}
-              stroke={isToday ? "none" : "#003366"}
-              strokeWidth={isToday ? 0 : 1.5}
-              strokeOpacity={0.35}
-            />
-            {isToday && bar.amount > 0 && (
-              <text x={pt.x} y={pt.y - 16} textAnchor="middle"
-                fontSize="10.5" fill="#003366" fontWeight="700">
-                {fmtMoney(bar.amount)}
-              </text>
-            )}
-            <text x={pt.x} y={H - 5} textAnchor="middle" fontSize="10"
-              fill={isToday ? "#003366" : "#b8c2d0"}
-              fontWeight={isToday ? "700" : "400"}>
-              {bar.label}
-            </text>
-          </g>
-        );
-      })}
     </svg>
   );
 }
 
-// ─── Ranked List ──────────────────────────────────────────────────────────────
-
-function RankedList({
-  items,
-  barColor,
-  emptyText,
-}: {
-  items: { id: string; label: string; amount: number }[];
-  barColor: string;
-  emptyText: string;
-}) {
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 py-8 text-black/20">
-        <Package className="h-6 w-6" strokeWidth={1.5} />
-        <p className="text-xs">{emptyText}</p>
-      </div>
-    );
+function statusBadge(status: RecentOrder["status"]) {
+  if (status === "submitted") {
+    return { label: "รอยืนยัน", className: "bg-amber-100 text-amber-700" };
   }
+  if (status === "confirmed") {
+    return { label: "ยืนยันแล้ว", className: "bg-sky-100 text-sky-700" };
+  }
+  if (status === "cancelled") {
+    return { label: "ยกเลิก", className: "bg-rose-100 text-rose-700" };
+  }
+  return { label: "ฉบับร่าง", className: "bg-slate-100 text-slate-600" };
+}
 
-  const maxAmt = items[0].amount;
-  const medalBg = ["bg-amber-400", "bg-black/[0.12]", "bg-amber-700/25", "bg-black/[0.07]", "bg-black/[0.07]"];
-  const medalText = ["text-white", "text-black/50", "text-amber-800/70", "text-black/30", "text-black/30"];
+function KpiCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  tone = "primary",
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: ReactNode;
+  tone?: "primary" | "success";
+}) {
+  const iconBg = tone === "success" ? "bg-emerald-100 text-emerald-700" : "bg-[#e9ecff] text-[#000666]";
+  const valueColor = tone === "success" ? "text-emerald-700" : "text-[#000666]";
 
   return (
-    <ul className="space-y-3">
-      {items.map((item, i) => {
-        const pct = maxAmt > 0 ? (item.amount / maxAmt) * 100 : 0;
-        return (
-          <li key={item.id}>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold tabular-nums ${medalBg[i]} ${medalText[i]}`}>
-                {i + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.label}</span>
-              <span className="shrink-0 text-sm font-bold tabular-nums">{fmtMoney(item.amount)}</span>
-            </div>
-            <div className="ml-7 mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-black/[0.06]">
-              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <article className="rounded-2xl bg-white p-4 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[13px] font-semibold text-[#454652]">{title}</p>
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${iconBg}`}>{icon}</span>
+      </div>
+      <p className={`mt-3 text-3xl font-black leading-none tabular-nums sm:text-[2rem] ${valueColor}`}>{value}</p>
+      <p className="mt-1.5 text-[12px] font-medium text-[#454652]">{subtitle}</p>
+    </article>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function ActionCard({
+  href,
+  title,
+  detail,
+  icon,
+  badge,
+}: {
+  href: string;
+  title: string;
+  detail: string;
+  icon: ReactNode;
+  badge?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl bg-white p-4 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] transition hover:-translate-y-0.5"
+    >
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef1ff] text-[#000666]">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-bold text-[#1b1b21]">{title}</p>
+            {badge ? (
+              <span className="rounded-full bg-[#000666] px-2 py-0.5 text-xs font-bold text-white">{badge}</span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs font-medium text-[#454652]">{detail}</p>
+        </div>
+        <ArrowRight className="h-4 w-4 shrink-0 text-[#8f94a3] transition group-hover:translate-x-0.5" />
+      </div>
+    </Link>
+  );
+}
+
+function TopCustomersBarBlock({
+  items,
+}: {
+  items: Array<{ id: string; label: string; amount: number }>;
+}) {
+  const maxAmount = items.length > 0 ? Math.max(...items.map((item) => item.amount), 1) : 1;
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] sm:p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#eef1ff] text-[#000666]">
+          <Store className="h-4.5 w-4.5" strokeWidth={2.2} />
+        </span>
+        <h3 className="text-base font-bold text-[#1b1b21]">ร้านค้ายอดขายสูงสุด 5 อันดับ</h3>
+      </div>
+      {items.length === 0 ? (
+        <p className="py-6 text-center text-sm font-medium text-[#7b8091]">ยังไม่มีข้อมูลในช่วงนี้</p>
+      ) : (
+        <div className="pb-1">
+          <div
+            className="grid items-end gap-2 sm:gap-3"
+            style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(items.length, 5))}, minmax(0, 1fr))` }}
+          >
+            {items.map((item, index) => {
+              const heightPct = Math.max(10, (item.amount / maxAmount) * 100);
+              return (
+                <div key={item.id} className="min-w-0">
+                  <p className="truncate text-center text-[10px] font-bold tabular-nums text-[#000666] sm:text-[11px]">
+                    {fmtMoney(item.amount)}
+                  </p>
+                  <div className="mt-2 flex h-32 items-end justify-center sm:h-40">
+                    <div
+                      className="w-6 rounded-md sm:w-10 sm:rounded-lg"
+                      style={{
+                        height: `${heightPct}%`,
+                        backgroundColor: CUSTOMER_BAR_COLORS[index % CUSTOMER_BAR_COLORS.length],
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 text-center">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#e9ecff] text-[10px] font-bold text-[#000666]">
+                      {index + 1}
+                    </span>
+                    <p className="mt-1.5 line-clamp-2 text-[10px] font-semibold leading-3.5 text-[#1b1b21] sm:text-xs sm:leading-4">
+                      {item.label}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const CUSTOMER_BAR_COLORS = ["#000666", "#D8CDBA", "#F59E0B", "#9CA3AF", "#8B5E3C"];
+
+function TopProductsListBlock({
+  items,
+}: {
+  items: Array<{ id: string; label: string; amount: number; imageUrl: string | null }>;
+}) {
+  const maxAmount = items.length > 0 ? Math.max(...items.map((item) => item.amount), 1) : 1;
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] sm:p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#eef1ff] text-[#000666]">
+          <Package className="h-4.5 w-4.5" strokeWidth={2.2} />
+        </span>
+        <h3 className="text-base font-bold text-[#1b1b21]">สินค้าขายดี 5 อันดับแรก</h3>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="py-6 text-center text-sm font-medium text-[#7b8091]">ยังไม่มีข้อมูลในช่วงนี้</p>
+      ) : (
+        <ul className="divide-y divide-[#e4e8f1]">
+          {items.map((item, index) => {
+            const progress = Math.max(8, (item.amount / maxAmount) * 100);
+            return (
+              <li key={item.id} className="py-3">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                  <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-white">
+                    <Image
+                      src={item.imageUrl || "/placeholders/product-placeholder.svg"}
+                      alt={item.label}
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                    <span className="absolute left-1 top-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#000666] px-1 text-[9px] font-bold text-white">
+                      {index + 1}
+                    </span>
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[#1b1b21]">{item.label}</p>
+                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#e5e7ef]">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(135deg,#000666,#1a237e)]"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="shrink-0 text-sm font-bold tabular-nums text-[#000666]">{fmtMoney(item.amount)}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 export default async function DashboardPage() {
   const session = await requireAppSession();
   if (session.role === "warehouse") redirect(roleHomePage("warehouse"));
+
   const today = getTodayInBangkok();
-  const { kpi, weeklyTrend, topCustomers, topProducts } = await getDashboardOverview(
+  const { kpi, recentOrders, topCustomers, topProducts, weeklyTrend } = await getDashboardOverview(
     session.organizationId,
   );
 
-  const weeklyTotal = weeklyTrend.reduce((s, b) => s + b.amount, 0);
-  const weeklyCount = weeklyTrend.reduce((s, b) => s + b.count, 0);
-  const weeklyAvg = weeklyCount > 0 ? weeklyTotal / 7 : 0;
-  const countDiff = (weeklyTrend[6]?.count ?? 0) - (weeklyTrend[5]?.count ?? 0);
-  const hasActionItems = kpi.submittedOrderCount > 0 || kpi.pendingDeliveryCount > 0;
-
-  const customerItems = topCustomers.map((c) => ({
-    id: c.customerId, label: c.customerName, amount: c.totalAmount,
+  const weeklyTotal = weeklyTrend.reduce((sum, item) => sum + item.amount, 0);
+  const weeklyCount = weeklyTrend.reduce((sum, item) => sum + item.count, 0);
+  const weeklyRows = weeklyTrend.map((row, index) => {
+    const prev = index > 0 ? weeklyTrend[index - 1].amount : null;
+    const changePct = prev !== null && prev > 0 ? ((row.amount - prev) / prev) * 100 : null;
+    return {
+      ...row,
+      changePct,
+    };
+  });
+  const weeklyAvgAmount = weeklyTrend.length > 0 ? weeklyTotal / weeklyTrend.length : 0;
+  const topCustomerRows = topCustomers.map((row) => ({
+    id: row.customerId,
+    label: row.customerName,
+    amount: row.totalAmount,
   }));
-  const productItems = topProducts.map((p) => ({
-    id: p.productId, label: p.productName, amount: p.totalAmount,
+  const topProductRows = topProducts.map((row) => ({
+    id: row.productId,
+    label: row.productName,
+    amount: row.totalAmount,
+    imageUrl: row.imageUrl,
   }));
 
   return (
     <AppSidebarLayout>
-      <div className="min-h-screen bg-[#f4f7fb]">
-
-        {/* ── Page header ─────────────────────────────────────────────── */}
-        <div className="border-b border-black/[0.06] bg-white">
-          <div className="h-[3px] bg-gradient-to-r from-[#003366] via-[#1a5fa8] to-[#003366]" />
-          <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
-            <div className="flex items-start justify-between gap-4">
+      <div className="min-h-screen bg-[#fbf8ff] text-[#1b1b21]">
+        <div className="mx-auto max-w-6xl px-4 pb-8 pt-5 sm:px-6 sm:pt-7 lg:px-8">
+          <header className="rounded-2xl bg-[#f5f2fb] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/25">
-                  T&amp;Y Noodle · ภาพรวม
-                </p>
-                <h1 className="mt-1 text-xl font-bold sm:text-2xl">สวัสดี, {session.displayName}</h1>
-                <p className="mt-0.5 text-xs text-black/40">{fmtDate(today)}</p>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#5f6270]">T&Y Noodle</p>
+                <h1 className="mt-1 text-2xl font-black leading-tight text-[#000666] sm:text-[2rem]">แดชบอร์ดภาพรวมรายวัน</h1>
+                <p className="mt-1.5 text-sm font-medium text-[#454652]">สวัสดี {session.displayName} · {fmtThaiDateLong(today)}</p>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  ออนไลน์
-                </span>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Link
+                  href="/orders/incoming"
+                  className="inline-flex items-center justify-center rounded-xl bg-[linear-gradient(135deg,#000666,#1a237e)] px-4 py-2.5 text-sm font-bold text-white"
+                >
+                  รับออเดอร์
+                </Link>
+                <Link
+                  href="/delivery"
+                  className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#000666]"
+                >
+                  ใบจัดส่ง
+                </Link>
               </div>
             </div>
-          </div>
-        </div>
+          </header>
 
-        <div className="mx-auto max-w-5xl space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+          <main className="mt-6 space-y-8 sm:mt-8 sm:space-y-10">
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              <KpiCard
+                title="ออเดอร์วันนี้"
+                value={fmtNumber(kpi.todayOrderCount)}
+                subtitle="รายการ"
+                icon={<ClipboardList className="h-4.5 w-4.5" strokeWidth={2.2} />}
+              />
+              <KpiCard
+                title="ยอดขายวันนี้"
+                value={fmtMoney(kpi.todayOrderAmount)}
+                subtitle="บาท"
+                icon={<TrendingUp className="h-4.5 w-4.5" strokeWidth={2.2} />}
+                tone="success"
+              />
+              <KpiCard
+                title="รอยืนยันออเดอร์"
+                value={fmtNumber(kpi.submittedOrderCount)}
+                subtitle="รายการ"
+                icon={<ClipboardCheck className="h-4.5 w-4.5" strokeWidth={2.2} />}
+              />
+              <KpiCard
+                title="ยอดส่งสำเร็จเดือนนี้"
+                value={fmtMoney(kpi.monthDeliveredAmount)}
+                subtitle="ยอดสะสม"
+                icon={<TrendingUp className="h-4.5 w-4.5" strokeWidth={2.2} />}
+                tone="success"
+              />
+            </section>
 
-          {/* ── 1. ACTION STATUS ────────────────────────────────────────
-               สิ่งที่ต้องดำเนินการ — แสดงเสมอ เพื่อให้เห็นสถานะระบบ  */}
-          <section>
-            {hasActionItems ? (
-              <div className="overflow-hidden rounded-2xl border border-orange-200/80 bg-orange-50/60">
-                <div className="flex items-center gap-2 border-b border-orange-200/60 px-4 py-3">
-                  <AlertCircle className="h-4 w-4 text-orange-500" strokeWidth={2.2} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-orange-600">
-                    ต้องดำเนินการ
-                  </span>
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <CheckCircle2 className="h-4.5 w-4.5 text-[#000666]" />
+                <h2 className="text-base font-bold text-[#1b1b21]">งานที่ต้องทำตอนนี้</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <ActionCard
+                  href="/orders/incoming"
+                  title="รอยืนยันออเดอร์"
+                  detail="ตรวจและยืนยันคำสั่งซื้อใหม่"
+                  icon={<ClipboardCheck className="h-5 w-5" strokeWidth={2.2} />}
+                  badge={`${fmtNumber(kpi.submittedOrderCount)}`}
+                />
+                <ActionCard
+                  href="/delivery"
+                  title="รอจัดส่ง"
+                  detail={kpi.pendingDeliveryAmount > 0 ? `มูลค่า ${fmtMoney(kpi.pendingDeliveryAmount)} บาท` : "ตรวจสอบรายการก่อนออกรถ"}
+                  icon={<Truck className="h-5 w-5" strokeWidth={2.2} />}
+                  badge={`${fmtNumber(kpi.pendingDeliveryCount)}`}
+                />
+                <ActionCard
+                  href="/stock"
+                  title="จัดการสต็อก"
+                  detail="ตรวจรับเข้า / ดูความเคลื่อนไหว"
+                  icon={<Boxes className="h-5 w-5" strokeWidth={2.2} />}
+                />
+              </div>
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+              <div className="rounded-2xl bg-white p-5 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] sm:p-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4.5 w-4.5 text-[#000666]" strokeWidth={2.2} />
+                      <h3 className="text-base font-bold text-[#1b1b21]">แนวโน้มยอดขาย 7 วันล่าสุด</h3>
+                    </div>
+                    <p className="mt-1 text-xs font-medium text-[#454652]">ยอดรวม {fmtMoneyNoSymbol(weeklyTotal)} บาท · ทั้งหมด {fmtNumber(weeklyCount)} รายการ</p>
+                  </div>
                 </div>
-                <div className="divide-y divide-orange-100/80">
-                  {kpi.submittedOrderCount > 0 && (
-                    <Link href="/orders/incoming"
-                      className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-orange-50/80 active:bg-orange-100/60">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-                        <ClipboardCheck className="h-4.5 w-4.5 text-orange-500" strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">รอยืนยันออเดอร์</p>
-                        <p className="text-xs text-black/40">
-                          {kpi.submittedOrderCount} รายการยังไม่ได้ยืนยัน
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="rounded-full bg-orange-500 px-2.5 py-0.5 text-xs font-bold text-white">
-                          {kpi.submittedOrderCount}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-black/25" strokeWidth={2} />
-                      </div>
-                    </Link>
-                  )}
-                  {kpi.pendingDeliveryCount > 0 && (
-                    <Link href="/delivery"
-                      className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-orange-50/80 active:bg-orange-100/60">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-                        <Truck className="h-4.5 w-4.5 text-amber-500" strokeWidth={2} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">รอจัดส่ง</p>
-                        <p className="text-xs text-black/40">
-                          {kpi.pendingDeliveryCount} รายการรอออกรถ
-                          {kpi.pendingDeliveryAmount > 0 && ` · ${fmtMoney(kpi.pendingDeliveryAmount)}`}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-xs font-bold text-white">
-                          {kpi.pendingDeliveryCount}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-black/25" strokeWidth={2} />
-                      </div>
-                    </Link>
-                  )}
+                <div className="h-[208px] w-full sm:h-[176px]">
+                  <TrendChart bars={weeklyTrend} />
+                </div>
+                <div className="mt-4">
+                  <div className="hidden items-center gap-2 md:flex">
+                    <ClipboardList className="h-4 w-4 text-[#000666]" strokeWidth={2.2} />
+                    <h4 className="text-sm font-bold text-[#1b1b21]">สรุป 7 วันล่าสุด</h4>
+                  </div>
+
+                  <div className="mt-3 hidden overflow-hidden rounded-lg bg-white md:block">
+                    <table className="w-full table-fixed text-sm">
+                      <thead className="bg-[#eef1ff] text-[#000666]">
+                        <tr>
+                          <th className="px-3 py-1.5 text-left text-xs font-bold">วัน</th>
+                          <th className="px-3 py-1.5 text-right text-xs font-bold">ออเดอร์</th>
+                          <th className="px-3 py-1.5 text-right text-xs font-bold">ยอดขาย</th>
+                          <th className="px-3 py-1.5 text-right text-xs font-bold">เทียบวันก่อน</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeklyRows.map((row) => (
+                          <tr key={`table-${row.date}`} className="border-t border-[#eef1f6]">
+                            <td className="px-3 py-1.5 text-xs font-bold text-[#1b1b21]">
+                              {fmtThaiWeekdayShort(row.date)} {fmtThaiShortDate(row.date)}
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-[#1b1b21]">
+                              {fmtNumber(row.count)}
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-xs font-bold tabular-nums text-[#000666]">
+                              {fmtMoneyNoSymbol(row.amount)}
+                            </td>
+                            <td
+                              className={`px-3 py-1.5 text-right text-xs font-bold tabular-nums ${
+                                row.changePct === null
+                                  ? "text-[#7b8091]"
+                                  : row.changePct >= 0
+                                    ? "text-emerald-700"
+                                    : "text-rose-700"
+                              }`}
+                            >
+                              {fmtChangePercent(row.changePct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="border-t-2 border-[#dbe0ee] bg-[#f8f9ff]">
+                        <tr>
+                          <td className="px-3 py-1.5 text-xs font-bold text-[#1b1b21]">รวม 7 วัน</td>
+                          <td className="px-3 py-1.5 text-right text-xs font-bold tabular-nums text-[#1b1b21]">{fmtNumber(weeklyCount)}</td>
+                          <td className="px-3 py-1.5 text-right text-xs font-extrabold tabular-nums text-[#000666]">{fmtMoneyNoSymbol(weeklyTotal)}</td>
+                          <td className="px-3 py-1.5 text-right text-[11px] font-semibold text-[#5f6270]">
+                            เฉลี่ย {fmtMoneyNoSymbol(weeklyAvgAmount)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 px-4 py-3">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" strokeWidth={2.2} />
-                <p className="text-xs font-semibold text-emerald-700">
-                  ทุกอย่างเรียบร้อย — ไม่มีรายการรอดำเนินการ
-                </p>
-              </div>
-            )}
-          </section>
 
-          {/* ── 2. KPI CARDS ────────────────────────────────────────────
-               4 ตัวเลขหลักที่เจ้าของกิจการต้องดูทุกวัน              */}
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-
-            {/* ออเดอร์วันนี้ */}
-            <div className="relative overflow-hidden rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5">
-              <div className="absolute left-0 top-0 h-[3px] w-full bg-[#003366]" />
-              <div className="flex items-start justify-between gap-1">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef3f9]">
-                  <ClipboardList className="h-4 w-4 text-[#003366]" strokeWidth={2.2} />
+              <div className="rounded-2xl bg-white p-5 shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] sm:p-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4.5 w-4.5 text-[#000666]" strokeWidth={2.2} />
+                    <h3 className="text-base font-bold text-[#1b1b21]">รายการล่าสุด</h3>
+                  </div>
+                  <Link href="/orders" className="text-xs font-bold text-[#000666]">
+                    ดูทั้งหมด
+                  </Link>
                 </div>
-                {countDiff !== 0 && (
-                  <span className={`mt-0.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                    countDiff > 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"
-                  }`}>
-                    {countDiff > 0
-                      ? <TrendingUp className="h-2.5 w-2.5" strokeWidth={2.5} />
-                      : <TrendingDown className="h-2.5 w-2.5" strokeWidth={2.5} />}
-                    {Math.abs(countDiff)}
-                  </span>
+                {recentOrders.length === 0 ? (
+                  <p className="py-8 text-center text-sm font-medium text-[#7b8091]">ยังไม่มีรายการในช่วงนี้</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {recentOrders.map((order) => {
+                      const badge = statusBadge(order.status);
+                      return (
+                        <li
+                          key={order.id}
+                          className="rounded-xl bg-white p-3 shadow-[0_4px_18px_rgba(27,27,33,0.05),0_10px_28px_rgba(27,27,33,0.08)]"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-[#1b1b21]">{order.customerName}</p>
+                              <p className="mt-0.5 text-xs font-medium text-[#5f6270]">
+                                {order.orderNumber} · {fmtThaiShortDate(order.orderDate)}
+                              </p>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                              {badge.label}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-right text-sm font-extrabold tabular-nums text-[#000666]">
+                            {fmtMoney(order.totalAmount)} บาท
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
               </div>
-              <p className="mt-4 text-3xl font-black tabular-nums leading-none text-[#003366] sm:text-4xl">
-                {fmt(kpi.todayOrderCount)}
-              </p>
-              <p className="mt-1.5 text-sm font-bold tabular-nums text-blue-600">
-                {kpi.todayOrderAmount > 0 ? fmtMoney(kpi.todayOrderAmount) : "—"}
-              </p>
-              <p className="mt-1 text-[11px] text-black/35">ออเดอร์วันนี้</p>
-            </div>
+            </section>
 
-            {/* รอยืนยัน — action card */}
-            <Link href="/orders/incoming"
-              className={`group relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-5 ${
-                kpi.submittedOrderCount > 0
-                  ? "border-orange-200/80 bg-orange-50/50"
-                  : "border-black/[0.06] bg-white"
-              }`}>
-              <div className={`absolute left-0 top-0 h-[3px] w-full ${
-                kpi.submittedOrderCount > 0 ? "bg-orange-400" : "bg-black/10"
-              }`} />
-              <div className="flex items-start justify-between gap-1">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                  kpi.submittedOrderCount > 0 ? "bg-orange-100" : "bg-black/[0.05]"
-                }`}>
-                  <ClipboardCheck className={`h-4 w-4 ${
-                    kpi.submittedOrderCount > 0 ? "text-orange-500" : "text-black/30"
-                  }`} strokeWidth={2.2} />
-                </div>
-                <ArrowRight className="mt-0.5 h-3.5 w-3.5 text-black/20 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+            <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <TopCustomersBarBlock items={topCustomerRows} />
+              <TopProductsListBlock items={topProductRows} />
+            </section>
+
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <Boxes className="h-4.5 w-4.5 text-[#000666]" strokeWidth={2.2} />
+                <h2 className="text-base font-bold text-[#1b1b21]">ทางลัดระบบ</h2>
               </div>
-              <p className={`mt-4 text-3xl font-black tabular-nums leading-none sm:text-4xl ${
-                kpi.submittedOrderCount > 0 ? "text-orange-500" : "text-black/20"
-              }`}>
-                {fmt(kpi.submittedOrderCount)}
-              </p>
-              <p className="mt-1.5 text-sm font-bold tabular-nums text-transparent select-none">—</p>
-              <p className="mt-1 text-[11px] text-black/35">รอยืนยัน</p>
-            </Link>
-
-            {/* รอจัดส่ง — action card */}
-            <Link href="/delivery"
-              className={`group relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-5 ${
-                kpi.pendingDeliveryCount > 0
-                  ? "border-amber-200/80 bg-amber-50/50"
-                  : "border-black/[0.06] bg-white"
-              }`}>
-              <div className={`absolute left-0 top-0 h-[3px] w-full ${
-                kpi.pendingDeliveryCount > 0 ? "bg-amber-400" : "bg-black/10"
-              }`} />
-              <div className="flex items-start justify-between gap-1">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                  kpi.pendingDeliveryCount > 0 ? "bg-amber-100" : "bg-black/[0.05]"
-                }`}>
-                  <Truck className={`h-4 w-4 ${
-                    kpi.pendingDeliveryCount > 0 ? "text-amber-500" : "text-black/30"
-                  }`} strokeWidth={2.2} />
-                </div>
-                <ArrowRight className="mt-0.5 h-3.5 w-3.5 text-black/20 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {[
+                  { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์" },
+                  { href: "/orders/incoming", icon: ClipboardCheck, label: "รับออเดอร์" },
+                  { href: "/delivery", icon: Truck, label: "ใบจัดส่ง" },
+                  { href: "/billing", icon: FileText, label: "ใบวางบิล" },
+                  { href: "/stock", icon: Boxes, label: "สต็อก" },
+                  { href: "/settings/customers", icon: Users, label: "ร้านค้า" },
+                ].map(({ href, icon: Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="rounded-2xl bg-white p-4 text-center shadow-[0_4px_20px_rgba(27,27,33,0.04),0_12px_40px_rgba(27,27,33,0.08)] transition hover:-translate-y-0.5"
+                  >
+                    <span className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef1ff] text-[#000666]">
+                      <Icon className="h-5 w-5" strokeWidth={2.2} />
+                    </span>
+                    <p className="mt-2 text-[13px] font-bold text-[#1b1b21]">{label}</p>
+                  </Link>
+                ))}
               </div>
-              <p className={`mt-4 text-3xl font-black tabular-nums leading-none sm:text-4xl ${
-                kpi.pendingDeliveryCount > 0 ? "text-amber-500" : "text-black/20"
-              }`}>
-                {fmt(kpi.pendingDeliveryCount)}
-              </p>
-              <p className="mt-1.5 text-sm font-bold tabular-nums text-amber-500">
-                {kpi.pendingDeliveryAmount > 0 ? fmtMoney(kpi.pendingDeliveryAmount) : "—"}
-              </p>
-              <p className="mt-1 text-[11px] text-black/35">รอจัดส่ง</p>
-            </Link>
-
-            {/* ยอดเดือนนี้ */}
-            <div className="relative overflow-hidden rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5">
-              <div className="absolute left-0 top-0 h-[3px] w-full bg-emerald-400" />
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
-                <TrendingUp className="h-4 w-4 text-emerald-600" strokeWidth={2.2} />
-              </div>
-              <p className="mt-4 text-3xl font-black tabular-nums leading-none text-emerald-600 sm:text-4xl">
-                {fmtMoney(kpi.monthDeliveredAmount)}
-              </p>
-              <p className="mt-1.5 text-sm font-bold tabular-nums text-transparent select-none">—</p>
-              <p className="mt-1 text-[11px] text-black/35">ยอดเดือนนี้</p>
-            </div>
-
-          </section>
-
-          {/* ── 3. TREND CHART ──────────────────────────────────────────
-               กราฟยอดขาย 7 วัน + สถิติสนับสนุน                       */}
-          <section className="rounded-2xl border border-black/[0.06] bg-white shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.05] px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-black/25">
-                  ยอดขาย 7 วันล่าสุด
-                </p>
-                <p className="mt-1 text-2xl font-black tabular-nums sm:text-3xl">
-                  {fmtMoney(weeklyTotal)}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                <div className="text-right">
-                  <p className="text-[11px] text-black/30">เฉลี่ย/วัน</p>
-                  <p className="text-sm font-bold tabular-nums">{fmtMoney(weeklyAvg)}</p>
-                </div>
-                <div className="h-8 w-px bg-black/[0.06]" />
-                <div className="text-right">
-                  <p className="text-[11px] text-black/30">ร้านค้าที่ใช้งาน</p>
-                  <p className="text-sm font-bold tabular-nums">{fmt(kpi.activeCustomerCount)} ร้าน</p>
-                </div>
-                <div className="h-8 w-px bg-black/[0.06]" />
-                <span className="rounded-full border border-black/[0.06] bg-black/[0.03] px-2.5 py-1 text-[11px] font-semibold text-black/35">
-                  {fmt(weeklyCount)} รายการ
-                </span>
-              </div>
-            </div>
-            <div className="px-2 py-3 sm:px-3" style={{ height: "160px" }}>
-              <AreaChart bars={weeklyTrend} />
-            </div>
-          </section>
-
-          {/* ── 4. RANKINGS ─────────────────────────────────────────────
-               ร้านค้าและสินค้าที่มียอดสูงสุดเดือนนี้                  */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-            <div className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#003366]">
-                  <Store className="h-4 w-4 text-white" strokeWidth={2} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold">ร้านค้าสั่งมากที่สุด</p>
-                  <p className="text-[11px] text-black/35">เดือนนี้ · Top 5</p>
-                </div>
-              </div>
-              <RankedList items={customerItems} barColor="bg-[#003366]/60" emptyText="ยังไม่มีข้อมูลเดือนนี้" />
-            </div>
-
-            <div className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
-                  <Package className="h-4 w-4 text-white" strokeWidth={2} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold">สินค้าขายดีที่สุด</p>
-                  <p className="text-[11px] text-black/35">เดือนนี้ · Top 5</p>
-                </div>
-              </div>
-              <RankedList items={productItems} barColor="bg-emerald-400" emptyText="ยังไม่มีข้อมูลเดือนนี้" />
-            </div>
-
-          </section>
-
-          {/* ── 5. QUICK LINKS ──────────────────────────────────────────
-               ทางลัดไปยังงานประจำวัน                                  */}
-          <section>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.15em] text-black/25">
-              ทางลัด
-            </p>
-            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
-              {[
-                { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์", iconColor: "text-[#003366]", iconBg: "bg-[#eef3f9]" },
-                { href: "/orders/incoming", icon: ClipboardCheck, label: "รับออเดอร์", iconColor: "text-orange-600", iconBg: "bg-orange-50" },
-                { href: "/delivery", icon: Truck, label: "จัดส่ง", iconColor: "text-amber-600", iconBg: "bg-amber-50" },
-                { href: "/billing", icon: FileText, label: "วางบิล", iconColor: "text-violet-600", iconBg: "bg-violet-50" },
-                { href: "/stock", icon: Boxes, label: "สต็อก", iconColor: "text-emerald-600", iconBg: "bg-emerald-50" },
-                { href: "/settings/customers", icon: Users, label: "ร้านค้า", iconColor: "text-sky-600", iconBg: "bg-sky-50" },
-              ].map(({ href, icon: Icon, label, iconColor, iconBg }) => (
-                <Link key={href} href={href}
-                  className="flex flex-col items-center gap-2 rounded-2xl border border-black/[0.06] bg-white px-2 py-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97]">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
-                    <Icon className={`h-5 w-5 ${iconColor}`} strokeWidth={2} />
-                  </div>
-                  <span className="text-xs font-semibold leading-tight">{label}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          {/* ── Footer ── */}
-          <div className="border-t border-black/[0.05] pb-6 pt-4">
-            <p className="text-[11px] text-black/20">
-              T&amp;YNoodle · {session.role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก"}
-            </p>
-          </div>
-
+            </section>
+          </main>
         </div>
       </div>
     </AppSidebarLayout>
