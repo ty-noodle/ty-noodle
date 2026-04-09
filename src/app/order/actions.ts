@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getEffectiveSaleUnitCost, normalizeSaleUnitCostMode } from "@/lib/products/sale-unit-cost";
-import { notifyNewOrder, notifyCustomerReceipt, notifyNewCustomerInquiry } from "@/lib/line/notify";
+import { notifyCustomerReceiptImage, notifyNewCustomerInquiry, notifyNewOrder } from "@/lib/line/notify";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 
@@ -31,6 +31,23 @@ type OrderMutationItemInput = {
   productSaleUnitId: string;
   quantity: number;
 };
+
+const RECEIPT_IMAGE_BUCKET = "product-images";
+
+function parseImageDataUrl(input: string) {
+  const match = input.match(/^data:(image\/png|image\/jpeg|image\/webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const [, contentType, base64] = match;
+  const buffer = Buffer.from(base64, "base64");
+  if (!buffer.length) return null;
+  return { contentType, buffer };
+}
+
+function guessExtension(contentType: string) {
+  if (contentType === "image/png") return "png";
+  if (contentType === "image/webp") return "webp";
+  return "jpg";
+}
 
 function buildClientOrderItems(
   orderItemsData: Array<{
@@ -583,12 +600,7 @@ export async function createOrder(
         })),
       };
 
-      await Promise.all([
-        notifyNewOrder(notifyPayload),
-        customer?.line_user_id
-          ? notifyCustomerReceipt(customer.line_user_id, notifyPayload)
-          : Promise.resolve(),
-      ]);
+      await notifyNewOrder(notifyPayload);
     } catch (err) {
       console.error("[createOrder:notify]", err);
     }
@@ -602,6 +614,83 @@ export async function createOrder(
       receiptItems,
     },
   };
+}
+
+export async function sendCustomerReceiptImage(
+  organizationId: string,
+  customerId: string,
+  orderNumber: string,
+  imageDataUrl: string,
+  fallbackLineUserId?: string | null,
+): Promise<ActionResult<{ imageUrl: string }>> {
+  if (!organizationId?.trim() || !customerId?.trim() || !orderNumber?.trim() || !imageDataUrl?.trim()) {
+    return { success: false, error: "ข้อมูลใบยืนยันไม่ครบถ้วน" };
+  }
+
+  const parsedImage = parseImageDataUrl(imageDataUrl);
+  if (!parsedImage) {
+    return { success: false, error: "รูปใบยืนยันไม่ถูกต้อง" };
+  }
+
+  if (parsedImage.buffer.byteLength > 8 * 1024 * 1024) {
+    return { success: false, error: "ขนาดรูปใบยืนยันใหญ่เกินไป" };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: customer, error: customerError } = await supabase
+    .from("customers")
+    .select("name, line_user_id")
+    .eq("id", customerId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (customerError || !customer) {
+    console.error("[sendCustomerReceiptImage:customer]", customerError);
+    return { success: false, error: "ไม่พบข้อมูลร้านค้า" };
+  }
+
+  const lineUserId = customer.line_user_id?.trim() || fallbackLineUserId?.trim() || "";
+  if (!lineUserId) {
+    return { success: false, error: "ไม่พบ LINE ของลูกค้า" };
+  }
+
+  const extension = guessExtension(parsedImage.contentType);
+  const storagePath = `${organizationId}/line-receipts/${orderNumber}-${Date.now()}.${extension}`;
+
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const hasBucket = (buckets ?? []).some((bucket) => bucket.name === RECEIPT_IMAGE_BUCKET);
+  if (!hasBucket) {
+    await supabase.storage.createBucket(RECEIPT_IMAGE_BUCKET, {
+      public: true,
+      fileSizeLimit: "10MB",
+      allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
+    });
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from(RECEIPT_IMAGE_BUCKET)
+    .upload(storagePath, parsedImage.buffer, {
+      upsert: true,
+      contentType: parsedImage.contentType,
+      cacheControl: "31536000",
+    });
+
+  if (uploadError) {
+    console.error("[sendCustomerReceiptImage:upload]", uploadError);
+    return { success: false, error: "อัปโหลดรูปใบยืนยันไม่สำเร็จ" };
+  }
+
+  const {
+    data: { publicUrl: imageUrl },
+  } = supabase.storage.from(RECEIPT_IMAGE_BUCKET).getPublicUrl(storagePath);
+
+  await notifyCustomerReceiptImage(lineUserId, {
+    customerName: customer.name ?? customerId,
+    orderNumber,
+    imageUrl,
+  });
+
+  return { success: true, data: { imageUrl } };
 }
 
 export async function updateCustomerOrder(

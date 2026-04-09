@@ -46,6 +46,7 @@ import {
   getFrequentlyOrderedProducts,
   getCustomerOrders,
   createOrder,
+  sendCustomerReceiptImage,
   updateCustomerOrder,
 } from "./actions";
 
@@ -678,6 +679,8 @@ export default function OrderClient({
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
   const receiptCardRef = useRef<HTMLDivElement | null>(null);
+  const receiptCaptureLockRef = useRef(false);
+  const receiptPushStatusRef = useRef<Record<string, "sending" | "sent" | "failed">>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProductCategory, setSelectedProductCategory] = useState<"all" | string>("all");
 
@@ -1597,32 +1600,40 @@ export default function OrderClient({
 
   // Receipt
 
-  const saveReceiptAsImage = async () => {
-    if (!receiptCardRef.current || isSavingImage) return;
-    setIsSavingImage(true);
-    setReceiptImageUrl(null);
+  const blobToDataUrl = useCallback((blob: Blob) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error ?? new Error("Failed to read blob"));
+      reader.readAsDataURL(blob);
+    });
+  }, []);
+
+  const captureReceiptImage = useCallback(async (): Promise<{ blob: Blob; fileName: string } | null> => {
+    if (!receiptCardRef.current || receiptCaptureLockRef.current) return null;
+
+    receiptCaptureLockRef.current = true;
     let cloneHost: HTMLDivElement | null = null;
     try {
       const { default: html2canvas } = await import("html2canvas");
       const target = receiptCardRef.current;
-      const OUTER_PAD = 24; // white padding around the receipt in the saved image
+      const outerPadding = 24;
 
       cloneHost = document.createElement("div");
       cloneHost.style.cssText = [
         "position:fixed",
         "left:-10000px",
         "top:0",
-        `padding:${OUTER_PAD}px`,
+        `padding:${outerPadding}px`,
         "margin:0",
         "background:#ffffff",
         "z-index:-1",
         "overflow:visible",
-        `width:${RECEIPT_EXPORT_WIDTH + OUTER_PAD * 2}px`,
+        `width:${RECEIPT_EXPORT_WIDTH + outerPadding * 2}px`,
         "box-sizing:border-box",
       ].join(";");
 
       const clone = target.cloneNode(true) as HTMLDivElement;
-      // Always capture at the fixed receipt width regardless of viewport size
       clone.style.width = `${RECEIPT_EXPORT_WIDTH}px`;
       clone.style.minWidth = `${RECEIPT_EXPORT_WIDTH}px`;
       clone.style.maxWidth = "none";
@@ -1632,9 +1643,8 @@ export default function OrderClient({
       cloneHost.appendChild(clone);
       document.body.appendChild(cloneHost);
 
-      const captureWidth = RECEIPT_EXPORT_WIDTH + OUTER_PAD * 2;
+      const captureWidth = RECEIPT_EXPORT_WIDTH + outerPadding * 2;
       const captureHeight = Math.ceil(cloneHost.scrollHeight);
-
       const canvas = await html2canvas(cloneHost, {
         scale: 3,
         useCORS: true,
@@ -1648,25 +1658,113 @@ export default function OrderClient({
         scrollX: 0,
         scrollY: 0,
       });
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png", 1));
+      if (!blob) return null;
+
       const receiptOrderMeta = receiptOrder as { order_number?: string } | null;
       const fileName = `TYNoodle-${lastOrderMeta?.orderNumber ?? receiptOrderMeta?.order_number ?? "order"}.png`;
-      const objectUrl = canvas.toDataURL("image/png");
-      const downloadLink = document.createElement("a");
-      downloadLink.href = objectUrl;
-      downloadLink.download = fileName;
-      downloadLink.rel = "noopener";
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+
+      return { blob, fileName };
     } catch (err) {
-      console.error("[saveReceiptAsImage]", err);
+      console.error("[captureReceiptImage]", err);
+      return null;
     } finally {
       if (cloneHost && document.body.contains(cloneHost)) {
         document.body.removeChild(cloneHost);
       }
+      receiptCaptureLockRef.current = false;
+    }
+  }, [lastOrderMeta?.orderNumber, receiptOrder]);
+
+  const saveReceiptAsImage = async () => {
+    if (isSavingImage) return;
+    setIsSavingImage(true);
+    setReceiptImageUrl(null);
+    try {
+      const captured = await captureReceiptImage();
+      if (!captured) return;
+
+      const objectUrl = URL.createObjectURL(captured.blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = objectUrl;
+      downloadLink.download = captured.fileName;
+      downloadLink.rel = "noopener";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error("[saveReceiptAsImage]", err);
+    } finally {
       setIsSavingImage(false);
     }
   };
+
+  useEffect(() => {
+    if (currentView !== "success" || !lastOrderMeta || !linkedCustomer) return;
+
+    const orderNumber = lastOrderMeta.orderNumber;
+    const currentStatus = receiptPushStatusRef.current[orderNumber];
+    if (currentStatus === "sending" || currentStatus === "sent" || currentStatus === "failed") return;
+
+    const lineUserId = profile?.userId ?? sessionLineUserId;
+    if (!lineUserId) return;
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      if (cancelled) return;
+
+      receiptPushStatusRef.current[orderNumber] = "sending";
+      try {
+        let captured: { blob: Blob; fileName: string } | null = null;
+        for (let attempt = 0; attempt < 3 && !captured && !cancelled; attempt += 1) {
+          captured = await captureReceiptImage();
+          if (!captured && attempt < 2) {
+            await new Promise((resolve) => window.setTimeout(resolve, 140));
+          }
+        }
+
+        if (!captured || cancelled) {
+          receiptPushStatusRef.current[orderNumber] = "failed";
+          return;
+        }
+
+        const imageDataUrl = await blobToDataUrl(captured.blob);
+        if (!imageDataUrl) {
+          receiptPushStatusRef.current[orderNumber] = "failed";
+          return;
+        }
+
+        const result = await sendCustomerReceiptImage(
+          organizationId,
+          linkedCustomer.id,
+          orderNumber,
+          imageDataUrl,
+          lineUserId,
+        );
+
+        receiptPushStatusRef.current[orderNumber] = result.success ? "sent" : "failed";
+      } catch (error) {
+        console.error("[sendCustomerReceiptImage:auto]", error);
+        receiptPushStatusRef.current[orderNumber] = "failed";
+      }
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    blobToDataUrl,
+    captureReceiptImage,
+    currentView,
+    lastOrderMeta,
+    linkedCustomer,
+    organizationId,
+    profile?.userId,
+    sessionLineUserId,
+  ]);
 
   // Handlers
 

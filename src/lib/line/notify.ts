@@ -7,12 +7,13 @@ function isValidLinePushTarget(value: string | null | undefined): value is strin
   return Boolean(normalized && /^[UCR][0-9a-f]{32}$/i.test(normalized));
 }
 
-async function linePush(to: string, token: string, message: object): Promise<void> {
+async function linePush(to: string, token: string, message: object | object[]): Promise<void> {
   try {
+    const messages = Array.isArray(message) ? message : [message];
     const res = await fetch(LINE_API, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ to, messages: [message] }),
+      body: JSON.stringify({ to, messages }),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -373,6 +374,31 @@ export async function notifyCustomerReceipt(
     return;
   }
   await linePush(lineUserId, token, buildCustomerReceiptFlex(payload));
+}
+
+interface CustomerReceiptImagePayload {
+  customerName: string;
+  orderNumber: string;
+  imageUrl: string;
+}
+
+export async function notifyCustomerReceiptImage(
+  lineUserId: string,
+  payload: CustomerReceiptImagePayload,
+): Promise<void> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token || !isValidLinePushTarget(lineUserId)) {
+    console.warn("[line/customer-image] Invalid LINE user id — skipping push");
+    return;
+  }
+
+  const imageMessage = {
+    type: "image",
+    originalContentUrl: payload.imageUrl,
+    previewImageUrl: payload.imageUrl,
+  };
+
+  await linePush(lineUserId, token, imageMessage);
 }
 
 // ─── New customer inquiry notification ───────────────────────────────────────
