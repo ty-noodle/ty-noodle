@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { sortProductsByCategory } from "@/lib/products/sort-by-category";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -110,6 +111,11 @@ export type SettingsData = {
   vehicles: SettingsVehicle[];
 };
 
+export type SettingsProductsData = Pick<
+  SettingsData,
+  "nextProductSku" | "productCategories" | "products" | "setupHint"
+>;
+
 type ProductRow = {
   cost_price: number | string;
   id: string;
@@ -211,7 +217,7 @@ function getNextCustomerCode(codes: string[]) {
   return `TYS${String(maxSequence + 1).padStart(3, "0")}`;
 }
 
-export async function getSettingsData(organizationId: string): Promise<SettingsData> {
+async function fetchSettingsData(organizationId: string): Promise<SettingsData> {
   const admin = getSupabaseAdmin();
   const productsTable = admin.from("products") as unknown as SelectTable;
   const imagesTable = admin.from("product_images") as unknown as SelectTable;
@@ -531,4 +537,231 @@ export async function getSettingsData(organizationId: string): Promise<SettingsD
       sortOrder: Number(vehicle.sort_order),
     })),
   };
+}
+
+export function getSettingsData(organizationId: string): Promise<SettingsData> {
+  return unstable_cache(
+    () => fetchSettingsData(organizationId),
+    ["settings", organizationId],
+    { tags: [`settings-${organizationId}`] },
+  )();
+}
+
+async function fetchSettingsProductsData(organizationId: string): Promise<SettingsProductsData> {
+  const admin = getSupabaseAdmin();
+  const productsTable = admin.from("products") as unknown as SelectTable;
+  const imagesTable = admin.from("product_images") as unknown as SelectTable;
+  const saleUnitsTable = admin.from("product_sale_units") as unknown as SelectTable;
+  const categoriesTable = admin.from("product_categories") as unknown as SelectTable;
+  const categoryItemsTable = admin.from("product_category_items") as unknown as SelectTable;
+
+  const [productsResult, imagesResult, saleUnitsResult, categoriesResult, categoryItemsResult] =
+    await Promise.all([
+      productsTable
+        .select("id, organization_id, sku, name, cost_price, stock_quantity, unit, is_active, metadata")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false }),
+      imagesTable
+        .select("product_id, public_url, sort_order")
+        .eq("organization_id", organizationId)
+        .order("sort_order", { ascending: true }),
+      saleUnitsTable
+        .select(
+          "id, product_id, unit_label, base_unit_quantity, is_default, sort_order, cost_mode, fixed_cost_price, min_order_qty, step_order_qty",
+        )
+        .eq("organization_id", organizationId)
+        .order("sort_order", { ascending: true }),
+      categoriesTable
+        .select("id, name, sort_order, is_active")
+        .eq("organization_id", organizationId)
+        .order("sort_order", { ascending: true }),
+      categoryItemsTable
+        .select("product_category_id, product_id")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: true }),
+    ]);
+
+  const errors = [productsResult.error, imagesResult.error, saleUnitsResult.error].filter(Boolean);
+  const categoryErrors = [categoriesResult.error, categoryItemsResult.error].filter(Boolean);
+
+  if (errors.length > 0) {
+    const firstError = errors[0];
+    return {
+      nextProductSku: getNextProductSku([]),
+      productCategories: [],
+      products: [],
+      setupHint: isMissingTableError(firstError?.message)
+        ? "ยังไม่ได้รัน migration สำหรับหน้าตั้งค่า"
+        : "ยังโหลดข้อมูลหน้าตั้งค่าไม่สำเร็จ",
+    };
+  }
+
+  const products = (productsResult.data ?? []) as ProductRow[];
+  const images = (imagesResult.data ?? []) as ProductImageRow[];
+  const saleUnits = (saleUnitsResult.data ?? []) as ProductSaleUnitRow[];
+  const categories =
+    categoryErrors.length > 0
+      ? []
+      : ((categoriesResult.data ?? []) as ProductCategoryRow[]);
+  const categoryItems =
+    categoryErrors.length > 0
+      ? []
+      : ((categoryItemsResult.data ?? []) as ProductCategoryItemRow[]);
+
+  const imageMap = new Map<string, string[]>();
+  for (const image of images) {
+    const current = imageMap.get(image.product_id) ?? [];
+    current.push(image.public_url);
+    imageMap.set(image.product_id, current);
+  }
+
+  const productCostMap = new Map<string, number>(
+    products.map((product) => [product.id, Number(product.cost_price ?? 0)]),
+  );
+
+  const saleUnitMap = new Map<
+    string,
+    {
+      baseUnitQuantity: number;
+      costMode: SaleUnitCostMode;
+      effectiveCostPrice: number;
+      fixedCostPrice: number | null;
+      id: string;
+      isDefault: boolean;
+      label: string;
+      minOrderQty: number;
+      sortOrder: number;
+      stepOrderQty: number | null;
+    }[]
+  >();
+
+  for (const saleUnit of saleUnits) {
+    const current = saleUnitMap.get(saleUnit.product_id) ?? [];
+    const baseCostPrice = productCostMap.get(saleUnit.product_id) ?? 0;
+    const baseUnitQuantity = Number(saleUnit.base_unit_quantity);
+    const fixedCostPrice =
+      saleUnit.fixed_cost_price === null ? null : Number(saleUnit.fixed_cost_price);
+    const costMode = normalizeSaleUnitCostMode(saleUnit.cost_mode);
+
+    current.push({
+      baseUnitQuantity,
+      costMode,
+      effectiveCostPrice: getEffectiveSaleUnitCost({
+        baseCostPrice,
+        baseUnitQuantity,
+        costMode,
+        fixedCostPrice,
+      }),
+      fixedCostPrice,
+      id: saleUnit.id,
+      isDefault: saleUnit.is_default,
+      label: saleUnit.unit_label,
+      minOrderQty: Number(saleUnit.min_order_qty ?? 1),
+      sortOrder: Number(saleUnit.sort_order),
+      stepOrderQty: saleUnit.step_order_qty !== null && saleUnit.step_order_qty !== undefined
+        ? Number(saleUnit.step_order_qty)
+        : null,
+    });
+    saleUnitMap.set(saleUnit.product_id, current);
+  }
+
+  const categoryIdsByProductId = new Map<string, string[]>();
+  const categoryNamesByProductId = new Map<string, string[]>();
+  const productIdsByCategoryId = new Map<string, string[]>();
+  const categoryNameMap = new Map(categories.map((category) => [category.id, category.name]));
+
+  for (const item of categoryItems) {
+    const productCategoryIds = categoryIdsByProductId.get(item.product_id) ?? [];
+    productCategoryIds.push(item.product_category_id);
+    categoryIdsByProductId.set(item.product_id, productCategoryIds);
+
+    const categoryName = categoryNameMap.get(item.product_category_id);
+    if (categoryName) {
+      const productCategoryNames = categoryNamesByProductId.get(item.product_id) ?? [];
+      productCategoryNames.push(categoryName);
+      categoryNamesByProductId.set(item.product_id, productCategoryNames);
+    }
+
+    const categoryProductIds = productIdsByCategoryId.get(item.product_category_id) ?? [];
+    categoryProductIds.push(item.product_id);
+    productIdsByCategoryId.set(item.product_category_id, categoryProductIds);
+  }
+
+  return {
+    nextProductSku: getNextProductSku(products.map((product) => product.sku)),
+    productCategories: categories
+      .toSorted((left, right) => {
+        if (Number(left.sort_order) !== Number(right.sort_order)) {
+          return Number(left.sort_order) - Number(right.sort_order);
+        }
+
+        return left.name.localeCompare(right.name, "th");
+      })
+      .map((category) => ({
+        id: category.id,
+        isActive: category.is_active,
+        name: category.name,
+        productCount: productIdsByCategoryId.get(category.id)?.length ?? 0,
+        productIds: productIdsByCategoryId.get(category.id) ?? [],
+        sortOrder: Number(category.sort_order),
+      })),
+    products: sortProductsByCategory(
+      products.map((product) => {
+        const meta = (product.metadata ?? {}) as Record<string, string>;
+        const categoryNames = categoryNamesByProductId.get(product.id) ?? [];
+        return {
+          baseUnit: product.unit,
+          brand: meta.brand ?? "",
+          category: categoryNames.join(", ") || meta.category || "",
+          categoryIds: categoryIdsByProductId.get(product.id) ?? [],
+          categoryNames,
+          costPrice: Number(product.cost_price),
+          description: meta.description ?? "",
+          id: product.id,
+          imageUrls: imageMap.get(product.id) ?? [],
+          isActive: product.is_active,
+          name: product.name,
+          pricingCount: 0,
+          saleUnits:
+            saleUnitMap.get(product.id)?.toSorted((left, right) => {
+              if (left.sortOrder !== right.sortOrder) {
+                return left.sortOrder - right.sortOrder;
+              }
+
+              if (left.isDefault !== right.isDefault) {
+                return left.isDefault ? -1 : 1;
+              }
+
+              return left.label.localeCompare(right.label, "th");
+            }).map((u) => ({
+              baseUnitQuantity: u.baseUnitQuantity,
+              costMode: u.costMode,
+              effectiveCostPrice: u.effectiveCostPrice,
+              fixedCostPrice: u.fixedCostPrice,
+              id: u.id,
+              isDefault: u.isDefault,
+              label: u.label,
+              minOrderQty: u.minOrderQty,
+              sortOrder: u.sortOrder,
+              stepOrderQty: u.stepOrderQty,
+            })) ?? [],
+          sku: product.sku,
+          stockQuantity: Number(product.stock_quantity),
+        };
+      }),
+      categories.map((c) => ({ id: c.id, sortOrder: Number(c.sort_order) })),
+    ),
+    setupHint:
+      categoryErrors.length > 0 && categoryErrors.every((error) => isMissingTableError(error?.message))
+        ? "ระบบหมวดหมู่สินค้ายังไม่พร้อมใช้งาน"
+        : null,
+  };
+}
+
+export function getSettingsProductsData(organizationId: string): Promise<SettingsProductsData> {
+  return unstable_cache(
+    () => fetchSettingsProductsData(organizationId),
+    ["settings-products", organizationId],
+    { tags: [`settings-${organizationId}`] },
+  )();
 }

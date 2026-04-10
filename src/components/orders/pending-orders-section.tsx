@@ -412,10 +412,16 @@ function StoreDeliveryModal({
   customerName,
   orders,
   onClose,
+  defaultVehicleId = null,
+  defaultVehicleName = null,
+  vehicles = [],
 }: {
   customerName: string;
   orders: DeliveryFormData[];
   onClose: () => void;
+  defaultVehicleId?: string | null;
+  defaultVehicleName?: string | null;
+  vehicles?: { id: string; name: string }[];
 }) {
   const router = useRouter();
   // All items across all orders, each tagged with orderId
@@ -449,6 +455,7 @@ function StoreDeliveryModal({
     return init;
   });
   const [notes, setNotes] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(defaultVehicleId);
   const [isPending, startTransition] = useTransition();
   const [results, setResults] = useState<CreateDeliveryState[]>([]);
 
@@ -469,6 +476,13 @@ function StoreDeliveryModal({
 
   async function handleSubmit() {
     if (hasOverStock || !hasAnyQty || isPending) return;
+
+    if (!selectedVehicleId) {
+      window.alert(
+        "⚠️ ยังไม่ได้เลือกรถจัดส่ง\n\nกรุณาเลือกรถจัดส่งก่อนยืนยัน\nเลือกได้จากช่อง \"รถจัดส่ง\" ด้านบน"
+      );
+      return;
+    }
 
     if (unpricedActiveGroups.length > 0) {
       const names = unpricedActiveGroups.map((g) => `  • ${g.productName} (${g.saleUnitLabel})`).join("\n");
@@ -512,6 +526,7 @@ function StoreDeliveryModal({
       fd.set("customerId", orders[0].customerId);
       fd.set("notes", notes);
       fd.set("items", JSON.stringify(allItemsPayload));
+      if (selectedVehicleId) fd.set("vehicleId", selectedVehicleId);
 
       const result = await createDeliveryNoteAction(null, fd);
       setResults([result]);
@@ -527,7 +542,7 @@ function StoreDeliveryModal({
       <div className="w-full max-h-[92vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-5xl sm:rounded-3xl">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 rounded-t-3xl border-b border-slate-100 bg-white px-6 py-5">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-[#003366]" strokeWidth={2.2} />
               <h2 className="text-lg font-bold text-slate-950">สร้างใบส่งของ</h2>
@@ -540,6 +555,34 @@ function StoreDeliveryModal({
                 </span>
               )}
             </p>
+            {/* Vehicle selector */}
+            <div className="mt-3 flex items-center gap-2">
+              <Truck className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.2} />
+              <span className="text-sm font-medium text-slate-600">รถจัดส่ง</span>
+              {vehicles.length === 0 ? (
+                <span className="text-sm text-slate-400">ยังไม่มีข้อมูลรถ</span>
+              ) : defaultVehicleId && defaultVehicleName ? (
+                <span className="rounded-full bg-[#003366]/10 px-3 py-0.5 text-sm font-semibold text-[#003366]">
+                  {defaultVehicleName}
+                </span>
+              ) : (
+                <select
+                  value={selectedVehicleId ?? ""}
+                  onChange={(e) => setSelectedVehicleId(e.target.value || null)}
+                  className={[
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+                    selectedVehicleId
+                      ? "border-slate-200 text-slate-800"
+                      : "border-orange-400 bg-orange-50 text-orange-700",
+                  ].join(" ")}
+                >
+                  <option value="">— กรุณาเลือกรถจัดส่ง —</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -1462,10 +1505,16 @@ export function StoreDeliveryButton({
   customerId,
   customerName,
   date,
+  defaultVehicleId = null,
+  defaultVehicleName = null,
+  vehicles = [],
 }: {
   customerId: string;
   customerName: string;
   date: string;
+  defaultVehicleId?: string | null;
+  defaultVehicleName?: string | null;
+  vehicles?: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1498,6 +1547,9 @@ export function StoreDeliveryButton({
         <StoreDeliveryModal
           customerName={customerName}
           orders={orders}
+          defaultVehicleId={defaultVehicleId}
+          defaultVehicleName={defaultVehicleName}
+          vehicles={vehicles}
           onClose={() => { setOpen(false); setOrders(null); }}
         />
       )}

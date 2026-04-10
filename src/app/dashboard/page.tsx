@@ -616,8 +616,8 @@ export default async function DashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {[
-                  { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์" },
                   { href: "/orders/incoming", icon: ClipboardCheck, label: "รับออเดอร์" },
+                  { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์" },
                   { href: "/delivery", icon: Truck, label: "ใบจัดส่ง" },
                   { href: "/billing", icon: FileText, label: "ใบวางบิล" },
                   { href: "/stock", icon: Boxes, label: "สต็อก" },

@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import type { OrderDailyData, OrderStoreDetail } from "@/lib/orders/admin";
 import { UnpricedItemsDialog } from "./unpriced-items-dialog";
-import { AllStoresDeliveryButton, StoreDeliveryButton } from "./pending-orders-section";
+import { AllStoresDeliveryButton } from "./pending-orders-section";
+import { StoreVehicleCell } from "./store-vehicle-cell";
 import { DateNav } from "@/components/ui/date-nav";
 import { OrderSearchForm } from "./order-search-form";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
@@ -307,7 +308,7 @@ function StoreDetailPanel({ date, detail }: { date: string; detail: OrderStoreDe
 }
 
 export function OrderDailyTable({ data, date, expanded, q, deliveredToday }: Props) {
-  const { stats, stores, expandedDetails } = data;
+  const { stats, stores, expandedDetails, vehicles } = data;
 
   return (
     <div className="space-y-8">
@@ -497,6 +498,9 @@ export function OrderDailyTable({ data, date, expanded, q, deliveredToday }: Pro
                   <th className="hidden px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 md:table-cell">
                     สินค้าขาด
                   </th>
+                  <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 lg:table-cell">
+                    รถจัดส่ง
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                     ยอดรวม
                   </th>
@@ -558,17 +562,18 @@ export function OrderDailyTable({ data, date, expanded, q, deliveredToday }: Pro
                         <td className="px-4 py-4 text-right font-bold text-slate-950">
                           {formatThaiCurrency(store.totalAmount)} บาท
                         </td>
-                        <td className="px-4 py-4 print:hidden">
-                          <StoreDeliveryButton
-                            customerId={store.customerId}
-                            customerName={store.customerName}
-                            date={date}
-                          />
-                        </td>
+                        <StoreVehicleCell
+                          customerId={store.customerId}
+                          customerName={store.customerName}
+                          date={date}
+                          defaultVehicleId={store.vehicleId}
+                          defaultVehicleName={store.vehicleName}
+                          vehicles={vehicles}
+                        />
                       </tr>
                       {isExpanded && detail && (
                         <tr className="bg-slate-50/60">
-                          <td colSpan={7} className="px-2 py-0">
+                          <td colSpan={8} className="px-2 py-0">
                             <StoreDetailPanel date={date} detail={detail} />
                           </td>
                         </tr>

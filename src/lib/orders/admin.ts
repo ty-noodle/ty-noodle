@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type QueryError = {
@@ -82,6 +83,8 @@ export type OrderStoreSummary = {
   shortageProductCount: number;
   totalAmount: number;
   totalQuantity: number;
+  vehicleId: string | null;
+  vehicleName: string | null;
 };
 
 export type OrderItemAggregate = {
@@ -164,17 +167,52 @@ async function getOrderStoreSummaries(
     throw new Error(error.message ?? "Failed to load order summaries.");
   }
 
-  return ((data ?? []) as SummaryRow[]).map((row) => ({
-    customerCode: row.customer_code,
-    customerId: row.customer_id,
-    customerName: row.customer_name,
-    latestOrderAt: row.latest_order_at,
-    orderRounds: normalizeNumeric(row.order_rounds),
-    productCount: normalizeNumeric(row.product_count),
-    shortageProductCount: normalizeNumeric(row.shortage_product_count),
-    totalAmount: normalizeNumeric(row.total_amount),
-    totalQuantity: normalizeNumeric(row.total_quantity),
-  }));
+  const rows = (data ?? []) as SummaryRow[];
+  if (rows.length === 0) return { stores: [], vehicles: [] };
+
+  const customerIds = rows.map((r) => r.customer_id);
+
+  const admin = getSupabaseAdmin();
+  const [customersResult, vehiclesResult] = await Promise.all([
+    admin
+      .from("customers")
+      .select("id, default_vehicle_id")
+      .eq("organization_id", organizationId)
+      .in("id", customerIds),
+    admin
+      .from("vehicles")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .order("name", { ascending: true }),
+  ]);
+
+  const vehicles = ((vehiclesResult.data ?? []) as { id: string; name: string }[]);
+  const vehicleNameMap = new Map(vehicles.map((v) => [v.id, v.name]));
+  const customerVehicleMap = new Map(
+    ((customersResult.data ?? []) as { id: string; default_vehicle_id: string | null }[]).map(
+      (c) => [c.id, c.default_vehicle_id],
+    ),
+  );
+
+  const stores = rows.map((row) => {
+    const vehicleId = customerVehicleMap.get(row.customer_id) ?? null;
+    return {
+      customerCode: row.customer_code,
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      latestOrderAt: row.latest_order_at,
+      orderRounds: normalizeNumeric(row.order_rounds),
+      productCount: normalizeNumeric(row.product_count),
+      shortageProductCount: normalizeNumeric(row.shortage_product_count),
+      totalAmount: normalizeNumeric(row.total_amount),
+      totalQuantity: normalizeNumeric(row.total_quantity),
+      vehicleId,
+      vehicleName: vehicleId ? (vehicleNameMap.get(vehicleId) ?? null) : null,
+    };
+  });
+
+  return { stores, vehicles };
 }
 
 async function getOrderStoreDetail(
@@ -308,9 +346,10 @@ export type OrderDailyData = {
     totalOrderRounds: number;
   };
   stores: OrderStoreSummary[];
+  vehicles: { id: string; name: string }[];
 };
 
-export const getOrderDailyData = cache(
+const getOrderDailyDataCached = cache(
   async (
     organizationId: string,
     {
@@ -323,7 +362,7 @@ export const getOrderDailyData = cache(
       searchTerm?: string | null;
     },
   ): Promise<OrderDailyData> => {
-    const stores = await getOrderStoreSummaries(
+    const { stores, vehicles } = await getOrderStoreSummaries(
       organizationId,
       orderDate,
       normalizeSearchTerm(searchTerm),
@@ -350,9 +389,21 @@ export const getOrderDailyData = cache(
         totalOrderRounds: stores.reduce((sum, s) => sum + s.orderRounds, 0),
       },
       stores,
+      vehicles,
     };
   },
 );
+
+export function getOrderDailyData(
+  organizationId: string,
+  opts: { expandedIds: string[]; orderDate: string; searchTerm?: string | null },
+): Promise<OrderDailyData> {
+  return unstable_cache(
+    () => getOrderDailyDataCached(organizationId, opts),
+    ["orders", organizationId, opts.orderDate, opts.searchTerm ?? ""],
+    { tags: [`orders-${organizationId}`] },
+  )();
+}
 
 export const getOrderWorkboardData = cache(
   async (
@@ -367,7 +418,7 @@ export const getOrderWorkboardData = cache(
       selectedCustomerId?: string | null;
     },
   ): Promise<OrderWorkboardData> => {
-    const stores = await getOrderStoreSummaries(
+    const { stores } = await getOrderStoreSummaries(
       organizationId,
       orderDate,
       normalizeSearchTerm(searchTerm),

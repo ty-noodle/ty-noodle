@@ -115,8 +115,8 @@ function MobileTopBar() {
 const mainNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "แดชบอร์ด" },
   { href: "/stock", icon: Boxes, label: "สต็อก" },
-  { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์" },
   { href: "/orders/incoming", icon: ScanText, label: "รายการออเดอร์" },
+  { href: "/orders", icon: ClipboardList, label: "สรุปออเดอร์" },
   { href: "/delivery", icon: Truck, label: "ใบจัดส่ง" },
   { href: "/billing", icon: FileText, label: "ใบวางบิล" },
 ] as const;

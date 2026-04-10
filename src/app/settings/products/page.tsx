@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { FolderTree, Package2 } from "lucide-react";
+import { FolderTree, Package2, Search } from "lucide-react";
+import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
 import { ProductCategoryManager } from "@/components/settings/product-category-manager";
 import { ProductForm } from "@/components/settings/product-form";
 import { ProductList } from "@/components/settings/product-list";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { requireAppRole } from "@/lib/auth/authorization";
-import { getSettingsData } from "@/lib/settings/admin";
+import { getSettingsProductsData } from "@/lib/settings/admin";
 
 export const metadata = {
   title: "จัดการสินค้า",
@@ -13,8 +14,10 @@ export const metadata = {
 
 type SettingsProductsPageProps = {
   searchParams: Promise<{
+    category?: string;
     create?: string;
     edit?: string;
+    q?: string;
     tab?: string;
   }>;
 };
@@ -23,7 +26,7 @@ export default async function SettingsProductsPage({
   searchParams,
 }: SettingsProductsPageProps) {
   const session = await requireAppRole("admin");
-  const data = await getSettingsData(session.organizationId);
+  const data = await getSettingsProductsData(session.organizationId);
   const params = await searchParams;
   const activeTab =
     params.tab === "categories" && params.create !== "1" && !params.edit
@@ -32,6 +35,26 @@ export default async function SettingsProductsPage({
   const editingProduct = data.products.find((product) => product.id === params.edit) ?? null;
   const shouldShowForm =
     activeTab === "products" && (params.create === "1" || editingProduct !== null);
+  const searchQuery = (params.q ?? "").trim();
+  const categoryFilter = (params.category ?? "").trim();
+
+  const filteredProducts = data.products.filter((product) => {
+    const matchesCategory = !categoryFilter || product.categoryIds.includes(categoryFilter);
+    if (!matchesCategory) return false;
+
+    if (!searchQuery) return true;
+    const normalized = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(normalized) ||
+      product.sku.toLowerCase().includes(normalized) ||
+      product.categoryNames.some((categoryName) => categoryName.toLowerCase().includes(normalized))
+    );
+  });
+
+  const listQuery = new URLSearchParams();
+  if (searchQuery) listQuery.set("q", searchQuery);
+  if (categoryFilter) listQuery.set("category", categoryFilter);
+  const listHref = listQuery.size > 0 ? `/settings/products?${listQuery.toString()}` : "/settings/products";
 
   return (
     <SettingsShell
@@ -52,6 +75,7 @@ export default async function SettingsProductsPage({
       <div className="mb-6 inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm">
         <Link
           href="/settings/products"
+          scroll={false}
           className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
             activeTab === "products"
               ? "bg-[#003366] text-white shadow-[0_10px_24px_rgba(0,51,102,0.18)]"
@@ -63,6 +87,7 @@ export default async function SettingsProductsPage({
         </Link>
         <Link
           href="/settings/products?tab=categories"
+          scroll={false}
           className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
             activeTab === "categories"
               ? "bg-[#003366] text-white shadow-[0_10px_24px_rgba(0,51,102,0.18)]"
@@ -78,13 +103,111 @@ export default async function SettingsProductsPage({
         <ProductCategoryManager categories={data.productCategories} products={data.products} />
       ) : (
         <>
-          <ProductList products={data.products} />
+          <div className="mb-4 hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:block">
+            <form method="get" className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto]">
+              <input type="hidden" name="tab" value="products" />
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">ค้นหาสินค้า</span>
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <Search className="h-4.5 w-4.5 text-slate-400" strokeWidth={2} />
+                  <input
+                    type="search"
+                    name="q"
+                    defaultValue={searchQuery}
+                    placeholder="ชื่อสินค้า หรือรหัสสินค้า"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">หมวดหมู่</span>
+                <select
+                  name="category"
+                  defaultValue={categoryFilter}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+                >
+                  <option value="">ทุกหมวดหมู่</option>
+                  {data.productCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                type="submit"
+                className="action-touch-safe rounded-xl bg-[#003366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#002244]"
+              >
+                ค้นหา
+              </button>
+              <Link
+                href="/settings/products"
+                scroll={false}
+                className="action-touch-safe inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                ล้างตัวกรอง
+              </Link>
+            </form>
+          </div>
+
+          <MobileSearchDrawer title="ค้นหาสินค้า">
+            <form method="get" className="space-y-3">
+              <input type="hidden" name="tab" value="products" />
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">ค้นหาสินค้า</span>
+                <input
+                  type="search"
+                  name="q"
+                  defaultValue={searchQuery}
+                  placeholder="ชื่อสินค้า หรือรหัสสินค้า"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">หมวดหมู่</span>
+                <select
+                  name="category"
+                  defaultValue={categoryFilter}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+                >
+                  <option value="">ทุกหมวดหมู่</option>
+                  {data.productCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="submit"
+                  className="action-touch-safe rounded-xl bg-[#003366] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  ค้นหา
+                </button>
+                <Link
+                  href="/settings/products"
+                  scroll={false}
+                  className="action-touch-safe inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600"
+                >
+                  ล้างตัวกรอง
+                </Link>
+              </div>
+            </form>
+          </MobileSearchDrawer>
+
+          <ProductList products={filteredProducts} baseListHref={listHref} />
           {shouldShowForm ? (
             <ProductForm
               categories={data.productCategories}
               editingProduct={editingProduct}
               nextSku={data.nextProductSku}
-              returnHref="/settings/products"
+              returnHref={listHref}
             />
           ) : null}
         </>

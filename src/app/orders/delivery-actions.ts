@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOrderItemsForDelivery, getStoreOrdersForDelivery } from "@/lib/delivery/admin";
@@ -89,6 +89,7 @@ export async function createDeliveryNoteAction(
   const customerId = String(formData.get("customerId") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const itemsJson = String(formData.get("items") ?? "[]");
+  const vehicleId = String(formData.get("vehicleId") ?? "").trim() || null;
 
   let orderIds: string[];
   try {
@@ -118,7 +119,7 @@ export async function createDeliveryNoteAction(
     p_organization_id: session.organizationId,
     p_order_ids: orderIds,
     p_customer_id: customerId,
-    p_vehicle_id: null,
+    p_vehicle_id: vehicleId,
     p_delivery_date: bangkokTodayIsoDate(),
     p_notes: notes || null,
     p_created_by: session.userId,
@@ -132,9 +133,9 @@ export async function createDeliveryNoteAction(
     };
   }
 
-  revalidatePath("/orders");
-  revalidatePath("/stock");
-  revalidatePath("/settings/stock");
+  revalidateTag(`orders-${session.organizationId}`, "max");
+  revalidateTag(`stock-${session.organizationId}`, "max");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 
   const deliveryNumber = String(data);
   const { data: dnRow } = await admin

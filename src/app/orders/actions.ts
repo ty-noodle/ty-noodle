@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { getEffectiveSaleUnitCost, normalizeSaleUnitCostMode } from "@/lib/products/sale-unit-cost";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -304,5 +304,5 @@ export async function setStoreItemPrices(
   }
 
   await upsertStorePriceBatch(admin, session.organizationId, customerId, items);
-  revalidatePath("/orders");
+  revalidateTag(`orders-${session.organizationId}`, "max");
 }

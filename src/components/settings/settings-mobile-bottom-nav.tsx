@@ -80,7 +80,7 @@ export function SettingsMobileBottomNav() {
       </div>
 
       {/* Bottom nav bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(15,23,42,0.08)] will-change-transform md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {primaryNav.map(({ href, icon: Icon, label, ...rest }) => {
             const activePrefix = "activePrefix" in rest ? (rest as { activePrefix: string }).activePrefix : undefined;

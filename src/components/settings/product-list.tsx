@@ -12,6 +12,7 @@ import {
 import type { SettingsProduct } from "@/lib/settings/admin";
 
 type ProductListProps = {
+  baseListHref?: string;
   products: SettingsProduct[];
 };
 
@@ -25,7 +26,11 @@ function getCostNote(unit: SettingsProduct["saleUnits"][number]) {
   return "คำนวณอัตโนมัติ";
 }
 
-export function ProductList({ products }: ProductListProps) {
+export function ProductList({ products, baseListHref = "/settings/products" }: ProductListProps) {
+  const createHref = `${baseListHref}${baseListHref.includes("?") ? "&" : "?"}create=1`;
+  const editHref = (id: string) =>
+    `${baseListHref}${baseListHref.includes("?") ? "&" : "?"}edit=${id}`;
+
   return (
     <SettingsPanel>
       <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
@@ -37,8 +42,9 @@ export function ProductList({ products }: ProductListProps) {
         </div>
 
         <Link
-          href="/settings/products?create=1"
-          className="inline-flex items-center gap-2 rounded-full bg-[#003366] px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(0,51,102,0.22)] transition hover:bg-[#002244]"
+          href={createHref}
+          scroll={false}
+          className="action-touch-safe inline-flex items-center gap-2 rounded-full bg-[#003366] px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(0,51,102,0.22)] transition hover:bg-[#002244]"
         >
           <Plus className="h-4 w-4" strokeWidth={2.2} />
           เพิ่มสินค้า
@@ -115,8 +121,9 @@ export function ProductList({ products }: ProductListProps) {
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-50 pt-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          href={`/settings/products?edit=${product.id}`}
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                          href={editHref(product.id)}
+                          scroll={false}
+                          className="action-touch-safe inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                         >
                           <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
                           แก้ไข
@@ -286,8 +293,9 @@ export function ProductList({ products }: ProductListProps) {
                         <td className="px-6 py-5 text-center align-middle">
                           <div className="flex items-center justify-center gap-2">
                             <Link
-                              href={`/settings/products?edit=${product.id}`}
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                              href={editHref(product.id)}
+                              scroll={false}
+                              className="action-touch-safe inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
                             >
                               <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
                               แก้ไข

@@ -1,6 +1,6 @@
 ﻿"use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -40,7 +40,7 @@ async function updateDispatch(
 
   if (error) return { error: error.message ?? "เกิดข้อผิดพลาด" };
 
-  revalidatePath("/delivery");
+  revalidateTag(`delivery-${organizationId}`, "max");
   return {};
 }
 
@@ -97,9 +97,8 @@ export async function adjustDeliveryLineQtyAction(
 
   if (error) return { error: error.message ?? "แก้ไขจำนวนส่งจริงไม่สำเร็จ" };
 
-  revalidatePath("/delivery");
-  revalidatePath("/orders");
-  revalidatePath("/delivery/print");
+  revalidateTag(`delivery-${session.organizationId}`, "max");
+  revalidateTag(`orders-${session.organizationId}`, "max");
   return {};
 }
 
@@ -148,9 +147,7 @@ export async function adjustDeliveryGroupQtyAction(
     if (error) return { error: error.message ?? "แก้ไขจำนวนส่งจริงไม่สำเร็จ" };
   }
 
-  revalidatePath("/delivery");
-  revalidatePath("/orders");
-  revalidatePath("/delivery/print");
+  revalidateTag(`delivery-${session.organizationId}`, "max");
+  revalidateTag(`orders-${session.organizationId}`, "max");
   return {};
 }
-

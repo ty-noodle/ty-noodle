@@ -15,17 +15,6 @@ export function OrdersMobileTabs() {
     <div className="fixed inset-x-0 top-[68px] z-30 border-b border-slate-200 bg-white shadow-sm md:hidden">
       <div className="flex">
         <Link
-          href="/orders"
-          className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-semibold transition-colors ${
-            onSummary
-              ? "border-[#003366] text-[#003366]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2.2} />
-          สรุปออเดอร์
-        </Link>
-        <Link
           href="/orders/incoming"
           className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-semibold transition-colors ${
             onIncoming
@@ -35,6 +24,17 @@ export function OrdersMobileTabs() {
         >
           <ScanText className="h-4 w-4 shrink-0" strokeWidth={2.2} />
           รายการออเดอร์
+        </Link>
+        <Link
+          href="/orders"
+          className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-semibold transition-colors ${
+            onSummary
+              ? "border-[#003366] text-[#003366]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+          สรุปออเดอร์
         </Link>
       </div>
     </div>

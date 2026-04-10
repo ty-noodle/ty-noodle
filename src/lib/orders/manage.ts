@@ -24,7 +24,9 @@ type SaleUnitRow = {
   base_unit_quantity: number | string;
   id: string;
   is_default: boolean;
+  min_order_qty: number | string;
   product_id: string;
+  step_order_qty: number | string | null;
   unit_label: string;
 };
 
@@ -54,7 +56,14 @@ export type OrderProductOption = {
   id: string;
   imageUrl: string | null;
   name: string;
-  saleUnits: { baseUnitQuantity: number; id: string; isDefault: boolean; label: string }[];
+  saleUnits: {
+    baseUnitQuantity: number;
+    id: string;
+    isDefault: boolean;
+    label: string;
+    minOrderQty: number;
+    stepOrderQty: number | null;
+  }[];
   sku: string;
   stockQuantity: number;
   unit: string;
@@ -87,7 +96,7 @@ export async function getProductsForOrder(orgId: string): Promise<OrderProductOp
       .order("name", { ascending: true }),
     admin
       .from("product_sale_units")
-      .select("id, product_id, unit_label, base_unit_quantity, is_default")
+      .select("id, product_id, unit_label, base_unit_quantity, is_default, min_order_qty, step_order_qty")
       .eq("organization_id", orgId)
       .eq("is_active", true)
       .order("sort_order", { ascending: true }),
@@ -117,6 +126,11 @@ export async function getProductsForOrder(orgId: string): Promise<OrderProductOp
       id: u.id,
       isDefault: u.is_default,
       label: u.unit_label,
+      minOrderQty: Number(u.min_order_qty ?? 1),
+      stepOrderQty:
+        u.step_order_qty === null || u.step_order_qty === undefined
+          ? null
+          : Number(u.step_order_qty),
     });
     byProduct.set(u.product_id, list);
   }

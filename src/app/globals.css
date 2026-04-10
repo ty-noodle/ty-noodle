@@ -57,11 +57,16 @@ html {
   scroll-behavior: smooth;
   /* Prevent iOS rubber-band bounce from pulling sticky headers off-screen */
   overscroll-behavior-y: none;
+  /* Prevent horizontal rubber-band overscroll on mobile */
+  overscroll-behavior-x: none;
+  /* Ensure gap below fixed bottom nav (during browser chrome animation) shows white */
+  background-color: white;
 }
 
 body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sarabun), "Sarabun", "Noto Sans Thai", sans-serif;
@@ -175,4 +180,12 @@ button:hover {
 
 .animate-gentle-drop-in-delay-2 {
   animation: gentle-drop-in 2.35s cubic-bezier(0.16, 0.84, 0.22, 1) 0.56s both;
+}
+
+/* Prevent mobile long-press context menu on primary action controls only */
+.action-touch-safe {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }

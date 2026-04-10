@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { normalizeSaleUnitCostMode } from "@/lib/products/sale-unit-cost";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -110,7 +110,12 @@ function getNextProductSku(skus: string[]) {
 
 async function generateProductSku(organizationId: string) {
   const admin = getSupabaseAdmin();
-  const { data } = await admin.from("products").select("sku").eq("organization_id", organizationId);
+  const { data } = await admin
+    .from("products")
+    .select("sku")
+    .eq("organization_id", organizationId)
+    .order("sku", { ascending: false })
+    .limit(1);
 
   return getNextProductSku((data ?? []).map((product) => product.sku));
 }
@@ -303,12 +308,9 @@ async function syncCategoryMetadataForProducts(
   );
 }
 
-function revalidateSettingsCategorySurfaces() {
-  revalidatePath("/settings/products");
-  revalidatePath("/dashboard/settings", "layout");
-  revalidatePath("/order");
-  revalidatePath("/orders");
-  revalidatePath("/reports/product-sales");
+function revalidateSettingsSurfaces(organizationId: string) {
+  revalidateTag(`settings-${organizationId}`, "max");
+  revalidateTag(`orders-${organizationId}`, "max");
 }
 
 export async function createCustomer(formData: FormData) {
@@ -355,7 +357,7 @@ export async function createCustomer(formData: FormData) {
     },
   );
 
-  revalidatePath("/dashboard/settings", "layout");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
 export async function createProduct(formData: FormData) {
@@ -449,7 +451,7 @@ export async function createProduct(formData: FormData) {
     }
   }
 
-  revalidateSettingsCategorySurfaces();
+  revalidateSettingsSurfaces(session.organizationId);
 }
 
 export async function upsertStoreProductPrice(formData: FormData) {
@@ -486,7 +488,7 @@ export async function upsertStoreProductPrice(formData: FormData) {
     },
   );
 
-  revalidatePath("/dashboard/settings", "layout");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
 export async function deleteCustomerPrice(formData: FormData) {
@@ -504,7 +506,7 @@ export async function deleteCustomerPrice(formData: FormData) {
     .eq("customer_id", customerId)
     .eq("product_sale_unit_id", productSaleUnitId);
 
-  revalidatePath("/dashboard/settings", "layout");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
 export async function updateProduct(formData: FormData) {
@@ -545,83 +547,75 @@ export async function updateProduct(formData: FormData) {
     return;
   }
 
-  const { categoryIds, categoryNames } = await resolveCategorySelection(
-    admin,
-    session.organizationId,
-    requestedCategoryIds,
-  );
+  // Run all independent reads in parallel
+  const [
+    { categoryIds, categoryNames },
+    { data: oldProduct },
+    { data: existingSaleUnits },
+  ] = await Promise.all([
+    resolveCategorySelection(admin, session.organizationId, requestedCategoryIds),
+    admin.from("products").select("cost_price").eq("id", productId).single(),
+    admin
+      .from("product_sale_units")
+      .select("id, unit_label, base_unit_quantity, cost_mode, fixed_cost_price, is_default, sort_order")
+      .eq("product_id", productId),
+  ]);
+
   const metadata: Record<string, string> = {};
   if (brand) metadata.brand = brand;
   if (categoryNames.length > 0) metadata.category = categoryNames.join(", ");
   if (description) metadata.description = description;
 
   const storage = admin.storage;
-
-  // Snapshot old costs before updating
-  const { data: oldProduct } = await admin.from("products")
-    .select("cost_price")
-    .eq("id", productId)
-    .single();
-  const { data: oldSaleUnits } = await admin.from("product_sale_units")
-    .select("id, unit_label, cost_mode, fixed_cost_price, is_default")
-    .eq("product_id", productId);
-
-  const { data: existingSaleUnits } = await admin.from("product_sale_units")
-    .select("id, unit_label, base_unit_quantity, is_default, sort_order")
-    .eq("product_id", productId);
-
-  await admin.from("products").update({
-    cost_price: costPrice,
-    metadata: metadata as Json,
-    name,
-    sku,
-    stock_quantity: stockQuantity,
-    unit: baseUnit,
-  }).eq("id", productId);
-
   const submittedIds = new Set(saleUnits.map((saleUnit) => saleUnit.id).filter(Boolean));
 
-  for (const [index, saleUnit] of saleUnits.entries()) {
-    if (saleUnit.id) {
-      await admin.from("product_sale_units").update({
-        base_unit_quantity: saleUnit.baseUnitQuantity,
-        cost_mode: saleUnit.costMode,
-        fixed_cost_price: saleUnit.costMode === "fixed" ? saleUnit.fixedCostPrice : null,
-        is_active: true,
-        is_default: index === 0,
-        min_order_qty: saleUnit.minOrderQty,
-        sort_order: index,
-        step_order_qty: saleUnit.stepOrderQty,
-        unit_label: saleUnit.label,
-      }).eq("id", saleUnit.id);
-      continue;
-    }
+  // Run product update + all sale unit mutations in parallel
+  const toDeactivateIds = (existingSaleUnits ?? [])
+    .filter((u) => !submittedIds.has(u.id))
+    .map((u) => u.id);
 
-    await admin.from("product_sale_units").insert({
-      base_unit_quantity: saleUnit.baseUnitQuantity,
-      cost_mode: saleUnit.costMode,
-      fixed_cost_price: saleUnit.costMode === "fixed" ? saleUnit.fixedCostPrice : null,
-      is_active: true,
-      is_default: index === 0,
-      min_order_qty: saleUnit.minOrderQty,
-      organization_id: session.organizationId,
-      product_id: productId,
-      sort_order: index,
-      step_order_qty: saleUnit.stepOrderQty,
-      unit_label: saleUnit.label,
-    });
-  }
-
-  for (const existingSaleUnit of existingSaleUnits ?? []) {
-    if (submittedIds.has(existingSaleUnit.id)) {
-      continue;
-    }
-
-    await admin.from("product_sale_units").update({
-      is_active: false,
-      is_default: false,
-    }).eq("id", existingSaleUnit.id);
-  }
+  await Promise.all([
+    admin.from("products").update({
+      cost_price: costPrice,
+      metadata: metadata as Json,
+      name,
+      sku,
+      stock_quantity: stockQuantity,
+      unit: baseUnit,
+    }).eq("id", productId),
+    ...saleUnits.map((saleUnit, index) =>
+      saleUnit.id
+        ? admin.from("product_sale_units").update({
+          base_unit_quantity: saleUnit.baseUnitQuantity,
+          cost_mode: saleUnit.costMode,
+          fixed_cost_price: saleUnit.costMode === "fixed" ? saleUnit.fixedCostPrice : null,
+          is_active: true,
+          is_default: index === 0,
+          min_order_qty: saleUnit.minOrderQty,
+          sort_order: index,
+          step_order_qty: saleUnit.stepOrderQty,
+          unit_label: saleUnit.label,
+        }).eq("id", saleUnit.id)
+        : admin.from("product_sale_units").insert({
+          base_unit_quantity: saleUnit.baseUnitQuantity,
+          cost_mode: saleUnit.costMode,
+          fixed_cost_price: saleUnit.costMode === "fixed" ? saleUnit.fixedCostPrice : null,
+          is_active: true,
+          is_default: index === 0,
+          min_order_qty: saleUnit.minOrderQty,
+          organization_id: session.organizationId,
+          product_id: productId,
+          sort_order: index,
+          step_order_qty: saleUnit.stepOrderQty,
+          unit_label: saleUnit.label,
+        }),
+    ),
+    toDeactivateIds.length > 0
+      ? admin.from("product_sale_units")
+        .update({ is_active: false, is_default: false })
+        .in("id", toDeactivateIds)
+      : Promise.resolve(),
+  ]);
 
   // Log cost history for any changed values
   {
@@ -650,7 +644,7 @@ export async function updateProduct(formData: FormData) {
 
     for (const saleUnit of saleUnits) {
       if (!saleUnit.id || saleUnit.costMode !== "fixed") continue;
-      const oldUnit = (oldSaleUnits ?? []).find((u) => u.id === saleUnit.id);
+      const oldUnit = (existingSaleUnits ?? []).find((u) => u.id === saleUnit.id);
       if (!oldUnit) continue;
       const oldCost = oldUnit.fixed_cost_price !== null ? Number(oldUnit.fixed_cost_price) : null;
       if (oldCost !== saleUnit.fixedCostPrice) {
@@ -696,7 +690,7 @@ export async function updateProduct(formData: FormData) {
     }
   }
 
-  revalidateSettingsCategorySurfaces();
+  revalidateSettingsSurfaces(session.organizationId);
 }
 
 export async function upsertProductCategory(input: {
@@ -781,7 +775,7 @@ export async function upsertProductCategory(input: {
     ...((existingCategoryItems ?? []) as Array<{ product_id: string }>).map((row) => row.product_id),
     ...((movedCategoryItems ?? []) as Array<{ product_id: string }>).map((row) => row.product_id),
   ]);
-  revalidateSettingsCategorySurfaces();
+  revalidateSettingsSurfaces(session.organizationId);
 
   return { success: true as const, categoryId };
 }
@@ -821,13 +815,13 @@ export async function deleteProductCategory(categoryId: string) {
     session.organizationId,
     ((existingCategoryItems ?? []) as Array<{ product_id: string }>).map((row) => row.product_id),
   );
-  revalidateSettingsCategorySurfaces();
+  revalidateSettingsSurfaces(session.organizationId);
 
   return { success: true as const };
 }
 
 export async function setProductActive(formData: FormData) {
-  await requireAppRole("admin");
+  const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin() as SettingsAdmin;
   const productId = safeText(formData.get("productId"));
   const nextState = safeText(formData.get("nextState")) === "true";
@@ -840,11 +834,11 @@ export async function setProductActive(formData: FormData) {
     is_active: nextState,
   }).eq("id", productId);
 
-  revalidatePath("/dashboard/settings", "layout");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
 export async function deleteProduct(formData: FormData) {
-  await requireAppRole("admin");
+  const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin() as SettingsAdmin;
   const productId = safeText(formData.get("productId"));
 
@@ -854,7 +848,7 @@ export async function deleteProduct(formData: FormData) {
 
   await admin.from("products").delete().eq("id", productId);
 
-  revalidatePath("/dashboard/settings", "layout");
+  revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
 export type ProductCostHistoryRow = {

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   Camera,
   CirclePlus,
   ImagePlus,
+  Loader2,
   Package2,
   Save,
   Trash2,
@@ -202,15 +203,19 @@ export function ProductForm({
     };
   }, [isCameraOpen]);
 
-  async function handleSubmit(formData: FormData) {
-    if (isEditing) {
-      await updateProduct(formData);
-    } else {
-      await createProduct(formData);
-    }
+  const [isPending, startTransition] = useTransition();
 
-    router.replace(returnHref);
-    router.refresh();
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      if (isEditing) {
+        await updateProduct(formData);
+      } else {
+        await createProduct(formData);
+      }
+
+      router.replace(returnHref);
+      router.refresh();
+    });
   }
 
   function closeModal() {
@@ -1036,16 +1041,22 @@ export function ProductForm({
             <button
               type="button"
               onClick={closeModal}
-              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+              disabled={isPending}
+              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#003366] px-5 py-3 text-sm font-medium text-white shadow-[0_12px_30px_rgba(0,51,102,0.22)] transition hover:bg-[#002244]"
+              disabled={isPending}
+              className="action-touch-safe inline-flex items-center gap-2 rounded-xl bg-[#003366] px-5 py-3 text-sm font-medium text-white shadow-[0_12px_30px_rgba(0,51,102,0.22)] transition hover:bg-[#002244] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <Save className="h-4 w-4" strokeWidth={2.2} />
-              {isEditing ? "บันทึกการแก้ไข" : "บันทึกสินค้า"}
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" strokeWidth={2.2} />
+              )}
+              {isPending ? "กำลังบันทึก..." : isEditing ? "บันทึกการแก้ไข" : "บันทึกสินค้า"}
             </button>
           </div>
         </form>

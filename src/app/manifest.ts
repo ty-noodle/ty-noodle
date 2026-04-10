@@ -6,7 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "T&YNoodle",
     description:
       "ระบบจัดการธุรกิจจำหน่ายเส้นก๋วยเตี๋ยวและวัตถุดิบแบบดิจิทัล รองรับออเดอร์ จัดส่ง และรายงาน",
-    start_url: "/",
+    start_url: "/login",
+    scope: "/",
     display: "standalone",
     background_color: "#f7fbff",
     theme_color: "#003366",

@@ -139,22 +139,24 @@ export async function verifyPin(formData: FormData) {
     redirect(isLocked ? "/login?error=pin-locked" : "/login?error=incorrect-pin");
   }
 
-  await admin.rpc("record_pin_auth_result", {
-    p_user_id: user.id,
-    p_attempted_lookup: pinLookup,
-    p_success: true,
-    p_ip_hash: ipHash,
-    p_user_agent: userAgent,
-  });
-
-  const { data: sessionRows, error: sessionError } = await admin.rpc(
-    "create_app_session",
-    {
+  const [sessionResult] = await Promise.all([
+    admin.rpc("create_app_session", {
       p_user_id: user.id,
       p_ip_hash: ipHash,
       p_user_agent: userAgent,
-    },
-  );
+    }),
+    admin
+      .rpc("record_pin_auth_result", {
+        p_user_id: user.id,
+        p_attempted_lookup: pinLookup,
+        p_success: true,
+        p_ip_hash: ipHash,
+        p_user_agent: userAgent,
+      })
+      .catch(() => null),
+  ]);
+
+  const { data: sessionRows, error: sessionError } = sessionResult;
 
   if (sessionError || !Array.isArray(sessionRows) || !sessionRows[0]) {
     redirect("/login?error=session-unavailable");

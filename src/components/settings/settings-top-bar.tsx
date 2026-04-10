@@ -56,18 +56,18 @@ export function SettingsTopBar({ actions = [] }: SettingsTopBarProps) {
               สต็อก
             </Link>
             <Link
-              href="/orders"
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-            >
-              <ClipboardList className="h-4 w-4" strokeWidth={2.2} />
-              ออเดอร์
-            </Link>
-            <Link
               href="/orders/incoming"
               className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
             >
               <ScanText className="h-4 w-4" strokeWidth={2.2} />
               ออเดอร์เข้า
+            </Link>
+            <Link
+              href="/orders"
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+            >
+              <ClipboardList className="h-4 w-4" strokeWidth={2.2} />
+              ออเดอร์
             </Link>
             <SettingsNavMenu />
           </nav>

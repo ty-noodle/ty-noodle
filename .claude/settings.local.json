@@ -36,7 +36,10 @@
       "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\photo\\\\brand\")",
       "Bash(dir \"C:\\\\Users\\\\Riew\\\\Desktop\\\\TYNoodle\\\\public\\\\brand\")",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "WebFetch(domain:blog.logrocket.com)",
+      "WebFetch(domain:3fx.ch)",
+      "Bash(xargs wc:*)"
     ]
   }
 }
