@@ -159,7 +159,9 @@ const getCatalogData = cache(async () => {
       id: `${product.id}:${saleUnit.id}`,
       min_order_qty: Number(saleUnit.min_order_qty ?? 1),
       product_id: product.id,
-      product_images: product.product_images ?? [],
+      product_images: [...(product.product_images ?? [])].sort(
+        (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0),
+      ),
       product_sale_unit_id: saleUnit.id,
       sale_unit_label: saleUnit.unit_label,
       sale_unit_ratio: Number(saleUnit.base_unit_quantity),

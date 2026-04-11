@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { revalidateTag, updateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { normalizeSaleUnitCostMode } from "@/lib/products/sale-unit-cost";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -9,6 +9,10 @@ import type { Database, Json } from "@/types/database";
 const PRODUCT_IMAGES_BUCKET = "product-images";
 
 type SettingsAdmin = ReturnType<typeof getSupabaseAdmin>;
+export type ProductSubmitActionState = {
+  message: string;
+  status: "idle" | "success" | "error";
+};
 
 function safeText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -160,7 +164,7 @@ async function uploadProductImages(
         });
 
       if (uploadError) {
-        return null;
+        throw new Error(`Upload image failed: ${uploadError.message}`);
       }
 
       const {
@@ -177,7 +181,14 @@ async function uploadProductImages(
     }),
   );
 
-  return uploadedRows.filter((row): row is NonNullable<typeof row> => row !== null);
+  return uploadedRows;
+}
+
+function throwIfError(error: { message?: string } | null, fallbackMessage: string) {
+  if (!error) {
+    return;
+  }
+  throw new Error(error.message ?? fallbackMessage);
 }
 
 async function resolveCategorySelection(
@@ -309,6 +320,10 @@ async function syncCategoryMetadataForProducts(
 }
 
 function revalidateSettingsSurfaces(organizationId: string) {
+  // Read-your-own-write: expire immediately so reopening modal sees fresh data
+  updateTag(`settings-${organizationId}`);
+  updateTag(`orders-${organizationId}`);
+  // Keep SWR revalidation for any stale readers still holding old cache entries
   revalidateTag(`settings-${organizationId}`, "max");
   revalidateTag(`orders-${organizationId}`, "max");
 }
@@ -360,7 +375,7 @@ export async function createCustomer(formData: FormData) {
   revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
-export async function createProduct(formData: FormData) {
+export async function createProduct(formData: FormData): Promise<boolean> {
   const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin() as SettingsAdmin;
   const name = safeText(formData.get("name"));
@@ -391,7 +406,7 @@ export async function createProduct(formData: FormData) {
             saleUnit.fixedCostPrice < 0)),
     )
   ) {
-    return;
+    return false;
   }
 
   const sku = await generateProductSku(session.organizationId);
@@ -421,7 +436,7 @@ export async function createProduct(formData: FormData) {
     .single();
 
   if (productError || !product) {
-    return;
+    return false;
   }
 
   await admin.from("product_sale_units").insert(
@@ -447,11 +462,13 @@ export async function createProduct(formData: FormData) {
     const imageRows = await uploadProductImages(storage, session.organizationId, product.id, files);
 
     if (imageRows.length > 0) {
-      await admin.from("product_images").insert(imageRows);
+      const { error: imageInsertError } = await admin.from("product_images").insert(imageRows);
+      throwIfError(imageInsertError, "Insert product images failed");
     }
   }
 
   revalidateSettingsSurfaces(session.organizationId);
+  return true;
 }
 
 export async function upsertStoreProductPrice(formData: FormData) {
@@ -509,7 +526,7 @@ export async function deleteCustomerPrice(formData: FormData) {
   revalidateTag(`settings-${session.organizationId}`, "max");
 }
 
-export async function updateProduct(formData: FormData) {
+export async function updateProduct(formData: FormData): Promise<boolean> {
   const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin() as SettingsAdmin;
   const productId = safeText(formData.get("productId"));
@@ -525,6 +542,7 @@ export async function updateProduct(formData: FormData) {
   const keptExistingImageUrls = formData
     .getAll("keptExistingImageUrls")
     .filter((v): v is string => typeof v === "string" && v.length > 0);
+  const newImagesFirst = safeText(formData.get("newImagesFirst")) === "1";
   const brand = safeText(formData.get("brand")) ?? "";
   const requestedCategoryIds = parseCategoryIds(formData);
   const description = safeText(formData.get("description")) ?? "";
@@ -547,7 +565,7 @@ export async function updateProduct(formData: FormData) {
             saleUnit.fixedCostPrice < 0)),
     )
   ) {
-    return;
+    return false;
   }
 
   // Run all independent reads in parallel
@@ -672,7 +690,8 @@ export async function updateProduct(formData: FormData) {
   await syncProductCategoryAssignments(admin, session.organizationId, productId, categoryIds);
 
   {
-    // Sync images: keep existing URLs the client said to keep, delete the rest, then append new uploads
+    // Sync images: upload/insert new images first, then delete removed images last.
+    // This order avoids accidental data loss if a request is interrupted mid-flight.
     await ensureBucket();
 
     const { data: allCurrentImages } = await admin
@@ -691,24 +710,17 @@ export async function updateProduct(formData: FormData) {
       keptExistingImageUrls.includes(img.public_url ?? ""),
     );
 
-    if (toDelete.length > 0) {
-      await admin
-        .from("product_images")
-        .delete()
-        .in("id", toDelete.map((img) => img.id));
+    const shouldPrioritizeNewImages = files.length > 0 && newImagesFirst;
 
-      const pathsToRemove = toDelete.map((img) => img.storage_path).filter(Boolean);
-      if (pathsToRemove.length > 0) {
-        await storage.from(PRODUCT_IMAGES_BUCKET).remove(pathsToRemove);
-      }
-    }
-
-    // Re-order kept images so sort_order starts at 0
-    if (toKeep.length > 0) {
-      await Promise.all(
+    // Re-order kept images so sort_order starts at 0 (normal flow)
+    if (toKeep.length > 0 && !shouldPrioritizeNewImages) {
+      const updateResults = await Promise.all(
         toKeep.map((img, idx) =>
           admin.from("product_images").update({ sort_order: idx }).eq("id", img.id),
         ),
+      );
+      updateResults.forEach((result) =>
+        throwIfError(result.error, "Reorder kept product images failed"),
       );
     }
 
@@ -719,16 +731,103 @@ export async function updateProduct(formData: FormData) {
         productId,
         files,
       );
-      // Offset sort_order so new images come after the kept ones
-      const offset = toKeep.length;
-      const offsetRows = newRows.map((row, idx) => ({ ...row, sort_order: offset + idx }));
-      if (offsetRows.length > 0) {
-        await admin.from("product_images").insert(offsetRows);
+      if (shouldPrioritizeNewImages) {
+        // Put new images first, then move kept images after new images.
+        const primaryRows = newRows.map((row, idx) => ({ ...row, sort_order: idx }));
+        if (primaryRows.length > 0) {
+          const { error: primaryInsertError } = await admin.from("product_images").insert(primaryRows);
+          throwIfError(primaryInsertError, "Insert primary product images failed");
+        }
+
+        if (toKeep.length > 0) {
+          const offset = primaryRows.length;
+          const keepUpdateResults = await Promise.all(
+            toKeep.map((img, idx) =>
+              admin.from("product_images").update({ sort_order: offset + idx }).eq("id", img.id),
+            ),
+          );
+          keepUpdateResults.forEach((result) =>
+            throwIfError(result.error, "Reorder kept product images after insert failed"),
+          );
+        }
+      } else {
+        // Offset sort_order so new images come after the kept ones
+        const offset = toKeep.length;
+        const offsetRows = newRows.map((row, idx) => ({ ...row, sort_order: offset + idx }));
+        if (offsetRows.length > 0) {
+          const { error: offsetInsertError } = await admin.from("product_images").insert(offsetRows);
+          throwIfError(offsetInsertError, "Insert product images with offset failed");
+        }
+      }
+    }
+
+    if (toDelete.length > 0) {
+      const { error: deleteImageRowsError } = await admin
+        .from("product_images")
+        .delete()
+        .in("id", toDelete.map((img) => img.id));
+      throwIfError(deleteImageRowsError, "Delete removed product images failed");
+
+      const pathsToRemove = toDelete.map((img) => img.storage_path).filter(Boolean);
+      if (pathsToRemove.length > 0) {
+        const { error: removeStorageError } = await storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .remove(pathsToRemove);
+        throwIfError(removeStorageError, "Remove product images from storage failed");
       }
     }
   }
 
   revalidateSettingsSurfaces(session.organizationId);
+  return true;
+}
+
+export async function createProductFormAction(
+  _previousState: ProductSubmitActionState,
+  formData: FormData,
+): Promise<ProductSubmitActionState> {
+  try {
+    const success = await createProduct(formData);
+    if (!success) {
+      return {
+        message: "บันทึกสินค้าไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง",
+        status: "error",
+      };
+    }
+    return {
+      message: "เพิ่มสินค้าสำเร็จแล้ว",
+      status: "success",
+    };
+  } catch {
+    return {
+      message: "อัปโหลดรูปไม่สำเร็จ กรุณาตรวจสอบไฟล์รูปและลองใหม่อีกครั้ง",
+      status: "error",
+    };
+  }
+}
+
+export async function updateProductFormAction(
+  _previousState: ProductSubmitActionState,
+  formData: FormData,
+): Promise<ProductSubmitActionState> {
+  try {
+    const success = await updateProduct(formData);
+    if (!success) {
+      return {
+        message: "บันทึกการแก้ไขไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง",
+        status: "error",
+      };
+    }
+    return {
+      message: "แก้ไขสินค้าสำเร็จแล้ว",
+      status: "success",
+    };
+  } catch {
+    return {
+      message: "อัปโหลดรูปไม่สำเร็จ กรุณาตรวจสอบไฟล์รูปและลองใหม่อีกครั้ง",
+      status: "error",
+    };
+  }
 }
 
 export async function upsertProductCategory(input: {

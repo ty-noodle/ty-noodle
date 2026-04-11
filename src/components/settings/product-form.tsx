@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -21,7 +21,11 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
-import { createProduct, updateProduct } from "@/app/dashboard/settings/actions";
+import {
+  createProductFormAction,
+  updateProductFormAction,
+  type ProductSubmitActionState,
+} from "@/app/dashboard/settings/actions";
 import {
   settingsFieldLabelClass,
   settingsInputClass,
@@ -43,8 +47,14 @@ type ProductFormProps = {
 
 type OrderPreset = "free" | "integer" | "custom";
 const MAX_PRODUCT_IMAGES = 5;
+const MAX_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const INTEGER_ORDER_PRESET_QTY = 5;
 const SWIPE_THRESHOLD = 60;
+const initialProductSubmitActionState: ProductSubmitActionState = {
+  message: "",
+  status: "idle",
+};
 
 type SaleUnitDraft = {
   baseUnitQuantity: string;
@@ -72,6 +82,7 @@ type ProductFormBodyProps = {
   editingProduct: SettingsProduct | null;
   nextSku: string;
   onClose: () => void;
+  onPendingChange?: (pending: boolean) => void;
   onSubmitSuccess: () => void;
 };
 
@@ -80,6 +91,7 @@ function ProductFormBody({
   editingProduct,
   nextSku,
   onClose,
+  onPendingChange,
   onSubmitSuccess,
 }: ProductFormBodyProps) {
   const formId = useId();
@@ -130,11 +142,12 @@ function ProductFormBody({
   const skuValue = isEditing ? (editingProduct?.sku ?? "") : nextSku;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const filePickerRef = useRef<HTMLInputElement | null>(null);
 
   const [keptExistingUrls, setKeptExistingUrls] = useState<string[]>(
     editingProduct?.imageUrls ?? [],
   );
+  const [prioritizeNewImages, setPrioritizeNewImages] = useState(false);
 
   const previews = useMemo(
     () =>
@@ -224,61 +237,50 @@ function ProductFormBody({
     };
   }, [isCameraOpen]);
 
-  const [isPending, startTransition] = useTransition();
+  const serverAction = isEditing ? updateProductFormAction : createProductFormAction;
+  const [submitState, setSubmitState] = useState<ProductSubmitActionState>(
+    initialProductSubmitActionState,
+  );
+  const [isPending, startSubmitTransition] = useTransition();
+  const actionErrorMessage = submitState.status === "error" ? submitState.message : "";
+  const displayImageError = cameraError || actionErrorMessage;
   const [activeBodyTab, setActiveBodyTab] = useState<"info" | "images">("info");
-  const [showSuccess, setShowSuccess] = useState(false);
-  const progressBarRef = useRef<HTMLDivElement>(null);
-  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hideSuccessFeedback, setHideSuccessFeedback] = useState(false);
+  const showSuccess = submitState.status === "success" && !hideSuccessFeedback;
   const router = useRouter();
 
-  // Animate progress bar and auto-dismiss when showSuccess becomes true
   useEffect(() => {
-    if (!showSuccess) return;
-    const bar = progressBarRef.current;
-    if (bar) {
-      bar.style.transition = "none";
-      bar.style.width = "100%";
-      void bar.offsetWidth; // force reflow
-      bar.style.transition = "width 3s linear";
-      bar.style.width = "0%";
-    }
-    successTimerRef.current = setTimeout(() => setShowSuccess(false), 3000);
+    onPendingChange?.(isPending);
     return () => {
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      onPendingChange?.(false);
     };
-  }, [showSuccess]);
+  }, [isPending, onPendingChange]);
+
+  useEffect(() => {
+    if (submitState.status !== "success") {
+      return;
+    }
+
+    if (isEditing) {
+      startTransition(() => {
+        router.refresh();
+      });
+      return;
+    }
+
+    const closeTimer = setTimeout(() => {
+      onSubmitSuccess();
+    }, 1600);
+    return () => clearTimeout(closeTimer);
+  }, [submitState.status, submitState.message, isEditing, onSubmitSuccess, router]);
 
   function dismissSuccess() {
-    if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    setShowSuccess(false);
-  }
-
-  function handleSubmit(formData: FormData) {
-    startTransition(async () => {
-      if (isEditing) {
-        await updateProduct(formData);
-        setShowSuccess(true);
-        router.refresh();
-      } else {
-        await createProduct(formData);
-        setShowSuccess(true);
-        setTimeout(() => {
-          onSubmitSuccess();
-        }, 1600);
-      }
-    });
-  }
-
-  function syncFilesToInput(nextFiles: File[]) {
-    if (!uploadInputRef.current) return;
-
-    const dataTransfer = new DataTransfer();
-    nextFiles.forEach((file) => dataTransfer.items.add(file));
-    uploadInputRef.current.files = dataTransfer.files;
+    setHideSuccessFeedback(true);
   }
 
   function mergeFiles(currentFiles: File[], incomingFiles: File[]) {
-    const nextFiles = [...currentFiles, ...incomingFiles].slice(0, MAX_PRODUCT_IMAGES);
+    const maxNewFiles = Math.max(0, MAX_PRODUCT_IMAGES - keptExistingUrls.length);
+    const nextFiles = [...currentFiles, ...incomingFiles].slice(0, maxNewFiles);
     const omittedCount = currentFiles.length + incomingFiles.length - nextFiles.length;
 
     return {
@@ -291,16 +293,54 @@ function ProductFormBody({
     const selectedFiles = Array.from(fileList ?? []);
     if (selectedFiles.length === 0) return;
 
-    const { nextFiles, omittedCount } = mergeFiles(files, selectedFiles);
-    setFiles(nextFiles);
-    syncFilesToInput(nextFiles);
-    setActiveIndex(nextFiles.length - 1);
-    setCameraError(
-      omittedCount > 0 ? `เพิ่มรูปได้สูงสุด ${MAX_PRODUCT_IMAGES} รูป ระบบจึงไม่ได้เพิ่มรูปใหม่อีก` : "",
-    );
+    const validFiles: File[] = [];
+    let invalidTypeCount = 0;
+    let invalidSizeCount = 0;
 
-    if (uploadInputRef.current) {
-      uploadInputRef.current.value = "";
+    selectedFiles.forEach((file) => {
+      if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+        invalidTypeCount += 1;
+        return;
+      }
+      if (file.size > MAX_IMAGE_FILE_BYTES) {
+        invalidSizeCount += 1;
+        return;
+      }
+      validFiles.push(file);
+    });
+
+    if (validFiles.length === 0) {
+      const messages: string[] = [];
+      if (invalidTypeCount > 0) {
+        messages.push("รองรับเฉพาะไฟล์ PNG, JPG และ WEBP");
+      }
+      if (invalidSizeCount > 0) {
+        messages.push("ไฟล์รูปต้องมีขนาดไม่เกิน 5MB");
+      }
+      setCameraError(messages.join(" "));
+      if (filePickerRef.current) {
+        filePickerRef.current.value = "";
+      }
+      return;
+    }
+
+    const { nextFiles, omittedCount } = mergeFiles(files, validFiles);
+    setFiles(nextFiles);
+    setActiveIndex(keptExistingUrls.length + nextFiles.length - 1);
+    const messages: string[] = [];
+    if (invalidTypeCount > 0) {
+      messages.push("บางไฟล์ไม่รองรับ (รองรับ PNG, JPG, WEBP)");
+    }
+    if (invalidSizeCount > 0) {
+      messages.push("บางไฟล์มีขนาดเกิน 5MB");
+    }
+    if (omittedCount > 0) {
+      messages.push(`เพิ่มรูปได้สูงสุด ${MAX_PRODUCT_IMAGES} รูป ระบบจึงไม่ได้เพิ่มรูปใหม่อีก`);
+    }
+    setCameraError(messages.join(" "));
+
+    if (filePickerRef.current) {
+      filePickerRef.current.value = "";
     }
   }
 
@@ -311,13 +351,21 @@ function ProductFormBody({
 
     if (galleryIndex < existingCount) {
       // Removing an existing image
-      setKeptExistingUrls((prev) => prev.filter((_, i) => i !== galleryIndex));
+      setKeptExistingUrls((prev) => {
+        const next = prev.filter((_, i) => i !== galleryIndex);
+        if (next.length === 0) {
+          setPrioritizeNewImages(false);
+        }
+        return next;
+      });
     } else {
       // Removing a new file
       const fileIndex = galleryIndex - existingCount;
       setFiles((current) => {
         const nextFiles = current.filter((_, i) => i !== fileIndex);
-        syncFilesToInput(nextFiles);
+        if (nextFiles.length === 0) {
+          setPrioritizeNewImages(false);
+        }
         return nextFiles;
       });
       setCameraError("");
@@ -334,15 +382,20 @@ function ProductFormBody({
     // Only operates on new files (existing images keep their order)
     const existingCount = keptExistingUrls.length;
     const fileIndex = galleryIndex - existingCount;
-    if (fileIndex <= 0) return; // already first new file or is existing image
+    if (fileIndex < 0) return; // existing image
     setFiles((current) => {
+      if (fileIndex === 0) {
+        return current;
+      }
       if (fileIndex >= current.length) return current;
       const nextFiles = [...current];
       const [selectedFile] = nextFiles.splice(fileIndex, 1);
       nextFiles.unshift(selectedFile);
-      syncFilesToInput(nextFiles);
       return nextFiles;
     });
+    if (existingCount > 0) {
+      setPrioritizeNewImages(true);
+    }
     setActiveIndex(existingCount); // first new file
   }
 
@@ -358,7 +411,6 @@ function ProductFormBody({
       }
       const nextFiles = [...current];
       [nextFiles[fileIndex], nextFiles[targetFileIndex]] = [nextFiles[targetFileIndex], nextFiles[fileIndex]];
-      syncFilesToInput(nextFiles);
       return nextFiles;
     });
     setActiveIndex(existingCount + targetFileIndex);
@@ -457,9 +509,17 @@ function ProductFormBody({
       return;
     }
 
+    const maxSide = 1920;
+    const scale =
+      Math.max(video.videoWidth, video.videoHeight) > maxSide
+        ? maxSide / Math.max(video.videoWidth, video.videoHeight)
+        : 1;
+    const targetWidth = Math.max(1, Math.round(video.videoWidth * scale));
+    const targetHeight = Math.max(1, Math.round(video.videoHeight * scale));
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
     const context = canvas.getContext("2d");
 
@@ -468,10 +528,10 @@ function ProductFormBody({
       return;
     }
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(video, 0, 0, targetWidth, targetHeight);
 
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.92);
+      canvas.toBlob(resolve, "image/jpeg", 0.86);
     });
 
     if (!blob) {
@@ -483,10 +543,14 @@ function ProductFormBody({
       type: "image/jpeg",
     });
 
+    if (capturedFile.size > MAX_IMAGE_FILE_BYTES) {
+      setCameraError("รูปจากกล้องมีขนาดเกิน 5MB กรุณาถ่ายใหม่ให้ใกล้ขึ้นหรือแสงสว่างมากขึ้น");
+      return;
+    }
+
     const { nextFiles, omittedCount } = mergeFiles(files, [capturedFile]);
     setFiles(nextFiles);
-    syncFilesToInput(nextFiles);
-    setActiveIndex(nextFiles.length - 1);
+    setActiveIndex(keptExistingUrls.length + nextFiles.length - 1);
     setCameraError(
       omittedCount > 0 ? `เพิ่มรูปได้สูงสุด ${MAX_PRODUCT_IMAGES} รูป ระบบจึงไม่ได้เพิ่มรูปใหม่อีก` : "",
     );
@@ -518,10 +582,41 @@ function ProductFormBody({
     });
   }
 
+  function handleSubmit(formData: FormData) {
+    setHideSuccessFeedback(false);
+
+    const payload = new FormData();
+    formData.forEach((value, key) => {
+      if (key !== "images") {
+        payload.append(key, value);
+      }
+    });
+    files.forEach((file) => payload.append("images", file));
+
+    startSubmitTransition(() => {
+      void serverAction(initialProductSubmitActionState, payload)
+        .then((nextState) => {
+          setSubmitState(nextState);
+        })
+        .catch(() => {
+          setSubmitState({
+            message: "บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+            status: "error",
+          });
+        });
+    });
+  }
+
   return (
     <>
-      <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-        {isEditing ? <input type="hidden" name="productId" value={editingProduct.id} /> : null}
+        <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {isEditing ? <input type="hidden" name="newImagesFirst" value={prioritizeNewImages ? "1" : "0"} /> : null}
+          {isEditing ? <input type="hidden" name="productId" value={editingProduct.id} /> : null}
+          {isEditing
+            ? keptExistingUrls.map((url) => (
+              <input key={`keep-image-${url}`} type="hidden" name="keptExistingImageUrls" value={url} />
+            ))
+            : null}
 
         {/* ── Tab strip ── */}
         <div className="grid shrink-0 grid-cols-2 border-b border-slate-100">
@@ -552,7 +647,7 @@ function ProductFormBody({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
-          {activeBodyTab === "info" && <div className="space-y-8">
+          <div className={activeBodyTab === "info" ? "space-y-8" : "hidden"}>
 
               {/* Section: ข้อมูลสินค้า */}
               <section className="space-y-4">
@@ -810,9 +905,9 @@ function ProductFormBody({
                   })}
                 </div>
               </section>
-            </div>}
+            </div>
 
-          {activeBodyTab === "images" && <div className="space-y-5">
+          <div className={activeBodyTab === "images" ? "space-y-5" : "hidden"}>
               {isEditing ? (
                 <div className="space-y-4">
                   <div>
@@ -842,8 +937,7 @@ function ProductFormBody({
                         <p className="text-base font-semibold text-slate-900">เพิ่มรูปจากเครื่อง</p>
                         <p className="mt-1 text-sm text-slate-500">ได้สูงสุด {MAX_PRODUCT_IMAGES} รูปต่อสินค้า</p>
                         <input
-                          ref={uploadInputRef}
-                          name="images"
+                          ref={filePickerRef}
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           multiple
@@ -856,7 +950,7 @@ function ProductFormBody({
                         type="button"
                         onClick={openCamera}
                         disabled={remainingImageSlots <= 0}
-                        className="group relative flex min-h-44 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center transition hover:border-[#003366] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="hidden"
                       >
                         <div className="mb-4 rounded-full bg-white p-4 shadow-sm transition-transform group-hover:scale-105">
                           <Camera className="h-7 w-7 text-[#003366]" strokeWidth={2.2} />
@@ -870,11 +964,6 @@ function ProductFormBody({
                       </button>
                     </div>
                   </div>
-
-                  {/* Hidden inputs — tell server which existing images to keep */}
-                  {keptExistingUrls.map((url) => (
-                    <input key={url} type="hidden" name="keptExistingImageUrls" value={url} />
-                  ))}
 
                   {galleryItems.length > 0 ? (
                     <div className="space-y-3">
@@ -915,7 +1004,7 @@ function ProductFormBody({
                               <button
                                 type="button"
                                 onClick={() => setPrimaryImage(activeIndex)}
-                                disabled={activeIndex === 0}
+                                disabled={activeIndex === keptExistingUrls.length}
                                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <BadgeCheck className="h-4 w-4 text-[#003366]" strokeWidth={2.2} />
@@ -973,8 +1062,7 @@ function ProductFormBody({
                         <p className="text-base font-semibold text-slate-900">เพิ่มรูปจากเครื่อง</p>
                         <p className="mt-1 text-sm text-slate-500">ได้สูงสุด {MAX_PRODUCT_IMAGES} รูปต่อสินค้า</p>
                         <input
-                          ref={uploadInputRef}
-                          name="images"
+                          ref={filePickerRef}
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           multiple
@@ -987,7 +1075,7 @@ function ProductFormBody({
                         type="button"
                         onClick={openCamera}
                         disabled={remainingImageSlots <= 0}
-                        className="group relative flex min-h-52 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center transition hover:border-[#003366] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="hidden"
                       >
                         <div className="mb-4 rounded-full bg-white p-4 shadow-sm transition-transform group-hover:scale-105">
                           <Camera className="h-7 w-7 text-[#003366]" strokeWidth={2.2} />
@@ -1085,14 +1173,14 @@ function ProductFormBody({
                     </div>
                   )}
 
-                  {cameraError ? (
+                  {displayImageError ? (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      {cameraError}
+                      {displayImageError}
                     </div>
                   ) : null}
                 </>
               )}
-            </div>}
+            </div>
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -1120,7 +1208,7 @@ function ProductFormBody({
       </form>
 
       {showSuccess ? (
-        <div className="absolute inset-x-4 top-4 z-20 overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_rgba(15,23,42,0.18)] ring-1 ring-emerald-100 sm:inset-x-6">
+        <div className="absolute left-1/2 top-1/2 z-20 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_18px_48px_rgba(15,23,42,0.24)] ring-1 ring-emerald-100">
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
               <CheckCircle2 className="h-5 w-5 text-emerald-500" strokeWidth={2} />
@@ -1142,10 +1230,7 @@ function ProductFormBody({
               <X className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
-          {/* Progress bar */}
-          <div className="h-1 bg-emerald-50">
-            <div ref={progressBarRef} className="h-full bg-emerald-400" style={{ width: "100%" }} />
-          </div>
+          <div className="h-1 bg-emerald-100" />
         </div>
       ) : null}
 
@@ -1225,6 +1310,7 @@ export function ProductForm({
   returnHref,
 }: ProductFormProps) {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const initialIndex = productList
     ? Math.max(0, productList.findIndex((p) => p.id === editingProduct?.id))
@@ -1252,6 +1338,7 @@ export function ProductForm({
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
+    if (isSubmitting) return;
     if (touchStartX.current === null || touchStartY.current === null) return;
     const deltaX = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
     const deltaY = (e.changedTouches[0]?.clientY ?? touchStartY.current) - touchStartY.current;
@@ -1265,16 +1352,17 @@ export function ProductForm({
 
   // Keyboard arrow navigation
   useEffect(() => {
-    if (!hasNav) return;
+    if (!hasNav || isSubmitting) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowLeft" && canGoPrev) setCurrentIndex((i) => i - 1);
       if (e.key === "ArrowRight" && canGoNext) setCurrentIndex((i) => i + 1);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hasNav, canGoPrev, canGoNext]);
+  }, [hasNav, canGoPrev, canGoNext, isSubmitting]);
 
   function closeModal() {
+    if (isSubmitting) return;
     router.replace(returnHref, { scroll: false });
   }
 
@@ -1298,7 +1386,7 @@ export function ProductForm({
               <button
                 type="button"
                 onClick={() => setCurrentIndex((i) => i - 1)}
-                disabled={!canGoPrev}
+                disabled={!canGoPrev || isSubmitting}
                 aria-label="สินค้าก่อนหน้า"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#003366] text-white shadow-md transition hover:bg-[#002244] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
               >
@@ -1319,7 +1407,7 @@ export function ProductForm({
               <button
                 type="button"
                 onClick={() => setCurrentIndex((i) => i + 1)}
-                disabled={!canGoNext}
+                disabled={!canGoNext || isSubmitting}
                 aria-label="สินค้าถัดไป"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#003366] text-white shadow-md transition hover:bg-[#002244] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
               >
@@ -1330,7 +1418,8 @@ export function ProductForm({
             <button
               type="button"
               onClick={closeModal}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+              disabled={isSubmitting}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="ปิด"
             >
               <X className="h-4 w-4" strokeWidth={2.2} />
@@ -1362,6 +1451,7 @@ export function ProductForm({
           editingProduct={currentProduct}
           nextSku={nextSku}
           onClose={closeModal}
+          onPendingChange={setIsSubmitting}
           onSubmitSuccess={handleSubmitSuccess}
         />
       </div>
