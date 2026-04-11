@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
+import { normalizeSearch } from "@/lib/utils/search";
 import {
   createManualOrderAction,
   fetchCustomerYesterdayItemsAction,
@@ -257,7 +258,7 @@ function ProductSelectModal({
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = normalizeSearch(query);
 
     return products.filter((product) => {
       const matchesCategory =
@@ -272,10 +273,10 @@ function ProductSelectModal({
       }
 
       return (
-        product.name.toLowerCase().includes(normalized) ||
-        product.sku.toLowerCase().includes(normalized) ||
+        normalizeSearch(product.name).includes(normalized) ||
+        normalizeSearch(product.sku).includes(normalized) ||
         product.categoryNames.some((categoryName) =>
-          categoryName.toLowerCase().includes(normalized),
+          normalizeSearch(categoryName).includes(normalized),
         )
       );
     });
@@ -835,8 +836,8 @@ export function CreateOrderModal({ customers, products, today }: Props) {
 
   const filteredCustomers = customerPickerQuery
     ? customers.filter((c) => {
-        const n = customerPickerQuery.toLowerCase();
-        return c.name.toLowerCase().includes(n) || c.code.toLowerCase().includes(n);
+        const n = normalizeSearch(customerPickerQuery);
+        return normalizeSearch(c.name).includes(n) || normalizeSearch(c.code).includes(n);
       })
     : customers;
 

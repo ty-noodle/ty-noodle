@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Json } from "@/types/database";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSearch } from "@/lib/utils/search";
 
 type QueryError = {
   message?: string;
@@ -319,7 +320,7 @@ export async function getIncomingOrders(
   },
 ): Promise<IncomingOrderListItem[]> {
   const admin = getSupabaseAdmin() as unknown as OrderDetailAdminClient;
-  const normalizedSearch = searchTerm?.trim().toLowerCase() ?? "";
+  const normalizedSearch = normalizeSearch(searchTerm ?? "");
 
   const ordersResult = await admin
     .from("orders")
@@ -395,10 +396,10 @@ export async function getIncomingOrders(
       }
 
       return (
-        order.orderNumber.toLowerCase().includes(normalizedSearch) ||
-        order.customerCode.toLowerCase().includes(normalizedSearch) ||
-        order.customerName.toLowerCase().includes(normalizedSearch) ||
-        order.channelLabel.toLowerCase().includes(normalizedSearch)
+        normalizeSearch(order.orderNumber).includes(normalizedSearch) ||
+        normalizeSearch(order.customerCode).includes(normalizedSearch) ||
+        normalizeSearch(order.customerName).includes(normalizedSearch) ||
+        normalizeSearch(order.channelLabel).includes(normalizedSearch)
       );
     });
 }

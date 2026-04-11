@@ -22,6 +22,7 @@ import {
 } from "@/app/dashboard/settings/actions";
 import { confirmBelowCostSave, isBelowCostPrice } from "@/components/pricing/price-guard";
 import type { SettingsPriceRow, SettingsSaleUnitOption } from "@/lib/settings/admin";
+import { normalizeSearch } from "@/lib/utils/search";
 
 export type CustomerPriceGroup = {
   customerId: string;
@@ -50,16 +51,16 @@ export function CustomerPricePanel({ groups, saleUnits }: CustomerPricePanelProp
   const [sheetCustomerId, setSheetCustomerId] = useState<string | null>(null);
   const [sheetAddMode, setSheetAddMode] = useState(false);
 
-  const q = search.trim().toLowerCase();
+  const q = normalizeSearch(search);
 
   const filtered = q
     ? groups.filter(
         (g) =>
-          g.customerName.toLowerCase().includes(q) ||
-          g.customerCode.toLowerCase().includes(q) ||
+          normalizeSearch(g.customerName).includes(q) ||
+          normalizeSearch(g.customerCode).includes(q) ||
           g.prices.some(
             (p) =>
-              p.productName.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
+              normalizeSearch(p.productName).includes(q) || normalizeSearch(p.sku).includes(q),
           ),
       )
     : groups;

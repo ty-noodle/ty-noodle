@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSearch } from "@/lib/utils/search";
 
 export type DeliveryNoteReportLine = {
   id: string;
@@ -145,12 +146,12 @@ export async function getDeliveryNotesReport(params: {
   if (notesError) throw new Error(notesError.message);
 
   let notes = (notesData ?? []) as RawDeliveryNote[];
-  const normalizedKeyword = keyword.trim().toLowerCase();
+  const normalizedKeyword = normalizeSearch(keyword);
   if (normalizedKeyword) {
     notes = notes.filter((note) =>
-      note.delivery_number.toLowerCase().includes(normalizedKeyword) ||
-      note.customers.name.toLowerCase().includes(normalizedKeyword) ||
-      note.customers.customer_code.toLowerCase().includes(normalizedKeyword),
+      normalizeSearch(note.delivery_number).includes(normalizedKeyword) ||
+      normalizeSearch(note.customers.name).includes(normalizedKeyword) ||
+      normalizeSearch(note.customers.customer_code).includes(normalizedKeyword),
     );
   }
 

@@ -242,7 +242,7 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
       productsTable
         .select("id, organization_id, sku, name, cost_price, stock_quantity, unit, is_active, metadata")
         .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false }),
+        .order("sku", { ascending: true }),
       imagesTable
         .select("product_id, public_url, sort_order")
         .eq("organization_id", organizationId)
@@ -560,7 +560,7 @@ async function fetchSettingsProductsData(organizationId: string): Promise<Settin
       productsTable
         .select("id, organization_id, sku, name, cost_price, stock_quantity, unit, is_active, metadata")
         .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false }),
+        .order("sku", { ascending: true }),
       imagesTable
         .select("product_id, public_url, sort_order")
         .eq("organization_id", organizationId)

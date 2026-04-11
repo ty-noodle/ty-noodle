@@ -522,6 +522,9 @@ export async function updateProduct(formData: FormData) {
   const files = formData
     .getAll("images")
     .filter((value): value is File => value instanceof File && value.size > 0);
+  const keptExistingImageUrls = formData
+    .getAll("keptExistingImageUrls")
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
   const brand = safeText(formData.get("brand")) ?? "";
   const requestedCategoryIds = parseCategoryIds(formData);
   const description = safeText(formData.get("description")) ?? "";
@@ -668,25 +671,60 @@ export async function updateProduct(formData: FormData) {
 
   await syncProductCategoryAssignments(admin, session.organizationId, productId, categoryIds);
 
-  if (files.length > 0) {
+  {
+    // Sync images: keep existing URLs the client said to keep, delete the rest, then append new uploads
     await ensureBucket();
 
-    const { data: existingImages } = await admin.from("product_images")
-      .select("storage_path")
-      .eq("product_id", productId);
+    const { data: allCurrentImages } = await admin
+      .from("product_images")
+      .select("id, public_url, storage_path, sort_order")
+      .eq("product_id", productId)
+      .order("sort_order", { ascending: true });
 
-    const existingPaths = (existingImages ?? []).map((image) => image.storage_path).filter(Boolean);
+    const currentImages = allCurrentImages ?? [];
 
-    await admin.from("product_images").delete().eq("product_id", productId);
+    // Images to delete: those whose public_url is no longer in the kept list
+    const toDelete = currentImages.filter(
+      (img) => !keptExistingImageUrls.includes(img.public_url ?? ""),
+    );
+    const toKeep = currentImages.filter((img) =>
+      keptExistingImageUrls.includes(img.public_url ?? ""),
+    );
 
-    if (existingPaths.length > 0) {
-      await storage.from(PRODUCT_IMAGES_BUCKET).remove(existingPaths);
+    if (toDelete.length > 0) {
+      await admin
+        .from("product_images")
+        .delete()
+        .in("id", toDelete.map((img) => img.id));
+
+      const pathsToRemove = toDelete.map((img) => img.storage_path).filter(Boolean);
+      if (pathsToRemove.length > 0) {
+        await storage.from(PRODUCT_IMAGES_BUCKET).remove(pathsToRemove);
+      }
     }
 
-    const imageRows = await uploadProductImages(storage, session.organizationId, productId, files);
+    // Re-order kept images so sort_order starts at 0
+    if (toKeep.length > 0) {
+      await Promise.all(
+        toKeep.map((img, idx) =>
+          admin.from("product_images").update({ sort_order: idx }).eq("id", img.id),
+        ),
+      );
+    }
 
-    if (imageRows.length > 0) {
-      await admin.from("product_images").insert(imageRows);
+    if (files.length > 0) {
+      const newRows = await uploadProductImages(
+        storage,
+        session.organizationId,
+        productId,
+        files,
+      );
+      // Offset sort_order so new images come after the kept ones
+      const offset = toKeep.length;
+      const offsetRows = newRows.map((row, idx) => ({ ...row, sort_order: offset + idx }));
+      if (offsetRows.length > 0) {
+        await admin.from("product_images").insert(offsetRows);
+      }
     }
   }
 

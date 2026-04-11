@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Package, Search, X } from "lucide-react";
+import { normalizeSearch } from "@/lib/utils/search";
 
 type ProductOption = {
   categoryNames: string[];
@@ -35,12 +36,12 @@ export function ProductFilter({
   }, []);
 
   const filtered = products.filter((product) => {
-    const term = search.toLowerCase();
+    const term = normalizeSearch(search);
     return (
-      product.name.toLowerCase().includes(term) ||
-      product.sku.toLowerCase().includes(term) ||
+      normalizeSearch(product.name).includes(term) ||
+      normalizeSearch(product.sku).includes(term) ||
       product.categoryNames.some((categoryName) =>
-        categoryName.toLowerCase().includes(term),
+        normalizeSearch(categoryName).includes(term),
       )
     );
   });

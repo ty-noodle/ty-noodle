@@ -25,6 +25,7 @@ import {
   settingsFieldLabelClass,
   settingsInputClass,
 } from "@/components/settings/settings-ui";
+import { normalizeSearch } from "@/lib/utils/search";
 import type {
   SettingsProduct,
   SettingsProductCategory,
@@ -101,16 +102,16 @@ export function ProductCategoryManager({
     return () => window.cancelAnimationFrame(frame);
   }, [nameModalMode]);
 
-  const normalizedSearch = productSearch.trim().toLowerCase();
+  const normalizedSearch = normalizeSearch(productSearch);
   const filteredProducts = useMemo(() => {
     if (!normalizedSearch) return products;
 
     return products.filter((product) => {
-      const haystack = [product.name, product.sku, ...product.categoryNames]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(normalizedSearch);
+      return (
+        normalizeSearch(product.name).includes(normalizedSearch) ||
+        normalizeSearch(product.sku).includes(normalizedSearch) ||
+        product.categoryNames.some((n) => normalizeSearch(n).includes(normalizedSearch))
+      );
     });
   }, [normalizedSearch, products]);
 

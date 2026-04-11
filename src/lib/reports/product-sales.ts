@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSearch } from "@/lib/utils/search";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -271,9 +272,9 @@ export async function getProductSalesRanking(params: {
 
   // Product name / SKU filter
   if (productSearch) {
-    const term = productSearch.toLowerCase();
+    const term = normalizeSearch(productSearch);
     allRows = allRows.filter(
-      (r) => r.name.toLowerCase().includes(term) || r.sku.toLowerCase().includes(term),
+      (r) => normalizeSearch(r.name).includes(term) || normalizeSearch(r.sku).includes(term),
     );
   }
 

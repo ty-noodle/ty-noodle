@@ -1,6 +1,7 @@
 ﻿import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSearch } from "@/lib/utils/search";
 
 export type DeliveryLineStatus = "complete" | "partial" | "unlinked";
 
@@ -169,13 +170,13 @@ export async function getDeliveryList(
 
   if (notesError || !notesData) return [];
 
-  const normalizedKeyword = keyword.trim().toLowerCase();
+  const normalizedKeyword = normalizeSearch(keyword);
   const allNotes = notesData as RawDeliveryNoteRow[];
   const filteredNotes = normalizedKeyword
     ? allNotes.filter((row) => {
-        const customerName = row.customers.name.toLowerCase();
-        const customerCode = row.customers.customer_code.toLowerCase();
-        const deliveryNumber = row.delivery_number.toLowerCase();
+        const customerName = normalizeSearch(row.customers.name);
+        const customerCode = normalizeSearch(row.customers.customer_code);
+        const deliveryNumber = normalizeSearch(row.delivery_number);
         return (
           customerName.includes(normalizedKeyword) ||
           customerCode.includes(normalizedKeyword) ||

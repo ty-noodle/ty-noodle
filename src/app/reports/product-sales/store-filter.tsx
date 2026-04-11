@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Search, Store, X } from "lucide-react";
+import { normalizeSearch } from "@/lib/utils/search";
 
 type Customer = { id: string; name: string };
 
@@ -29,7 +30,7 @@ export function StoreFilter({
   }, []);
 
   const filtered = customers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
+    normalizeSearch(c.name).includes(normalizeSearch(search)),
   );
 
   function toggle(id: string) {

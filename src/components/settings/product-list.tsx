@@ -32,6 +32,17 @@ export function ProductList({ products, baseListHref = "/settings/products" }: P
     `${baseListHref}${baseListHref.includes("?") ? "&" : "?"}edit=${id}`;
 
   return (
+    <>
+    {/* Floating add button — always visible while scrolling */}
+    <Link
+      href={createHref}
+      scroll={false}
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#003366] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_32px_rgba(0,51,102,0.35)] transition hover:bg-[#002244] active:scale-95 md:bottom-6 md:right-6"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.5} />
+      เพิ่มสินค้า
+    </Link>
+
     <SettingsPanel>
       <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
         <div>
@@ -40,15 +51,6 @@ export function ProductList({ products, baseListHref = "/settings/products" }: P
             ดูสินค้าและจัดการสินค้าได้ที่นี่
           </p>
         </div>
-
-        <Link
-          href={createHref}
-          scroll={false}
-          className="action-touch-safe inline-flex items-center gap-2 rounded-full bg-[#003366] px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_28px_rgba(0,51,102,0.22)] transition hover:bg-[#002244]"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.2} />
-          เพิ่มสินค้า
-        </Link>
       </div>
 
       <SettingsPanelBody className="p-0">
@@ -85,7 +87,7 @@ export function ProductList({ products, baseListHref = "/settings/products" }: P
                         <p className="text-[11px] font-bold uppercase tracking-wider text-[#003366]">
                           {product.sku}
                         </p>
-                        <p className="mt-0.5 truncate text-base font-bold text-slate-950">
+                        <p className="mt-0.5 line-clamp-2 text-base font-bold text-slate-950">
                           {product.name}
                         </p>
                         <div className="mt-2 space-y-1">
@@ -339,5 +341,6 @@ export function ProductList({ products, baseListHref = "/settings/products" }: P
         )}
       </SettingsPanelBody>
     </SettingsPanel>
+    </>
   );
 }
