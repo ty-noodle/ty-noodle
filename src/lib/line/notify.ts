@@ -417,24 +417,25 @@ function buildNewCustomerInquiryFlex(name: string, phone: string): object {
 
   return {
     type: "flex",
-    altText: `🔔 ลูกค้าใหม่สนใจสินค้า: ${name}`,
+    altText: `🟢 ลูกค้าใหม่สนใจสินค้า: ${name}`,
     contents: {
       type: "bubble",
       size: "kilo",
       header: {
         type: "box",
         layout: "vertical",
-        backgroundColor: "#f59e0b",
+        backgroundColor: "#0f766e",
         paddingAll: "16px",
         contents: [
           {
             type: "box",
             layout: "horizontal",
             spacing: "sm",
+            alignItems: "center",
             contents: [
               {
                 type: "text",
-                text: "🔔",
+                text: "🟢",
                 size: "lg",
                 flex: 0,
               },
@@ -471,7 +472,7 @@ function buildNewCustomerInquiryFlex(name: string, phone: string): object {
             spacing: "sm",
             contents: [
               { type: "text", text: "เบอร์โทร", size: "sm", color: "#94a3b8", flex: 2 },
-              { type: "text", text: phone || "—", size: "sm", color: "#0f172a", weight: "bold", flex: 5 },
+              { type: "text", text: phone || "—", size: "sm", color: "#0f766e", weight: "bold", flex: 5 },
             ],
           },
           {
@@ -497,7 +498,7 @@ function buildNewCustomerInquiryFlex(name: string, phone: string): object {
                 type: "text",
                 text: "⚡ กรุณาติดต่อกลับโดยด่วน",
                 size: "sm",
-                color: "#dc2626",
+                color: "#0f766e",
                 weight: "bold",
                 wrap: true,
               },

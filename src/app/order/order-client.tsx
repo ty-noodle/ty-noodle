@@ -7,6 +7,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -645,14 +646,16 @@ export default function OrderClient({
   initialSessionLineUserId,
   organizationId,
   orgPhone,
+  previewView,
 }: {
   initialProducts: ProductWithImage[];
   initialSessionCustomer: SessionCustomer | null;
   initialSessionLineUserId: string | null;
   organizationId: string;
   orgPhone: string;
+  previewView?: string;
 }) {
-  const { isReady, liffToken, profile, login, logout } = useLiff();
+  const { isReady, liffToken, profile, login, logout, closeWindow } = useLiff();
   const cartButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Order window state — updates every minute
@@ -685,9 +688,14 @@ export default function OrderClient({
   const [selectedProductCategory, setSelectedProductCategory] = useState<"all" | string>("all");
 
   // View state
-  const [currentView, setCurrentView] = useState<ViewState>(
-    initialSessionCustomer ? "catalog" : "loading",
-  );
+  const PREVIEW_VIEWS: ViewState[] = ["new_inquiry", "inquiry_done", "register", "login"];
+  const initialView: ViewState =
+    previewView && (PREVIEW_VIEWS as string[]).includes(previewView)
+      ? (previewView as ViewState)
+      : initialSessionCustomer
+        ? "catalog"
+        : "loading";
+  const [currentView, setCurrentView] = useState<ViewState>(initialView);
   const [activeCategory, setActiveCategory] = useState<"all" | "favorites" | "recent">("all");
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
@@ -1437,7 +1445,7 @@ export default function OrderClient({
     : 0;
   const selectedProductId = selectedProduct?.id ?? null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selectedProductId || !isModalOpen) return;
     syncModalImageTrack(selectedProductImageIndex, 0, true);
   }, [
@@ -2378,10 +2386,10 @@ export default function OrderClient({
   // ─── 4. New customer inquiry ────────────────────────────────────────────────
   if (currentView === "new_inquiry") {
     const inputClass =
-      "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/10";
+      "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10";
 
     return (
-      <div className="min-h-screen bg-[linear-gradient(160deg,#fffbeb_0%,#f8fafc_60%,#fff_100%)]">
+      <div className="min-h-screen bg-[linear-gradient(160deg,#f0fdfa_0%,#f8fafc_60%,#fff_100%)]">
         <header className="border-b border-slate-100 bg-white/95 px-5 py-5 backdrop-blur-sm">
           <button
             type="button"
@@ -2392,7 +2400,7 @@ export default function OrderClient({
             กลับ
           </button>
           <div className="text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400 shadow-md">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500 shadow-md shadow-teal-200">
               <UserPlus className="h-7 w-7 text-white" strokeWidth={1.8} />
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-800">สมัครเป็นลูกค้าใหม่</h1>
@@ -2432,7 +2440,7 @@ export default function OrderClient({
               type="button"
               disabled={isPending || !inquiryName.trim() || !inquiryPhone.trim()}
               onClick={handleNewInquiry}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-4 text-base font-bold text-white shadow-md transition active:scale-[0.97] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-teal-500 px-6 py-4 text-base font-bold text-white shadow-md shadow-teal-200 transition active:scale-[0.97] disabled:opacity-50"
             >
               {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserPlus className="h-5 w-5" strokeWidth={2} />}
               {isPending ? "กำลังส่งข้อมูล..." : "ส่งข้อมูลให้ทีมงาน"}
@@ -2440,15 +2448,19 @@ export default function OrderClient({
           </div>
 
           {/* Shop contact */}
-          {orgPhone && (
-            <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
-              <p className="mb-1 text-xs font-bold uppercase tracking-widest text-amber-700">ติดต่อเราได้โดยตรง</p>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4.5 w-4.5 shrink-0 text-amber-600" strokeWidth={2} />
-                <span className="text-lg font-extrabold tracking-wide text-amber-900">{orgPhone}</span>
-              </div>
+          <a
+            href={`tel:${(orgPhone || "0819034686").replace(/[-\s]/g, "")}`}
+            className="mt-5 flex items-center gap-4 rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50 px-5 py-4 shadow-sm transition active:scale-[0.98]"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500 shadow-md shadow-teal-200">
+              <Phone className="h-5 w-5 text-white" strokeWidth={2} />
             </div>
-          )}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-teal-700">สามารถติดต่อเราได้ที่</p>
+              <p className="mt-0.5 text-xl font-extrabold tracking-wide text-teal-900">{orgPhone || "081-903-4686"}</p>
+            </div>
+            <ChevronRight className="ml-auto h-5 w-5 shrink-0 text-teal-400" strokeWidth={2.5} />
+          </a>
         </main>
       </div>
     );
@@ -2456,20 +2468,41 @@ export default function OrderClient({
 
   // ─── 5. Inquiry submitted ───────────────────────────────────────────────────
   if (currentView === "inquiry_done") {
+    const contactPhone = orgPhone || "081-903-4686";
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[linear-gradient(160deg,#fffbeb_0%,#fff_100%)] px-5 text-center">
-        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-400 shadow-lg">
-          <BadgeCheck className="h-10 w-10 text-white" strokeWidth={1.8} />
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[linear-gradient(160deg,#f0fdfa_0%,#fff_100%)] px-5 text-center">
+        {/* Success icon */}
+        <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-teal-500 shadow-[0_12px_32px_rgba(20,184,166,0.35)]">
+          <BadgeCheck className="h-12 w-12 text-white" strokeWidth={1.8} />
         </div>
+
         <h1 className="mb-2 text-2xl font-extrabold text-slate-800">ส่งข้อมูลเรียบร้อย!</h1>
         <p className="mb-1 text-base text-slate-600">ทีมงาน T&Y Noodle ได้รับข้อมูลของคุณแล้ว</p>
         <p className="text-sm text-slate-500">เราจะติดต่อกลับหาคุณโดยด่วน</p>
-        {orgPhone && (
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-700">หรือโทรหาเรา</p>
-            <p className="mt-1 text-xl font-extrabold text-amber-900">{orgPhone}</p>
+
+        {/* Contact card */}
+        <a
+          href={`tel:${contactPhone.replace(/[-\s]/g, "")}`}
+          className="mt-8 flex w-full max-w-xs items-center gap-4 rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50 px-5 py-4 shadow-sm transition active:scale-[0.98]"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500 shadow-md shadow-teal-200">
+            <Phone className="h-5 w-5 text-white" strokeWidth={2} />
           </div>
-        )}
+          <div className="text-left">
+            <p className="text-xs font-bold uppercase tracking-widest text-teal-700">หรือโทรหาเราได้เลย</p>
+            <p className="mt-0.5 text-xl font-extrabold tracking-wide text-teal-900">{contactPhone}</p>
+          </div>
+          <ChevronRight className="ml-auto h-5 w-5 shrink-0 text-teal-400" strokeWidth={2.5} />
+        </a>
+
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={closeWindow}
+          className="mt-4 flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-[#003366] px-6 py-4 text-base font-bold text-white shadow-md transition active:scale-[0.97]"
+        >
+          กลับไปยัง LINE
+        </button>
       </div>
     );
   }

@@ -18,6 +18,7 @@ type LiffContextType = {
   liffToken: string | null;
   login: () => void;
   logout: () => void;
+  closeWindow: () => void;
 };
 
 const LiffContext = createContext<LiffContextType>({
@@ -27,6 +28,7 @@ const LiffContext = createContext<LiffContextType>({
   liffToken: null,
   login: () => {},
   logout: () => {},
+  closeWindow: () => {},
 });
 
 export const useLiff = () => useContext(LiffContext);
@@ -128,8 +130,15 @@ export function LiffProvider({
     setLiffToken(null);
   };
 
+  const closeWindow = () => {
+    const liff = liffRef.current;
+    if (liff) {
+      liff.closeWindow();
+    }
+  };
+
   return (
-    <LiffContext.Provider value={{ isReady, error, profile, liffToken, login, logout }}>
+    <LiffContext.Provider value={{ isReady, error, profile, liffToken, login, logout, closeWindow }}>
       {children}
     </LiffContext.Provider>
   );

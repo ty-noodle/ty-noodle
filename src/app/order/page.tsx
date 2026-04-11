@@ -294,9 +294,19 @@ export async function generateMetadata({
   };
 }
 
-export default async function OrderPage() {
+export default async function OrderPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
   const { catalogProducts, organizationId, orgPhone } = await getCatalogData();
-  const initialAuth = await getInitialOrderAuth(organizationId);
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const previewView = getSearchParamValue(resolvedSearchParams.preview);
+  const isMock = process.env.NEXT_PUBLIC_LIFF_MOCK === "true";
+  const initialAuth =
+    isMock && previewView
+      ? { customer: null, lineUserId: null }
+      : await getInitialOrderAuth(organizationId);
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
@@ -306,6 +316,7 @@ export default async function OrderPage() {
         initialSessionLineUserId={initialAuth.lineUserId}
         organizationId={organizationId}
         orgPhone={orgPhone}
+        previewView={isMock ? previewView : undefined}
       />
     </main>
   );
