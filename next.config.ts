@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
         protocol: "https",
       },
       {
-        hostname: "profile.line-scdn.net",
+        hostname: "**.line-scdn.net",
         protocol: "https",
       },
     ],

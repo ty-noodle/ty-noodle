@@ -86,6 +86,7 @@ export function LiffProvider({
 
         if (liff.isLoggedIn()) {
           const userProfile = await liff.getProfile();
+          console.log("[LIFF] profile pictureUrl:", userProfile.pictureUrl);
           setProfile(userProfile);
           setLiffToken(liff.getIDToken());
         }

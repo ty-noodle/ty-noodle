@@ -145,15 +145,15 @@ export async function verifyPin(formData: FormData) {
       p_ip_hash: ipHash,
       p_user_agent: userAgent,
     }),
-    admin
-      .rpc("record_pin_auth_result", {
+    Promise.resolve(
+      admin.rpc("record_pin_auth_result", {
         p_user_id: user.id,
         p_attempted_lookup: pinLookup,
         p_success: true,
         p_ip_hash: ipHash,
         p_user_agent: userAgent,
-      })
-      .catch(() => null),
+      }),
+    ).catch(() => null),
   ]);
 
   const { data: sessionRows, error: sessionError } = sessionResult;
