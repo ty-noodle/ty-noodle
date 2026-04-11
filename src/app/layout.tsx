@@ -104,7 +104,10 @@ export default function RootLayout({
         className={`${sarabun.variable} ${ibmPlexMono.variable} ${instrumentSans.variable} bg-background text-foreground antialiased`}
       >
         <PwaProvider />
-        {children}
+        <a href="#main-content" className="skip-link">
+          ข้ามไปยังเนื้อหาหลัก
+        </a>
+        <main id="main-content">{children}</main>
       </body>
     </html>
   );

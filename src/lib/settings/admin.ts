@@ -758,7 +758,9 @@ async function fetchSettingsProductsData(organizationId: string): Promise<Settin
   };
 }
 
-export function getSettingsProductsData(organizationId: string): Promise<SettingsProductsData> {
+export function getSettingsProductsData(
+  organizationId: string,
+): Promise<SettingsProductsData> {
   return unstable_cache(
     () => fetchSettingsProductsData(organizationId),
     ["settings-products", organizationId],

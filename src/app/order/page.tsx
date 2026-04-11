@@ -8,6 +8,7 @@ import { getOrderCustomerSession } from "@/lib/auth/order-session";
 // Cache product catalog for 60 seconds — product data changes infrequently
 // Dramatically reduces TTFB and LCP for repeat requests
 export const revalidate = 60;
+
 import type { Database } from "@/types/database";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];

@@ -699,20 +699,43 @@ export default function OrderClient({
   const [modalRecommendationPageCount, setModalRecommendationPageCount] = useState(1);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
-  const [isModalImageLoaded, setIsModalImageLoaded] = useState(false);
+  const [loadedModalImageKeys, setLoadedModalImageKeys] = useState<Record<string, true>>({});
 
   const modalCartBtnRef = useRef<HTMLButtonElement>(null);
   const modalStepperRef = useRef<HTMLDivElement>(null);
   const modalRecommendationsRef = useRef<HTMLDivElement>(null);
+  const modalImageViewportRef = useRef<HTMLDivElement>(null);
+  const modalImageTrackRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const closeModalTimerRef = useRef<number | null>(null);
   const recommendationRafRef = useRef<number | null>(null);
   const recommendationScrollElementRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
   const touchCurrentXRef = useRef<number | null>(null);
+  const modalImageDragDistanceRef = useRef(0);
+  const isHorizontalImageSwipeRef = useRef(false);
+  const isImageDraggingRef = useRef(false);
+  const modalImageRafRef = useRef<number | null>(null);
 
   // Swipe logic for modal images
   const minSwipeDistance = 24;
+
+  const syncModalImageTrack = useCallback(
+    (imageIndex: number, dragDistance = 0, withTransition = true) => {
+      const viewport = modalImageViewportRef.current;
+      const track = modalImageTrackRef.current;
+      if (!viewport || !track) return;
+      const viewportWidth = Math.max(viewport.clientWidth, 1);
+      const translateX = -imageIndex * viewportWidth + dragDistance;
+      track.style.transition = withTransition
+        ? "transform 340ms cubic-bezier(0.22, 1, 0.36, 1)"
+        : "none";
+      track.style.transform = `translate3d(${translateX}px, 0, 0)`;
+      track.style.willChange = withTransition ? "auto" : "transform";
+    },
+    [],
+  );
 
   const closeProductModal = () => {
     setIsModalOpen(false);
@@ -753,13 +776,53 @@ export default function OrderClient({
   }, []);
 
   const onTouchStart = (e: React.TouchEvent) => {
+    if (!selectedProduct || selectedProductImages.length <= 1) return;
     const startX = e.targetTouches[0].clientX;
+    const startY = e.targetTouches[0].clientY;
     touchStartXRef.current = startX;
+    touchStartYRef.current = startY;
     touchCurrentXRef.current = startX;
+    modalImageDragDistanceRef.current = 0;
+    isHorizontalImageSwipeRef.current = false;
+    isImageDraggingRef.current = true;
+    syncModalImageTrack(selectedProductImageIndex, 0, false);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    touchCurrentXRef.current = e.targetTouches[0].clientX;
+    if (!isImageDraggingRef.current || touchStartXRef.current === null) {
+      return;
+    }
+    const touch = e.targetTouches[0];
+    touchCurrentXRef.current = touch.clientX;
+    const deltaX = touch.clientX - touchStartXRef.current;
+    const deltaY = touch.clientY - (touchStartYRef.current ?? touch.clientY);
+
+    if (!isHorizontalImageSwipeRef.current) {
+      if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) {
+        return;
+      }
+      if (Math.abs(deltaX) <= Math.abs(deltaY)) {
+        isImageDraggingRef.current = false;
+        touchStartXRef.current = null;
+        touchStartYRef.current = null;
+        touchCurrentXRef.current = null;
+        modalImageDragDistanceRef.current = 0;
+        return;
+      }
+      isHorizontalImageSwipeRef.current = true;
+    }
+
+    e.preventDefault();
+    modalImageDragDistanceRef.current = deltaX;
+    if (modalImageRafRef.current !== null) return;
+    modalImageRafRef.current = window.requestAnimationFrame(() => {
+      syncModalImageTrack(
+        selectedProductImageIndex,
+        modalImageDragDistanceRef.current,
+        false,
+      );
+      modalImageRafRef.current = null;
+    });
   };
 
   const onTouchEnd = () => {
@@ -770,12 +833,27 @@ export default function OrderClient({
     const distance = touchStartXRef.current - touchCurrentXRef.current;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-    if (selectedProduct && selectedProductImages.length > 1) {
-      if (isLeftSwipe) navigateModalImage(selectedProduct.id, selectedProductImages.length, "next");
-      if (isRightSwipe) navigateModalImage(selectedProduct.id, selectedProductImages.length, "prev");
+    const dragDistance = modalImageDragDistanceRef.current;
+    const viewportWidth = modalImageViewportRef.current?.clientWidth ?? 0;
+    const triggerDistance = Math.max(minSwipeDistance, viewportWidth * 0.18);
+    const passedThreshold = Math.abs(dragDistance) >= triggerDistance;
+    if (selectedProduct && selectedProductImages.length > 1 && isHorizontalImageSwipeRef.current) {
+      if (passedThreshold || isLeftSwipe || isRightSwipe) {
+        if (dragDistance < 0 || isLeftSwipe) {
+          navigateModalImage(selectedProduct.id, selectedProductImages.length, "next");
+        } else {
+          navigateModalImage(selectedProduct.id, selectedProductImages.length, "prev");
+        }
+      } else {
+        syncModalImageTrack(selectedProductImageIndex, 0, true);
+      }
     }
+    isImageDraggingRef.current = false;
+    isHorizontalImageSwipeRef.current = false;
     touchStartXRef.current = null;
+    touchStartYRef.current = null;
     touchCurrentXRef.current = null;
+    modalImageDragDistanceRef.current = 0;
   };
 
   useEffect(() => {
@@ -786,13 +864,11 @@ export default function OrderClient({
       if (recommendationRafRef.current !== null) {
         window.cancelAnimationFrame(recommendationRafRef.current);
       }
+      if (modalImageRafRef.current !== null) {
+        window.cancelAnimationFrame(modalImageRafRef.current);
+      }
     };
   }, []);
-
-  // Reset image load state when switching products in the modal
-  useEffect(() => {
-    setIsModalImageLoaded(false);
-  }, [selectedProductIndex]);
 
   useEffect(() => {
     if (!isShareMenuOpen) return;
@@ -1338,15 +1414,48 @@ export default function OrderClient({
     () => selectedProduct?.product_images ?? [],
     [selectedProduct],
   );
+  const selectedProductImageSlides = useMemo(
+    () =>
+      selectedProductImages.length > 0
+        ? selectedProductImages.map((image) => ({
+            id: image.id,
+            public_url: image.public_url,
+          }))
+        : [
+            {
+              id: `${selectedProduct?.id ?? "placeholder"}-placeholder`,
+              public_url: "/placeholders/product-placeholder.svg",
+            },
+          ],
+    [selectedProduct?.id, selectedProductImages],
+  );
   const selectedProductImageIndex = selectedProduct
     ? Math.min(
         modalImageIndexes[selectedProduct.id] ?? 0,
         Math.max(selectedProductImages.length - 1, 0),
       )
     : 0;
-  const selectedProductImageUrl =
-    selectedProductImages[selectedProductImageIndex]?.public_url ??
-    "/placeholders/product-placeholder.svg";
+  const selectedProductId = selectedProduct?.id ?? null;
+
+  useEffect(() => {
+    if (!selectedProductId || !isModalOpen) return;
+    syncModalImageTrack(selectedProductImageIndex, 0, true);
+  }, [
+    isModalOpen,
+    selectedProductId,
+    selectedProductImageIndex,
+    selectedProductImages.length,
+    syncModalImageTrack,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProductId || !isModalOpen) return;
+    const handleResize = () => syncModalImageTrack(selectedProductImageIndex, 0, false);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isModalOpen, selectedProductId, selectedProductImageIndex, syncModalImageTrack]);
 
   useEffect(() => {
     if (!selectedProduct || selectedProductImages.length <= 1) {
@@ -1367,6 +1476,13 @@ export default function OrderClient({
       image.src = imageUrl;
     }
   }, [selectedProduct, selectedProductImageIndex, selectedProductImages]);
+
+  const markModalImageLoaded = useCallback((loadKey: string) => {
+    setLoadedModalImageKeys((previous) => {
+      if (previous[loadKey]) return previous;
+      return { ...previous, [loadKey]: true };
+    });
+  }, []);
 
   const buildProductShareUrl = useCallback((productId: string) => {
     if (typeof window === "undefined") return "";
@@ -3382,11 +3498,7 @@ export default function OrderClient({
 
           <div
             id="product-modal-carousel"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
             className="relative flex-1 min-h-0 overflow-y-auto bg-slate-50 pb-6 no-scrollbar"
-            style={{ touchAction: "pan-y" }}
           >
             <div
               key={selectedProduct.id}
@@ -3399,20 +3511,50 @@ export default function OrderClient({
                 <div className="mx-auto flex max-w-[520px] flex-col gap-3">
                   {/* Image */}
                   <div className="relative overflow-hidden rounded-[1.5rem]">
-                    <div className="relative aspect-square w-full">
-                      {!isModalImageLoaded && (
-                        <div className="absolute inset-0 animate-pulse bg-slate-200" />
-                      )}
-                      <Image
-                        key={selectedProductImageUrl}
-                        src={selectedProductImageUrl}
-                        alt={`${selectedProduct.name} - ${selectedProductImageIndex + 1}`}
-                        fill
-                        priority
-                        sizes="(max-width: 767px) 100vw, 520px"
-                        className={`object-contain transition-opacity duration-300 ${isModalImageLoaded ? "opacity-100" : "opacity-0"}`}
-                        onLoad={() => setIsModalImageLoaded(true)}
-                      />
+                    <div
+                      ref={modalImageViewportRef}
+                      className="relative aspect-square w-full overflow-hidden"
+                      onTouchStart={onTouchStart}
+                      onTouchMove={onTouchMove}
+                      onTouchEnd={onTouchEnd}
+                      style={{ touchAction: "pan-y" }}
+                    >
+                      <div
+                        ref={modalImageTrackRef}
+                        className="flex h-full"
+                        style={{ width: `${Math.max(selectedProductImageSlides.length, 1) * 100}%` }}
+                      >
+                        {selectedProductImageSlides.map((image, imageIndex) => {
+                          const loadKey = `${selectedProduct.id}:${image.id}:${imageIndex}`;
+                          const isLoaded = Boolean(loadedModalImageKeys[loadKey]);
+                          const isNearActive = Math.abs(imageIndex - selectedProductImageIndex) <= 1;
+                          return (
+                            <div
+                              key={loadKey}
+                              className="relative h-full shrink-0"
+                              style={{ width: `${100 / Math.max(selectedProductImageSlides.length, 1)}%` }}
+                            >
+                              {!isLoaded && (
+                                <div className="absolute inset-0 animate-pulse bg-slate-200" />
+                              )}
+                              <Image
+                                src={image.public_url}
+                                alt={`${selectedProduct.name} - ${imageIndex + 1}`}
+                                fill
+                                preload={imageIndex === selectedProductImageIndex}
+                                loading={isNearActive ? "eager" : "lazy"}
+                                decoding="async"
+                                sizes="(max-width: 767px) 100vw, 520px"
+                                className={`object-contain transition-opacity duration-200 ${
+                                  isLoaded ? "opacity-100" : "opacity-0"
+                                }`}
+                                onLoad={() => markModalImageLoaded(loadKey)}
+                                onError={() => markModalImageLoaded(loadKey)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="absolute right-3 top-3 rounded-full bg-slate-950/70 px-3 py-1 text-xs font-bold text-white">

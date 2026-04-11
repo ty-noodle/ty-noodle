@@ -81,6 +81,35 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 9999;
+  transform: translateY(-120%);
+  border-radius: 10px;
+  border: 1px solid #003366;
+  background: #ffffff;
+  color: #003366;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(0, 51, 102, 0.18);
+  transition: transform 180ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid #003366;
+  outline-offset: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid #003366;
+  outline-offset: 2px;
+}
+
 a,
 button {
   transition:
@@ -188,4 +217,18 @@ button:hover {
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
