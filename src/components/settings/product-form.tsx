@@ -49,6 +49,47 @@ type OrderPreset = "free" | "integer" | "custom";
 const MAX_PRODUCT_IMAGES = 5;
 const MAX_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+// Compress an image file client-side before upload.
+// Resizes to max 1200px on the longest side and re-encodes as JPEG 0.85.
+// Skips small files (≤300 KB) and falls back to the original on any error.
+async function compressImageFile(file: File): Promise<File> {
+  if (file.size <= 300 * 1024) return file;
+  return new Promise<File>((resolve) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_SIDE = 1200;
+      let { width, height } = img;
+      if (width > MAX_SIDE || height > MAX_SIDE) {
+        if (width >= height) {
+          height = Math.round((height * MAX_SIDE) / width);
+          width = MAX_SIDE;
+        } else {
+          width = Math.round((width * MAX_SIDE) / height);
+          height = MAX_SIDE;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.85,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
 const INTEGER_ORDER_PRESET_QTY = 5;
 const SWIPE_THRESHOLD = 60;
 const initialProductSubmitActionState: ProductSubmitActionState = {
@@ -289,7 +330,7 @@ function ProductFormBody({
     };
   }
 
-  function handleFilesSelected(fileList: FileList | null) {
+  async function handleFilesSelected(fileList: FileList | null) {
     const selectedFiles = Array.from(fileList ?? []);
     if (selectedFiles.length === 0) return;
 
@@ -324,7 +365,8 @@ function ProductFormBody({
       return;
     }
 
-    const { nextFiles, omittedCount } = mergeFiles(files, validFiles);
+    const compressedFiles = await Promise.all(validFiles.map(compressImageFile));
+    const { nextFiles, omittedCount } = mergeFiles(files, compressedFiles);
     setFiles(nextFiles);
     setActiveIndex(keptExistingUrls.length + nextFiles.length - 1);
     const messages: string[] = [];
@@ -1208,7 +1250,9 @@ function ProductFormBody({
       </form>
 
       {showSuccess ? (
-        <div className="absolute left-1/2 top-1/2 z-20 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_18px_48px_rgba(15,23,42,0.24)] ring-1 ring-emerald-100">
+        <>
+          <div className="absolute inset-0 z-10 bg-white/55 backdrop-blur-sm" />
+          <div className="absolute left-1/2 top-1/2 z-20 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_18px_48px_rgba(15,23,42,0.24)] ring-1 ring-emerald-100">
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
               <CheckCircle2 className="h-5 w-5 text-emerald-500" strokeWidth={2} />
@@ -1232,6 +1276,7 @@ function ProductFormBody({
           </div>
           <div className="h-1 bg-emerald-100" />
         </div>
+        </>
       ) : null}
 
       {isCameraOpen ? (

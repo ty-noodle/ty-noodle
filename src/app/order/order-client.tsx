@@ -725,6 +725,8 @@ export default function OrderClient({
   const isHorizontalImageSwipeRef = useRef(false);
   const isImageDraggingRef = useRef(false);
   const modalImageRafRef = useRef<number | null>(null);
+  // Skip the transition in useLayoutEffect after an imperative swipe animation
+  const skipNextImageTransitionRef = useRef(false);
 
   // Swipe logic for modal images
   const minSwipeDistance = 24;
@@ -764,23 +766,6 @@ export default function OrderClient({
       ...prev,
       [productId]: Math.max(0, nextIndex),
     }));
-  }, []);
-
-  const navigateModalImage = useCallback((productId: string, imageCount: number, direction: "prev" | "next") => {
-    if (imageCount <= 1) return;
-
-    setModalImageIndexes((prev) => {
-      const currentIndex = prev[productId] ?? 0;
-      const nextIndex =
-        direction === "next"
-          ? (currentIndex + 1) % imageCount
-          : (currentIndex - 1 + imageCount) % imageCount;
-
-      return {
-        ...prev,
-        [productId]: nextIndex,
-      };
-    });
   }, []);
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -834,6 +819,12 @@ export default function OrderClient({
   };
 
   const onTouchEnd = () => {
+    // Cancel any pending RAF first — prevents stale drag position overwriting final animation
+    if (modalImageRafRef.current !== null) {
+      window.cancelAnimationFrame(modalImageRafRef.current);
+      modalImageRafRef.current = null;
+    }
+
     if (touchStartXRef.current === null || touchCurrentXRef.current === null) {
       return;
     }
@@ -847,11 +838,17 @@ export default function OrderClient({
     const passedThreshold = Math.abs(dragDistance) >= triggerDistance;
     if (selectedProduct && selectedProductImages.length > 1 && isHorizontalImageSwipeRef.current) {
       if (passedThreshold || isLeftSwipe || isRightSwipe) {
-        if (dragDistance < 0 || isLeftSwipe) {
-          navigateModalImage(selectedProduct.id, selectedProductImages.length, "next");
-        } else {
-          navigateModalImage(selectedProduct.id, selectedProductImages.length, "prev");
-        }
+        const imageCount = selectedProductImages.length;
+        const currentIndex = selectedProductImageIndex;
+        const newIndex =
+          dragDistance < 0 || isLeftSwipe
+            ? (currentIndex + 1) % imageCount
+            : (currentIndex - 1 + imageCount) % imageCount;
+        // Animate to the target position immediately — no waiting for React re-render
+        syncModalImageTrack(newIndex, 0, true);
+        // Tell useLayoutEffect to skip its own transition (already done above)
+        skipNextImageTransitionRef.current = true;
+        setModalImageIndex(selectedProduct.id, newIndex);
       } else {
         syncModalImageTrack(selectedProductImageIndex, 0, true);
       }
@@ -1447,7 +1444,11 @@ export default function OrderClient({
 
   useLayoutEffect(() => {
     if (!selectedProductId || !isModalOpen) return;
-    syncModalImageTrack(selectedProductImageIndex, 0, true);
+    // After a swipe gesture the DOM was already animated imperatively — skip the transition
+    // to avoid a double-animation. For all other cases (modal open, thumbnail tap) use transition.
+    const withTransition = !skipNextImageTransitionRef.current;
+    skipNextImageTransitionRef.current = false;
+    syncModalImageTrack(selectedProductImageIndex, 0, withTransition);
   }, [
     isModalOpen,
     selectedProductId,
