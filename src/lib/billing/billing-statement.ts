@@ -93,6 +93,30 @@ function chunkIds<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+async function fetchAllPaged<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await fetchPage(from, to);
+    if (error) {
+      throw error;
+    }
+    if (!data || data.length === 0) {
+      break;
+    }
+    all.push(...data);
+    if (data.length < pageSize) {
+      break;
+    }
+    from += pageSize;
+  }
+  return all;
+}
+
 async function getDeliveryNoteActualTotals(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   noteIds: string[],
@@ -101,21 +125,31 @@ async function getDeliveryNoteActualTotals(
     return new Map<string, number>();
   }
 
-  const deliveryNoteItems: Array<{ delivery_note_id: string; order_item_id: string | null }> = [];
-  for (const noteIdChunk of chunkIds(noteIds, 100)) {
-    const { data, error } = await supabase
+  const noteChunks = chunkIds(noteIds, 100);
+  const deliveryNoteItemsPromises = noteChunks.map((chunk) =>
+    supabase
       .from("delivery_note_items")
       .select("delivery_note_id, order_item_id")
-      .in("delivery_note_id", noteIdChunk);
+      .in("delivery_note_id", chunk)
+  );
 
-    if (error) {
-      console.error("[billing] failed to load delivery note items", error);
+  let results;
+  try {
+    results = await Promise.all(deliveryNoteItemsPromises);
+  } catch (error) {
+    console.error("[billing] failed to load delivery note items in parallel", error);
+    return new Map<string, number>();
+  }
+
+  const deliveryNoteItems: Array<{ delivery_note_id: string; order_item_id: string | null }> = [];
+  for (const res of results) {
+    if (res.error) {
+      console.error("[billing] failed to load delivery note items", res.error);
       return new Map<string, number>();
     }
-
-    deliveryNoteItems.push(
-      ...((data ?? []) as Array<{ delivery_note_id: string; order_item_id: string | null }>),
-    );
+    if (res.data) {
+      deliveryNoteItems.push(...(res.data as Array<{ delivery_note_id: string; order_item_id: string | null }>));
+    }
   }
 
   const orderItemIds = Array.from(
@@ -123,18 +157,30 @@ async function getDeliveryNoteActualTotals(
   );
   const orderItems: Array<{ id: string; line_total: number | null }> = [];
   if (orderItemIds.length > 0) {
-    for (const orderItemIdChunk of chunkIds(orderItemIds, 100)) {
-      const { data, error } = await supabase
+    const orderChunks = chunkIds(orderItemIds, 100);
+    const orderItemsPromises = orderChunks.map((chunk) =>
+      supabase
         .from("order_items")
         .select("id, line_total")
-        .in("id", orderItemIdChunk);
+        .in("id", chunk)
+    );
 
-      if (error) {
-        console.error("[billing] failed to load order item totals", error);
+    let orderResults;
+    try {
+      orderResults = await Promise.all(orderItemsPromises);
+    } catch (error) {
+      console.error("[billing] failed to load order item totals in parallel", error);
+      return new Map<string, number>();
+    }
+
+    for (const res of orderResults) {
+      if (res.error) {
+        console.error("[billing] failed to load order item totals", res.error);
         return new Map<string, number>();
       }
-
-      orderItems.push(...((data ?? []) as Array<{ id: string; line_total: number | null }>));
+      if (res.data) {
+        orderItems.push(...(res.data as Array<{ id: string; line_total: number | null }>));
+      }
     }
   }
 
@@ -187,47 +233,42 @@ async function ensureConfirmedDeliveryNotesForRange(
   toDate: string,
 ) {
   const supabase = getSupabaseAdmin();
-  const { data: orders, error: ordersError } = await supabase
-    .from("orders")
-    .select("id, customer_id, order_date, created_at")
-    .eq("organization_id", organizationId)
-    .gte("order_date", fromDate)
-    .lte("order_date", toDate)
-    .neq("status", "cancelled")
-    .not("customer_id", "is", null)
-    .order("order_date", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (ordersError || !orders || orders.length === 0) {
-    if (ordersError) {
-      console.error("[billing] failed to load orders for delivery-note repair", ordersError);
-    }
+  let orders: Array<{ id: string; customer_id: string | null; order_date: string; created_at: string }> = [];
+  let notes: Array<{ customer_id: string | null; delivery_date: string }> = [];
+  try {
+    const [ordersResult, notesResult] = await Promise.all([
+      fetchAllPaged((from, to) =>
+        supabase
+          .from("orders")
+          .select("id, customer_id, order_date, created_at")
+          .eq("organization_id", organizationId)
+          .gte("order_date", fromDate)
+          .lte("order_date", toDate)
+          .neq("status", "cancelled")
+          .not("customer_id", "is", null)
+          .order("order_date", { ascending: true })
+          .order("created_at", { ascending: true })
+          .range(from, to)
+      ),
+      fetchAllPaged((from, to) =>
+        supabase
+          .from("delivery_notes")
+          .select("customer_id, delivery_date")
+          .eq("organization_id", organizationId)
+          .eq("status", "confirmed")
+          .gte("delivery_date", fromDate)
+          .lte("delivery_date", toDate)
+          .range(from, to)
+      ),
+    ]);
+    orders = ordersResult;
+    notes = notesResult;
+  } catch (err) {
+    console.error("[billing] failed to load data for delivery-note repair", err);
     return;
   }
 
-  const customerIds = Array.from(
-    new Set(
-      orders
-        .map((order) => order.customer_id)
-        .filter((customerId): customerId is string => typeof customerId === "string" && customerId.length > 0),
-    ),
-  );
-
-  if (customerIds.length === 0) {
-    return;
-  }
-
-  const { data: notes, error: notesError } = await supabase
-    .from("delivery_notes")
-    .select("customer_id, delivery_date")
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .gte("delivery_date", fromDate)
-    .lte("delivery_date", toDate)
-    .in("customer_id", customerIds);
-
-  if (notesError) {
-    console.error("[billing] failed to load delivery notes for delivery-note repair", notesError);
+  if (orders.length === 0) {
     return;
   }
 
@@ -286,27 +327,47 @@ export async function getBillingCandidates(
   await ensureConfirmedDeliveryNotesForRange(organizationId, fromDate, toDate);
   const supabase = getSupabaseAdmin();
   
-  const { data: notes, error: notesError } = await supabase
-    .from("delivery_notes")
-    .select(`
-      id,
-      customer_id,
-      delivery_number,
-      delivery_date,
-      total_amount,
-      notes,
-      customers!inner (
-        id,
-        name,
-        customer_code
-      )
-    `)
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .gte("delivery_date", fromDate)
-    .lte("delivery_date", toDate);
-
-  if (notesError || !notes) return [];
+  interface DeliveryNoteCandidate {
+    id: string;
+    customer_id: string;
+    delivery_number: string;
+    delivery_date: string;
+    total_amount: number;
+    notes: string | null;
+    customers: {
+      id: string;
+      name: string;
+      customer_code: string;
+    };
+  }
+  let notes: DeliveryNoteCandidate[] = [];
+  try {
+    notes = await fetchAllPaged((from, to) =>
+      supabase
+        .from("delivery_notes")
+        .select(`
+          id,
+          customer_id,
+          delivery_number,
+          delivery_date,
+          total_amount,
+          notes,
+          customers!inner (
+            id,
+            name,
+            customer_code
+          )
+        `)
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .gte("delivery_date", fromDate)
+        .lte("delivery_date", toDate)
+        .range(from, to)
+    );
+  } catch (notesError) {
+    console.error("[billing] failed to load delivery notes for candidates", notesError);
+    return [];
+  }
 
   const deliveryTotals = await getDeliveryNoteActualTotals(
     supabase,
@@ -359,14 +420,29 @@ export async function getBillingCandidates(
   lookbackDate.setMonth(lookbackDate.getMonth() - 3);
   const lookbackISO = lookbackDate.toISOString().split("T")[0];
 
-  const { data: billingRecords } = await supabase
-    .from("billing_records")
-    .select("customer_id, billing_number, snapshot_rows, from_date, to_date")
-    .eq("organization_id", organizationId)
-    .gte("from_date", lookbackISO)
-    .in("customer_id", candidates.map((candidate) => candidate.customerId));
+  interface BillingRecordLookup {
+    customer_id: string;
+    billing_number: string;
+    snapshot_rows: Array<{ deliveryNumber: string }> | null;
+    from_date: string;
+    to_date: string;
+  }
+  let billingRecords: BillingRecordLookup[] = [];
+  try {
+    billingRecords = (await fetchAllPaged((from, to) =>
+      supabase
+        .from("billing_records")
+        .select("customer_id, billing_number, snapshot_rows, from_date, to_date")
+        .eq("organization_id", organizationId)
+        .gte("from_date", lookbackISO)
+        .in("customer_id", candidates.map((candidate) => candidate.customerId))
+        .range(from, to)
+    )) as unknown as BillingRecordLookup[];
+  } catch (error) {
+    console.error("[billing] failed to load billing records for candidates", error);
+  }
 
-  if (billingRecords) {
+  if (billingRecords && billingRecords.length > 0) {
     for (const record of (billingRecords as {
       customer_id: string;
       billing_number: string;
@@ -400,14 +476,19 @@ export async function getBilledDeliveryNumbersForRange(
   toDate: string,
 ): Promise<Set<string>> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("billing_records")
-    .select("snapshot_rows")
-    .eq("organization_id", organizationId)
-    .lte("from_date", toDate)
-    .gte("to_date", fromDate);
-
-  if (error || !data) {
+  let data: Array<{ snapshot_rows: SnapshotRow[] | null }> = [];
+  try {
+    data = (await fetchAllPaged((from, to) =>
+      supabase
+        .from("billing_records")
+        .select("snapshot_rows")
+        .eq("organization_id", organizationId)
+        .lte("from_date", toDate)
+        .gte("to_date", fromDate)
+        .range(from, to)
+    )) as unknown as Array<{ snapshot_rows: SnapshotRow[] | null }>;
+  } catch (error) {
+    console.error("[billing] failed to load billing records for range", error);
     return new Set();
   }
 
@@ -520,16 +601,19 @@ export async function getBillingHistory(
     const minFromDate = fromDates.sort()[0];
     const maxToDate = toDates.sort().reverse()[0];
 
-    const { data: notes, error: notesError } = await supabase
-      .from("delivery_notes")
-      .select("id, customer_id, delivery_number, delivery_date, total_amount, notes")
-      .in("customer_id", customerIds)
-      .gte("delivery_date", minFromDate)
-      .lte("delivery_date", maxToDate)
-      .eq("status", "confirmed");
-
-    if (!notesError && notes) {
-      activeNotes = notes as typeof activeNotes;
+    try {
+      activeNotes = await fetchAllPaged((from, to) =>
+        supabase
+          .from("delivery_notes")
+          .select("id, customer_id, delivery_number, delivery_date, total_amount, notes")
+          .in("customer_id", customerIds)
+          .gte("delivery_date", minFromDate)
+          .lte("delivery_date", maxToDate)
+          .eq("status", "confirmed")
+          .range(from, to)
+      );
+    } catch (notesError) {
+      console.error("[billing] failed to load delivery notes for history", notesError);
     }
   }
 
@@ -694,20 +778,27 @@ export async function getBatchBillingData(
 
   let targetIds = customerIds;
   if (!targetIds || targetIds.length === 0) {
-    let customerSourceQuery = supabase
-      .from("delivery_notes")
-      .select("customer_id")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gte("delivery_date", fromDate)
-      .lte("delivery_date", toDate);
+    let notes: Array<{ customer_id: string }> = [];
+    try {
+      notes = await fetchAllPaged((from, to) => {
+        let query = supabase
+          .from("delivery_notes")
+          .select("customer_id")
+          .eq("organization_id", organizationId)
+          .eq("status", "confirmed")
+          .gte("delivery_date", fromDate)
+          .lte("delivery_date", toDate);
 
-    if (deliveryNumbers && deliveryNumbers.length > 0) {
-      customerSourceQuery = customerSourceQuery.in("delivery_number", deliveryNumbers);
+        if (deliveryNumbers && deliveryNumbers.length > 0) {
+          query = query.in("delivery_number", deliveryNumbers);
+        }
+
+        return query.range(from, to);
+      });
+    } catch (error) {
+      console.error("[billing] failed to load delivery notes for batch billing", error);
+      return [];
     }
-
-    const { data: notes } = await customerSourceQuery;
-    if (!notes) return [];
     targetIds = Array.from(new Set(notes.map((note) => note.customer_id)));
   }
   if (targetIds.length === 0) return [];
