@@ -589,6 +589,7 @@ export type Database = {
       }
       delivery_note_items: {
         Row: {
+          cost_price: number
           created_at: string
           delivery_note_id: string
           id: string
@@ -604,6 +605,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          cost_price?: number
           created_at?: string
           delivery_note_id: string
           id?: string
@@ -619,6 +621,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          cost_price?: number
           created_at?: string
           delivery_note_id?: string
           id?: string

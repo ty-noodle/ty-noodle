@@ -50,20 +50,9 @@ type DeliveryNoteItemRow = {
   delivery_note_id: string;
   quantity_delivered: number | string | null;
   product_sale_unit_id: string | null;
-};
-
-type ProductSaleUnitRow = {
-  id: string;
-  product_id: string;
-  base_unit_quantity: number | string | null;
-  cost_mode: string | null;
-  fixed_cost_price: number | string | null;
-};
-
-type ProductRow = {
-  id: string;
   cost_price: number | string | null;
 };
+
 
 type OrderMetadataRow = {
   metadata: { source?: string } | null;
@@ -104,7 +93,7 @@ async function loadNoteCosts(noteIds: string[]) {
     const chunk = noteIds.slice(i, i + chunkSize);
     const { data: items, error } = await supabase
       .from("delivery_note_items")
-      .select("delivery_note_id, quantity_delivered, product_sale_unit_id")
+      .select("delivery_note_id, quantity_delivered, cost_price")
       .in("delivery_note_id", chunk);
 
     if (error) throw new Error(error.message);
@@ -113,70 +102,11 @@ async function loadNoteCosts(noteIds: string[]) {
     }
   }
 
-  const saleUnitIds = [
-    ...new Set(
-      typedItems
-        .map((item) => item.product_sale_unit_id)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ];
-
-  // 2. Chunk product_sale_units query
-  const typedSaleUnits: ProductSaleUnitRow[] = [];
-  for (let i = 0; i < saleUnitIds.length; i += chunkSize) {
-    const chunk = saleUnitIds.slice(i, i + chunkSize);
-    const { data: saleUnits, error } = await supabase
-      .from("product_sale_units")
-      .select("id, product_id, base_unit_quantity, cost_mode, fixed_cost_price")
-      .in("id", chunk);
-
-    if (error) throw new Error(error.message);
-    if (saleUnits) {
-      typedSaleUnits.push(...(saleUnits as ProductSaleUnitRow[]));
-    }
-  }
-
-  const productIds = [...new Set(typedSaleUnits.map((unit) => unit.product_id))];
-
-  // 3. Chunk products query
-  const typedProducts: ProductRow[] = [];
-  for (let i = 0; i < productIds.length; i += chunkSize) {
-    const chunk = productIds.slice(i, i + chunkSize);
-    const { data: products, error } = await supabase
-      .from("products")
-      .select("id, cost_price")
-      .in("id", chunk);
-
-    if (error) throw new Error(error.message);
-    if (products) {
-      typedProducts.push(...(products as ProductRow[]));
-    }
-  }
-
-  const productCostById = new Map(
-    typedProducts.map((product) => [product.id, toNumber(product.cost_price)]),
-  );
-
-  const saleUnitCostById = new Map(
-    typedSaleUnits.map((unit) => {
-      const productCost = productCostById.get(unit.product_id) ?? 0;
-      const baseQuantity = toNumber(unit.base_unit_quantity);
-      const effectiveCost =
-        unit.cost_mode === "fixed" && unit.fixed_cost_price != null
-          ? toNumber(unit.fixed_cost_price)
-          : productCost * baseQuantity;
-
-      return [unit.id, effectiveCost];
-    }),
-  );
-
   const noteCostById = new Map<string, number>();
 
   for (const item of typedItems) {
     const quantity = toNumber(item.quantity_delivered);
-    const unitCost = item.product_sale_unit_id
-      ? (saleUnitCostById.get(item.product_sale_unit_id) ?? 0)
-      : 0;
+    const unitCost = toNumber(item.cost_price);
 
     noteCostById.set(
       item.delivery_note_id,

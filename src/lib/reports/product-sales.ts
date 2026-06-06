@@ -163,6 +163,7 @@ export async function getProductSalesRanking(params: {
         unit_price,
         line_total,
         sale_unit_label,
+        cost_price,
         products!inner(id, name, sku, unit, cost_price, product_images(public_url, sort_order))
       )
     `)
@@ -186,6 +187,7 @@ export async function getProductSalesRanking(params: {
       unit_price: unknown;
       line_total: unknown;
       sale_unit_label: string;
+      cost_price: unknown;
       products: {
         id: string;
         name: string;
@@ -227,9 +229,8 @@ export async function getProductSalesRanking(params: {
       const imageUrl = sortedImages[0]?.public_url ?? null;
 
       const qty = toNum(item.quantity_in_base_unit) || toNum(item.quantity_delivered);
-      // delivery_note_items has no cost_price column — derive from product
       const costPerUnit = toNum(product.cost_price);
-      const cost = costPerUnit * toNum(item.quantity_delivered);
+      const cost = toNum(item.cost_price) * toNum(item.quantity_delivered);
 
       const existing = productMap.get(product.id);
       if (!existing) {

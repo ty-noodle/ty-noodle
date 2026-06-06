@@ -77,27 +77,15 @@ type DeliveryNoteItemRow = {
   product_sale_unit_id: string | null;
   line_total: number | string | null;
   sale_unit_label: string | null;
+  cost_price: number | string | null;
   products: {
     id: string;
     name: string | null;
     sku: string | null;
     unit: string | null;
-    cost_price: number | string | null;
   } | null;
 };
 
-type ProductSaleUnitRow = {
-  id: string;
-  product_id: string;
-  base_unit_quantity: number | string | null;
-  cost_mode: string | null;
-  fixed_cost_price: number | string | null;
-};
-
-type ProductRow = {
-  id: string;
-  cost_price: number | string | null;
-};
 
 const QUERY_CHUNK_SIZE = 50;
 
@@ -169,12 +157,12 @@ export async function getDetailedProfitSalesReport(params: {
         product_sale_unit_id,
         line_total,
         sale_unit_label,
+        cost_price,
         products(
           id,
           name,
           sku,
-          unit,
-          cost_price
+          unit
         )
       `)
       .in("delivery_note_id", chunk);
@@ -185,74 +173,7 @@ export async function getDetailedProfitSalesReport(params: {
     }
   }
 
-  // 3. Resolve cost structures for sale units and products
-  const saleUnitIds = [
-    ...new Set(
-      typedItems
-        .map((item) => item.product_sale_unit_id)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ];
-
-  const typedSaleUnits: ProductSaleUnitRow[] = [];
-  if (saleUnitIds.length > 0) {
-    for (let i = 0; i < saleUnitIds.length; i += QUERY_CHUNK_SIZE) {
-      const chunk = saleUnitIds.slice(i, i + QUERY_CHUNK_SIZE);
-      const { data: saleUnits, error: suError } = await supabase
-        .from("product_sale_units")
-        .select("id, product_id, base_unit_quantity, cost_mode, fixed_cost_price")
-        .in("id", chunk);
-
-      if (suError) throw new Error(suError.message);
-      if (saleUnits) {
-        typedSaleUnits.push(...(saleUnits as ProductSaleUnitRow[]));
-      }
-    }
-  }
-
-  const productIds = [
-    ...new Set(
-      typedSaleUnits
-        .map((unit) => unit.product_id)
-        .concat(
-          typedItems
-            .map((item) => item.products?.id)
-            .filter((v): v is string => Boolean(v)),
-        ),
-    ),
-  ];
-
-  const typedProducts: ProductRow[] = [];
-  if (productIds.length > 0) {
-    for (let i = 0; i < productIds.length; i += QUERY_CHUNK_SIZE) {
-      const chunk = productIds.slice(i, i + QUERY_CHUNK_SIZE);
-      const { data: products, error: pError } = await supabase
-        .from("products")
-        .select("id, cost_price")
-        .in("id", chunk);
-
-      if (pError) throw new Error(pError.message);
-      if (products) {
-        typedProducts.push(...(products as ProductRow[]));
-      }
-    }
-  }
-
-  const productCostById = new Map(
-    typedProducts.map((product) => [product.id, toNumber(product.cost_price)]),
-  );
-
-  const saleUnitCostById = new Map(
-    typedSaleUnits.map((unit) => {
-      const productCost = productCostById.get(unit.product_id) ?? 0;
-      const baseQuantity = toNumber(unit.base_unit_quantity);
-      const effectiveCost =
-        unit.cost_mode === "fixed" && unit.fixed_cost_price != null
-          ? toNumber(unit.fixed_cost_price)
-          : productCost * baseQuantity;
-      return [unit.id, effectiveCost];
-    }),
-  );
+  // 3. Resolve cost structures - No longer needed as we use cost_price directly
 
   // 4. Group & aggregate items by delivery note (customer + date + delivery number)
   // Map key: delivery_note_id
@@ -302,9 +223,7 @@ export async function getDetailedProfitSalesReport(params: {
     const lineTotal = toNumber(item.line_total);
 
     // Cost calculation
-    const unitCost = item.product_sale_unit_id
-      ? (saleUnitCostById.get(item.product_sale_unit_id) ?? 0)
-      : (item.products?.id ? (productCostById.get(item.products.id) ?? 0) : 0);
+    const unitCost = toNumber(item.cost_price);
     const lineCost = unitCost * qty;
 
     // Aggregate globally

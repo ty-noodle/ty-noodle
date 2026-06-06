@@ -62,7 +62,7 @@ export async function getStoreSalesRanking(params: {
         quantity_delivered,
         quantity_in_base_unit,
         line_total,
-        products!inner(id, cost_price)
+        cost_price
       )
     `)
     .eq("organization_id", organizationId)
@@ -85,7 +85,7 @@ export async function getStoreSalesRanking(params: {
       quantity_delivered: unknown;
       quantity_in_base_unit: unknown;
       line_total: unknown;
-      products: { id: string; cost_price: unknown } | null;
+      cost_price: unknown;
     }>;
   };
 
@@ -120,7 +120,7 @@ export async function getStoreSalesRanking(params: {
 
     for (const item of note.delivery_note_items ?? []) {
       const qty = toNum(item.quantity_in_base_unit) || toNum(item.quantity_delivered);
-      const costPerUnit = toNum(item.products?.cost_price);
+      const costPerUnit = toNum(item.cost_price);
       existing.totalRevenue += toNum(item.line_total);
       existing.totalCost += costPerUnit * toNum(item.quantity_delivered);
       existing.totalQty += qty;
@@ -172,7 +172,8 @@ export async function getStoreProductSales(params: {
         quantity_in_base_unit,
         line_total,
         sale_unit_label,
-        products!inner(id, name, sku, unit, cost_price, product_images(public_url, sort_order))
+        cost_price,
+        products!inner(id, name, sku, unit, product_images(public_url, sort_order))
       )
     `)
     .eq("organization_id", organizationId)
@@ -189,12 +190,12 @@ export async function getStoreProductSales(params: {
       quantity_in_base_unit: unknown;
       line_total: unknown;
       sale_unit_label: string;
+      cost_price: unknown;
       products: {
         id: string;
         name: string;
         sku: string;
         unit: string;
-        cost_price: unknown;
         product_images: Array<{ public_url: string; sort_order: number }>;
       } | null;
     }>;
@@ -224,7 +225,7 @@ export async function getStoreProductSales(params: {
       );
       const imageUrl = sortedImages[0]?.public_url ?? null;
       const qty = toNum(item.quantity_in_base_unit) || toNum(item.quantity_delivered);
-      const cost = toNum(product.cost_price) * toNum(item.quantity_delivered);
+      const cost = toNum(item.cost_price) * toNum(item.quantity_delivered);
       const revenue = toNum(item.line_total);
 
       const existing = productMap.get(product.id);

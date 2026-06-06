@@ -94,20 +94,9 @@ type DeliveryNoteItemRow = {
   delivery_note_id: string;
   quantity_delivered: number | string | null;
   product_sale_unit_id: string | null;
-};
-
-type ProductSaleUnitRow = {
-  id: string;
-  product_id: string;
-  base_unit_quantity: number | string | null;
-  cost_mode: string | null;
-  fixed_cost_price: number | string | null;
-};
-
-type ProductRow = {
-  id: string;
   cost_price: number | string | null;
 };
+
 
 type LinePendingOrderDashboardRow = {
   id: string;
@@ -184,56 +173,15 @@ async function loadTodayNetProfit(
   const noteIds = typedNotes.map((note) => note.id);
   const { data: items } = await supabase
     .from("delivery_note_items")
-    .select("delivery_note_id, quantity_delivered, product_sale_unit_id")
+    .select("delivery_note_id, quantity_delivered, cost_price")
     .in("delivery_note_id", noteIds);
 
   const typedItems = (items ?? []) as DeliveryNoteItemRow[];
-  const saleUnitIds = [
-    ...new Set(
-      typedItems
-        .map((item) => item.product_sale_unit_id)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ];
-
-  const { data: saleUnits } =
-    saleUnitIds.length > 0
-      ? await supabase
-          .from("product_sale_units")
-          .select("id, product_id, base_unit_quantity, cost_mode, fixed_cost_price")
-          .in("id", saleUnitIds)
-      : { data: [] };
-
-  const typedSaleUnits = (saleUnits ?? []) as ProductSaleUnitRow[];
-  const productIds = [...new Set(typedSaleUnits.map((unit) => unit.product_id))];
-  const { data: products } =
-    productIds.length > 0
-      ? await supabase.from("products").select("id, cost_price").in("id", productIds)
-      : { data: [] };
-
-  const productCostById = new Map(
-    ((products ?? []) as ProductRow[]).map((product) => [product.id, toNum(product.cost_price)]),
-  );
-
-  const saleUnitCostById = new Map(
-    typedSaleUnits.map((unit) => {
-      const productCost = productCostById.get(unit.product_id) ?? 0;
-      const baseQuantity = toNum(unit.base_unit_quantity);
-      const effectiveCost =
-        unit.cost_mode === "fixed" && unit.fixed_cost_price != null
-          ? toNum(unit.fixed_cost_price)
-          : productCost * baseQuantity;
-
-      return [unit.id, effectiveCost];
-    }),
-  );
 
   const totalRevenue = typedNotes.reduce((sum, note) => sum + toNum(note.total_amount), 0);
   const totalCost = typedItems.reduce((sum, item) => {
     const quantity = toNum(item.quantity_delivered);
-    const unitCost = item.product_sale_unit_id
-      ? (saleUnitCostById.get(item.product_sale_unit_id) ?? 0)
-      : 0;
+    const unitCost = toNum(item.cost_price);
 
     return sum + unitCost * quantity;
   }, 0);
