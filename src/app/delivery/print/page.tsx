@@ -46,6 +46,7 @@ type RawDeliveryPrintRow = {
       name: string;
       sku: string;
       unit: string;
+      display_order: number | null;
     };
   }[];
 };
@@ -105,6 +106,7 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
         saleUnitLabel: string;
         unitPrice: number;
         lineTotal: number;
+        displayOrder?: number | null;
       }
     >();
 
@@ -131,11 +133,21 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
           saleUnitLabel: unitLabel,
           unitPrice: toNumber(item.unit_price),
           lineTotal: toNumber(item.line_total),
+          displayOrder: item.products.display_order,
         });
       }
     }
 
     const items = Array.from(itemMap.values());
+    
+    // Sort items: display_order ascending, then name alphabetically
+    items.sort((a, b) => {
+      const orderA = a.displayOrder ?? 0;
+      const orderB = b.displayOrder ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.productName.localeCompare(b.productName, "th");
+    });
+
     items.forEach((item, index) => {
       item.lineNumber = index + 1;
     });
@@ -202,7 +214,7 @@ export default async function DeliveryBatchPrintPage({ searchParams }: Props) {
       orders(order_number),
       delivery_note_items(
         id, quantity_delivered, unit_price, line_total,
-        products!inner(name, sku, unit)
+        products!inner(name, sku, unit, display_order)
       )
     `)
     .eq("organization_id", session.organizationId)

@@ -89,14 +89,17 @@ function DeliveryNotePageView({
         orgAddress={dn.organization.address}
         orgPhone={dn.organization.phone}
         title="ใบส่งของ"
-        docNumber={dn.deliveryNumber}
-        docDate={dn.deliveryDate}
         pageLabel={totalPages > 1 ? `หน้า ${pageIndex + 1}/${totalPages}` : undefined}
         dividerStyle="none"
         docMetaFontSize="11.8pt"
       />
 
-      <PrintCustomerRow customer={dn.customer} />
+      <PrintCustomerRow
+        customer={dn.customer}
+        docNumber={dn.deliveryNumber}
+        docDate={dn.deliveryDate}
+        docMetaFontSize="11.8pt"
+      />
 
       <table
         style={{

@@ -114,7 +114,7 @@ export function PrintDocHeader({
   orgPhone?: string | null;
   title: string;
   docNumber?: string;
-  docDate: string;
+  docDate?: string;
   pageLabel?: string;
   extraMeta?: RightMetaItem[];
   dividerStyle?: DividerStyle;
@@ -171,17 +171,19 @@ export function PrintDocHeader({
             <span style={{ fontWeight: 850, fontFamily: "monospace" }}>{docNumber}</span>
           </p>
         ) : null}
-        <p
-          style={{
-            fontSize: docMetaFontSize,
-            color: "black",
-            lineHeight: 1.15,
-            marginTop: docNumber ? "2px" : undefined,
-          }}
-        >
-          <span style={{ color: "black", fontWeight: 800 }}>วันที่ </span>
-          <span style={{ fontWeight: 850 }}>{formatDate(docDate)}</span>
-        </p>
+        {docDate ? (
+          <p
+            style={{
+              fontSize: docMetaFontSize,
+              color: "black",
+              lineHeight: 1.15,
+              marginTop: docNumber ? "2px" : undefined,
+            }}
+          >
+            <span style={{ color: "black", fontWeight: 800 }}>วันที่ </span>
+            <span style={{ fontWeight: 850 }}>{formatDate(docDate)}</span>
+          </p>
+        ) : null}
         {extraMeta?.map((item) => (
           <p key={item.label} style={{ fontSize: "8.2pt", color: "black", marginTop: "2px" }}>
             <span style={{ color: "black", fontWeight: 800 }}>{item.label} </span>
@@ -198,11 +200,17 @@ export function PrintDocHeader({
 
 export function PrintCustomerRow({
   customer,
+  docNumber,
+  docDate,
+  docMetaFontSize = "11.8pt",
 }: {
   customer: { name: string; code: string; address: string };
+  docNumber?: string;
+  docDate?: string;
+  docMetaFontSize?: string;
 }) {
   return (
-    <div style={{ marginBottom: "1.5mm", padding: "0" }}>
+    <div style={{ marginBottom: "1.5mm", padding: "0", position: "relative" }}>
       <div style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
         <span style={{ fontSize: "13.5pt", color: "black", flexShrink: 0 }}>ลูกค้า</span>
         <span
@@ -212,6 +220,35 @@ export function PrintCustomerRow({
         </span>
         <span style={{ fontWeight: 700, fontSize: "13.5pt", color: "black" }}>{customer.name}</span>
       </div>
+      
+      {(docNumber || docDate) ? (
+        <div
+          style={{
+            position: "absolute",
+            left: "53%",
+            top: "0.5mm",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            fontSize: docMetaFontSize,
+            flexShrink: 0,
+          }}
+        >
+          {docNumber ? (
+            <p style={{ color: "black", lineHeight: 1.2 }}>
+              <span style={{ color: "black", fontWeight: 800 }}>เลขที่ </span>
+              <span style={{ fontWeight: 850, fontFamily: "monospace" }}>{docNumber}</span>
+            </p>
+          ) : null}
+          {docDate ? (
+            <p style={{ color: "black", lineHeight: 1.2, marginTop: "2px" }}>
+              <span style={{ color: "black", fontWeight: 800 }}>วันที่ </span>
+              <span style={{ fontWeight: 850 }}>{formatDate(docDate)}</span>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", gap: "8px", alignItems: "baseline", marginTop: "1px" }}>
         <span style={{ fontSize: "10.5pt", color: "black", flexShrink: 0 }}>ที่อยู่</span>
         <span style={{ fontSize: "10.5pt", color: "black" }}>{customer.address}</span>

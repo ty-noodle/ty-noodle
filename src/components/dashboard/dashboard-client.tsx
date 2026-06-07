@@ -169,21 +169,6 @@ function toThaiLongDate(isoDate: string) {
   }).format(new Date(`${isoDate}T00:00:00+07:00`));
 }
 
-function formatRange(startIso: string | null, endIso: string | null) {
-  if (!startIso || !endIso) return "-";
-  const start = new Intl.DateTimeFormat("th-TH", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Bangkok",
-  }).format(new Date(`${startIso}T00:00:00+07:00`));
-  const end = new Intl.DateTimeFormat("th-TH", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Bangkok",
-  }).format(new Date(`${endIso}T00:00:00+07:00`));
-  return `${start} - ${end}`;
-}
-
 function formatThaiDateTime(value: string) {
   const date = new Date(value);
   const datePart = new Intl.DateTimeFormat("th-TH", {
@@ -199,40 +184,6 @@ function formatThaiDateTime(value: string) {
   }).format(date);
 
   return `${datePart} ${timePart}`;
-}
-
-function formatYAxis(value: number) {
-  const rounded = Math.round(value / 500) * 500;
-  return rounded.toLocaleString("th-TH", { maximumFractionDigits: 0 });
-}
-
-function buildChartPoints(values: number[], width: number, height: number, padding: number, forcedMax?: number) {
-  if (values.length === 0) return [];
-  const max = forcedMax ?? Math.max(...values, 1);
-  const usableWidth = width - padding * 2;
-  const usableHeight = height - padding * 2;
-  const stepX = values.length === 1 ? 0 : usableWidth / (values.length - 1);
-
-  return values.map((value, index) => {
-    const x = padding + stepX * index;
-    const ratio = value / max;
-    const y = height - padding - ratio * usableHeight;
-    return { x, y };
-  });
-}
-
-function pointsToPath(points: { x: number; y: number }[]) {
-  if (points.length === 0) return "";
-  return points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
-    .join(" ");
-}
-
-function areaToPath(points: { x: number; y: number }[], height: number, bottomPadding: number) {
-  if (points.length === 0) return "";
-  const first = points[0];
-  const last = points[points.length - 1];
-  return `${pointsToPath(points)} L ${last.x.toFixed(2)} ${(height - bottomPadding).toFixed(2)} L ${first.x.toFixed(2)} ${(height - bottomPadding).toFixed(2)} Z`;
 }
 
 export function DashboardClient({
@@ -295,11 +246,7 @@ export function DashboardClient({
   const {
     kpi,
     dailyPerformanceRows,
-    dailyPerformanceRangeStartDate,
-    dailyPerformanceRangeEndDate,
     lineOrders,
-    topCustomers,
-    topProducts,
   } = overview;
 
   const fmtNumber = (value: number) => (value ?? 0).toLocaleString("th-TH");
@@ -346,37 +293,6 @@ export function DashboardClient({
     }
   }
 
-  const chartWidth = 400;
-  const chartHeight = 104;
-  const chartPaddingTop = 8;
-  const chartPaddingBottom = 16;
-  const chartRevenueValues = dailyPerformanceRows.map((row) => row.revenue);
-  const chartProfitValues = dailyPerformanceRows.map((row) => Math.max(row.profit, 0));
-  const commonMax = Math.max(...chartRevenueValues, ...chartProfitValues, 1);
-  const revenuePoints = buildChartPoints(
-    chartRevenueValues,
-    chartWidth,
-    chartHeight,
-    chartPaddingTop,
-    commonMax
-  );
-  const profitPoints = buildChartPoints(
-    chartProfitValues,
-    chartWidth,
-    chartHeight,
-    chartPaddingTop,
-    commonMax
-  );
-  const peakIndex =
-    chartRevenueValues.length > 0
-      ? chartRevenueValues.reduce(
-          (best, current, index, array) => (current > array[best] ? index : best),
-          0,
-        )
-      : -1;
-  const markerPoint = peakIndex >= 0 ? revenuePoints[peakIndex] : null;
-  const yAxisMax = Math.max(...chartRevenueValues, 0);
-  const yAxisMid = yAxisMax / 2;
   const dailySummaryRows = [...dailyPerformanceRows].reverse().slice(0, 7);
 
   return (
@@ -641,96 +557,6 @@ export function DashboardClient({
         </section>
 
         <div className="grid grid-cols-1 gap-8">
-          <section className="rounded-2xl border border-gray-50 bg-white p-4 shadow-sm">
-            <div className="mb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[15px] font-bold leading-none text-slate-800">
-                  กราฟเปรียบเทียบรายวัน
-                </h3>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-500">
-                  7 วันล่าสุด
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500">
-                {formatRange(dailyPerformanceRangeStartDate, dailyPerformanceRangeEndDate)}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[10px] font-medium text-slate-600">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-4 rounded-full bg-blue-600" />
-                  <span>ยอดขายรายวัน</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-4 border-t-2 border-dashed border-emerald-500" />
-                  <span>กำไรสุทธิรายวัน</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-3 w-0.5 bg-[#F59E0B]" />
-                  <span>วันที่ยอดขายสูงสุด</span>
-                </div>
-              </div>
-            </div>
-
-            {dailyPerformanceRows.length > 0 ? (
-              <>
-                <div className="relative h-32 w-full pl-6">
-                  <svg
-                    className="h-full w-full overflow-visible"
-                    preserveAspectRatio="none"
-                    viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                  >
-                    {[0, 0.33, 0.66, 1].map((ratio) => {
-                      const y =
-                        chartHeight -
-                        chartPaddingBottom -
-                        (chartHeight - chartPaddingTop - chartPaddingBottom) * ratio;
-                      return <line key={ratio} x1="0" x2={chartWidth} y1={y} y2={y} stroke="#F1F5F9" />;
-                    })}
-
-                    <path
-                      d={areaToPath(revenuePoints, chartHeight, chartPaddingBottom)}
-                      fill="rgba(59,130,246,0.18)"
-                    />
-                    <path d={pointsToPath(revenuePoints)} fill="none" stroke="#1D4ED8" strokeWidth="2" />
-                    <path
-                      d={pointsToPath(profitPoints)}
-                      fill="none"
-                      stroke="#10B981"
-                      strokeDasharray="4"
-                      strokeWidth="2"
-                    />
-
-                    {markerPoint ? (
-                      <line
-                        x1={markerPoint.x}
-                        x2={markerPoint.x}
-                        y1={chartPaddingTop}
-                        y2={chartHeight - chartPaddingBottom}
-                        stroke="#F59E0B"
-                        strokeWidth="2"
-                      />
-                    ) : null}
-                  </svg>
-
-                  <div className="absolute left-0 top-0 flex h-full flex-col justify-between text-[8px] font-medium text-gray-400">
-                    <span>{formatYAxis(yAxisMax)}</span>
-                    <span>{formatYAxis(yAxisMid)}</span>
-                    <span>0</span>
-                  </div>
-                </div>
-
-                <div className="mt-2 flex justify-between pl-6 pr-1 text-[8px] font-medium text-gray-500">
-                  {dailyPerformanceRows.map((row) => (
-                    <span key={row.isoDate}>{row.monthLabel}</span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">
-                ยังไม่มีข้อมูลกราฟรายวัน
-              </div>
-            )}
-          </section>
-
           <section className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-black leading-none text-slate-900 md:text-xl">
@@ -785,71 +611,7 @@ export function DashboardClient({
           </section>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <section>
-            <h2 className="mb-6 px-2 text-2xl font-black tracking-tight text-slate-900">
-              สินค้าขายดี เดือนนี้
-            </h2>
-            <div className="flex flex-col gap-4">
-              {topProducts.map((product, idx) => (
-                <div
-                  key={product.productId}
-                  className="group flex items-center gap-5 rounded-[2rem] border border-slate-50 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow hover:shadow-md"
-                >
-                  <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-3xl bg-slate-50 font-black text-2xl text-[#002581] transition-transform group-hover:scale-105 md:h-20 md:w-20">
-                    {product.imageUrl ? (
-                      <Image src={product.imageUrl} alt={product.productName} fill className="object-cover" />
-                    ) : (
-                      <ShoppingBag className="h-10 w-10 text-slate-200" />
-                    )}
-                    <div className="absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-br-xl bg-[#002581] text-xs font-black text-white shadow-md">
-                      {idx + 1}
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-lg font-black text-slate-800 md:text-xl">
-                      {product.productName}
-                    </p>
-                    <p className="mt-1 text-base font-black text-[#28A745]">
-                      ฿{fmtMoney(product.totalAmount)}
-                    </p>
-                  </div>
-                  <div className="hidden pr-4 md:block">
-                    <ChevronRight className="h-6 w-6 text-slate-100 transition-colors group-hover:text-slate-300" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
 
-          <section>
-            <h2 className="mb-6 px-2 text-2xl font-black tracking-tight text-slate-900">
-              ลูกค้าชั้นนำ เดือนนี้
-            </h2>
-            <div className="flex flex-col gap-4">
-              {topCustomers.map((customer, idx) => (
-                <div
-                  key={customer.customerId}
-                  className="group flex items-center gap-5 rounded-[2rem] border border-slate-50 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow hover:shadow-md"
-                >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-blue-50 text-2xl font-black text-[#002581] transition-all group-hover:bg-[#002581] group-hover:text-white md:h-16 md:w-16">
-                    {idx + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-lg font-black text-slate-800 md:text-xl">
-                      {customer.customerName}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-black text-[#002581] md:text-2xl">
-                      ฿{fmtMoney(customer.totalAmount)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
       </main>
 
       {viewingStores || isViewingStoresClosing ? (

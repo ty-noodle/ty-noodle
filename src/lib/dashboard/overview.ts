@@ -195,7 +195,6 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
   const supabase = getSupabaseAdmin();
   const today = getTodayInBangkok();
   const monthStart = firstOfMonth(today);
-  const sixDaysAgo = subtractDays(today, 6);
 
   const [
     todayOrdersRes,
@@ -248,26 +247,11 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
       .order("created_at", { ascending: false })
       .limit(5),
 
-    // 6. Last 7 days — weekly trend chart
-    supabase.from("orders")
-      .select("order_date, total_amount")
-      .eq("organization_id", organizationId)
-      .in("status", ["submitted", "confirmed"])
-      .gte("order_date", sixDaysAgo)
-      .lte("order_date", today),
+    // 6. Last 7 days — weekly trend chart (Bypassed to optimize speed)
+    Promise.resolve({ data: [] as unknown[] }),
 
-    // 7. This month's orders with customer + items+product — for Top 5 rankings
-    supabase.from("orders")
-      .select(`
-        total_amount,
-        customer_id,
-        customers!inner(name),
-        order_items(product_id, line_total, products(name, product_images(public_url, sort_order)))
-      `)
-      .eq("organization_id", organizationId)
-      .in("status", ["submitted", "confirmed"])
-      .gte("order_date", monthStart)
-      .lte("order_date", today),
+    // 7. This month's orders — for Top 5 rankings (Bypassed to optimize speed)
+    Promise.resolve({ data: [] as unknown[] }),
 
     // 8. Stock dashboard data (for low stock count)
     getStockDashboardData(organizationId, 0, 0),
