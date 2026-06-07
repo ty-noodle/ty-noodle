@@ -618,6 +618,19 @@ export default function OrderClient({
           setCanSubmitPendingLineOrder(false);
           setCurrentView("catalog");
         } else {
+          if (initialSessionCustomer) {
+            try {
+              await fetch("/api/order/session", { method: "DELETE" });
+            } catch (error) {
+              console.error("[order-session:clear]", error);
+            }
+            setLinkedCustomer(null);
+            setSessionLineUserId(null);
+            logout();
+            window.location.reload();
+            return;
+          }
+
           setCanSubmitPendingLineOrder(true);
           setRegFormOpen(false);
           setCurrentView("catalog");
@@ -629,7 +642,7 @@ export default function OrderClient({
         hasResolvedAuthRef.current = true;
       }
     });
-  }, [currentView, isReady, linkedCustomer, organizationId, profile?.userId, sessionLineUserId]);
+  }, [currentView, isReady, linkedCustomer, organizationId, profile?.userId, sessionLineUserId, initialSessionCustomer, logout]);
 
   // Geography cascade: load provinces when entering register view
   useEffect(() => {
