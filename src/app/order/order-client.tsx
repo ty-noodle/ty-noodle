@@ -57,7 +57,6 @@ import {
   registerLineCustomer,
   continueExistingLineCustomer,
   createPendingLineOrderAction,
-  getLineCustomerOnboardingState,
   submitNewCustomerInquiry,
   getFrequentlyOrderedProducts,
   getCustomerOrders,
@@ -619,15 +618,9 @@ export default function OrderClient({
           setCanSubmitPendingLineOrder(false);
           setCurrentView("catalog");
         } else {
-          const onboarding = await getLineCustomerOnboardingState(organizationId, lineUserId);
-          if (onboarding.success && onboarding.data.canSubmitPendingOrder) {
-            setCanSubmitPendingLineOrder(true);
-            setRegFormOpen(false);
-            setCurrentView("catalog");
-          } else {
-            setRegFormOpen(false);
-            setCurrentView("register");
-          }
+          setCanSubmitPendingLineOrder(true);
+          setRegFormOpen(false);
+          setCurrentView("catalog");
         }
       } catch (error) {
         console.error("[order-auth:bootstrap]", error);
