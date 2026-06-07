@@ -2,7 +2,7 @@
 
 import { FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type PrintFactoryOrderSheetButtonProps = {
   date: string;
@@ -21,10 +21,6 @@ export function PrintFactoryOrderSheetButton({
     () => `/orders/factory-order-sheet?date=${date}${endDate ? `&endDate=${endDate}` : ""}`,
     [date, endDate],
   );
-
-  useEffect(() => {
-    router.prefetch(url);
-  }, [router, url]);
 
   function handleOpen() {
     if (loading) return;

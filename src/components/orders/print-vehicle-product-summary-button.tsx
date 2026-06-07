@@ -2,7 +2,7 @@
 
 import { Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type PrintVehicleProductSummaryButtonProps = {
   date: string;
@@ -21,10 +21,6 @@ export function PrintVehicleProductSummaryButton({
     () => `/orders/vehicle-product-summary?date=${date}${endDate ? `&endDate=${endDate}` : ""}`,
     [date, endDate],
   );
-
-  useEffect(() => {
-    router.prefetch(url);
-  }, [router, url]);
 
   function handleOpen() {
     if (loading) return;

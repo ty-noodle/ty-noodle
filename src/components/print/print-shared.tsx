@@ -48,6 +48,19 @@ function dottedHorizontalRuleStyle(color: string): CSSProperties {
   };
 }
 
+function abbreviateThaiAddress(address: string) {
+  return address
+    .replace(/ตำบล\/แขวง\s*/g, "ต.")
+    .replace(/ตำบล\s*/g, "ต.")
+    .replace(/แขวง\s*/g, "ต.")
+    .replace(/อำเภอ\/เขต\s*/g, "อ.")
+    .replace(/อำเภอ\s*/g, "อ.")
+    .replace(/เขต\s*/g, "อ.")
+    .replace(/จังหวัด\s*/g, "จ.")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function formatDate(iso: string) {
   if (!iso || iso === "null") return iso;
   try {
@@ -139,14 +152,25 @@ export function PrintDocHeader({
   return (
     <div style={headerStyle}>
       <div>
-        <p style={{ fontWeight: 800, fontSize: "13pt", color: hideOrgDetails ? "black" : "#1e3a5f", lineHeight: 1.2 }}>
+        <p
+          style={{
+            fontWeight: 800,
+            fontSize: "13pt",
+            color: hideOrgDetails ? "black" : "#1e3a5f",
+            lineHeight: 1.2,
+          }}
+        >
           {orgName}
         </p>
         {!hideOrgDetails && orgAddress ? (
-          <p style={{ fontSize: "8.2pt", color: "black", fontWeight: 800, marginTop: "1px" }}>{orgAddress}</p>
+          <p style={{ fontSize: "8.2pt", color: "black", fontWeight: 800, marginTop: "1px" }}>
+            {orgAddress}
+          </p>
         ) : null}
         {!hideOrgDetails && orgPhone ? (
-          <p style={{ fontSize: "8.2pt", color: "black", fontWeight: 800, marginTop: "1px" }}>โทร {orgPhone}</p>
+          <p style={{ fontSize: "8.2pt", color: "black", fontWeight: 800, marginTop: "1px" }}>
+            โทร {orgPhone}
+          </p>
         ) : null}
       </div>
 
@@ -159,7 +183,14 @@ export function PrintDocHeader({
           pointerEvents: "none",
         }}
       >
-        <p style={{ fontSize: "16pt", fontWeight: 900, color: hideOrgDetails ? "black" : "#1e3a5f", letterSpacing: "0.05em" }}>
+        <p
+          style={{
+            fontSize: "16pt",
+            fontWeight: 900,
+            color: hideOrgDetails ? "black" : "#1e3a5f",
+            letterSpacing: "0.05em",
+          }}
+        >
           {title}
         </p>
       </div>
@@ -191,7 +222,9 @@ export function PrintDocHeader({
           </p>
         ))}
         {pageLabel ? (
-          <p style={{ fontSize: "7.8pt", color: "black", fontWeight: 700, marginTop: "2px" }}>{pageLabel}</p>
+          <p style={{ fontSize: "7.8pt", color: "black", fontWeight: 700, marginTop: "2px" }}>
+            {pageLabel}
+          </p>
         ) : null}
       </div>
     </div>
@@ -209,6 +242,8 @@ export function PrintCustomerRow({
   docDate?: string;
   docMetaFontSize?: string;
 }) {
+  const customerAddress = abbreviateThaiAddress(customer.address);
+
   return (
     <div style={{ marginBottom: "1.5mm", padding: "0", position: "relative" }}>
       <div style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
@@ -220,8 +255,8 @@ export function PrintCustomerRow({
         </span>
         <span style={{ fontWeight: 700, fontSize: "13.5pt", color: "black" }}>{customer.name}</span>
       </div>
-      
-      {(docNumber || docDate) ? (
+
+      {docNumber || docDate ? (
         <div
           style={{
             position: "absolute",
@@ -249,9 +284,31 @@ export function PrintCustomerRow({
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "baseline", marginTop: "1px" }}>
-        <span style={{ fontSize: "10.5pt", color: "black", flexShrink: 0 }}>ที่อยู่</span>
-        <span style={{ fontSize: "10.5pt", color: "black" }}>{customer.address}</span>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          alignItems: "flex-start",
+          marginTop: "1px",
+          maxWidth: "51%",
+        }}
+      >
+        <span style={{ fontSize: "10.5pt", color: "black", flexShrink: 0, lineHeight: 1.15 }}>
+          ที่อยู่
+        </span>
+        <span
+          style={{
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 2,
+            overflow: "hidden",
+            fontSize: "10.5pt",
+            color: "black",
+            lineHeight: 1.15,
+          }}
+        >
+          {customerAddress}
+        </span>
       </div>
     </div>
   );
@@ -296,7 +353,10 @@ export function PrintTotalRow({
       <p style={{ fontSize: "12.5pt", fontWeight: "bold", color: "black" }}>{bahtText(totalAmount)}</p>
       <div style={{ display: "flex", alignItems: "baseline", gap: "6mm" }}>
         <p style={{ fontSize: "12.5pt", fontWeight: 800, color: "black" }}>รวมทั้งสิ้น</p>
-        <p className="monospace-font" style={{ fontSize: "16.5pt", fontWeight: 900, color: "black", fontFamily: "monospace" }}>
+        <p
+          className="monospace-font"
+          style={{ fontSize: "16.5pt", fontWeight: 900, color: "black", fontFamily: "monospace" }}
+        >
           {fmt(totalAmount)}
         </p>
       </div>

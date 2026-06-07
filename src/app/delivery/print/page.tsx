@@ -24,6 +24,8 @@ type RawDeliveryPrintRow = {
   total_amount: number | string | null;
   notes: string | null;
   customer_id: string;
+  vehicle_id: string | null;
+  vehicles: { id: string; name: string } | { id: string; name: string }[] | null;
   customers: {
     id: string;
     name: string;
@@ -139,8 +141,7 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
     }
 
     const items = Array.from(itemMap.values());
-    
-    // Sort items: display_order ascending, then name alphabetically
+
     items.sort((a, b) => {
       const orderA = a.displayOrder ?? 0;
       const orderB = b.displayOrder ?? 0;
@@ -158,6 +159,10 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
         ? `${base.delivery_number} +${groupRows.length - 1}`
         : base.delivery_number;
     const notes = groupRows.map((row) => row.notes).filter(Boolean).join(" / ") || null;
+    const vehicleId = base.vehicle_id ?? base.customers.default_vehicle_id ?? null;
+    const vehicleName = base.vehicle_id
+      ? getVehicleName(base.vehicles)
+      : getVehicleName(base.customers.vehicles);
 
     return {
       deliveryNumber,
@@ -175,8 +180,8 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
         name: base.customers.name || "Unknown",
         code: base.customers.customer_code || "Unknown",
         address: base.customers.address || "Unknown",
-        vehicleId: base.customers.default_vehicle_id || null,
-        vehicleName: getVehicleName(base.customers.vehicles),
+        vehicleId,
+        vehicleName,
       },
       items,
     } satisfies DeliveryNotePrintData;
@@ -208,7 +213,8 @@ export default async function DeliveryBatchPrintPage({ searchParams }: Props) {
   let query = supabase
     .from("delivery_notes")
     .select(`
-      id, delivery_number, delivery_date, total_amount, notes, customer_id,
+      id, delivery_number, delivery_date, total_amount, notes, customer_id, vehicle_id,
+      vehicles(id, name),
       customers!inner(id, name, customer_code, address, default_vehicle_id, vehicles(id, name)),
       organizations!inner(name, metadata),
       orders(order_number),
@@ -234,11 +240,40 @@ export default async function DeliveryBatchPrintPage({ searchParams }: Props) {
     }
   }
 
-  const { data: rows } = await query
-    .order("delivery_date", { ascending: true })
-    .order("created_at", { ascending: true });
+  const [rowsResult, vehicleRowsResult] = await Promise.all([
+    query
+      .order("delivery_date", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("vehicles")
+      .select("id")
+      .eq("organization_id", session.organizationId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
 
+  const rows = rowsResult.data;
+  const vehicleRows = vehicleRowsResult.data ?? [];
+  const vehicleSortIndexMap = new Map(vehicleRows.map((vehicle, index) => [vehicle.id, index]));
   const dns = rows && rows.length > 0 ? buildPrintData(rows as unknown as RawDeliveryPrintRow[]) : [];
+
+  if (dns.length > 1) {
+    dns.sort((a, b) => {
+      const dateCompare = a.deliveryDate.localeCompare(b.deliveryDate);
+      if (dateCompare !== 0) return dateCompare;
+
+      const indexA =
+        a.customer.vehicleId === null ? 999 : (vehicleSortIndexMap.get(a.customer.vehicleId) ?? 998);
+      const indexB =
+        b.customer.vehicleId === null ? 999 : (vehicleSortIndexMap.get(b.customer.vehicleId) ?? 998);
+      if (indexA !== indexB) return indexA - indexB;
+
+      return (
+        a.customer.code.localeCompare(b.customer.code, "th") ||
+        a.customer.name.localeCompare(b.customer.name, "th")
+      );
+    });
+  }
 
   return (
     <>
