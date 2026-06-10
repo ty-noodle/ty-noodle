@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { reportOrderDebugClient } from "@/lib/order-debug";
 
 export function PageLoader() {
+  const pathname = usePathname();
   const [percent, setPercent] = useState(0);
 
   useEffect(() => {
@@ -30,6 +33,27 @@ export function PageLoader() {
     tick();
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (pathname !== "/order") return;
+
+    const startedAt = Date.now();
+    const timer = window.setTimeout(() => {
+      void reportOrderDebugClient("page_loader_slow", {
+        durationMs: Date.now() - startedAt,
+        pathname,
+        percent: 98,
+      });
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timer);
+      void reportOrderDebugClient("page_loader_complete", {
+        durationMs: Date.now() - startedAt,
+        pathname,
+      });
+    };
+  }, [pathname]);
 
   // Safe CSS position calculation in JavaScript to prevent mobile parsing errors
   const slidingOffset = percent * 0.48;

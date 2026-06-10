@@ -551,8 +551,36 @@ export default function OrderClient({
   const [editingOrder, setEditingOrder] = useState<CustomerOrderRow | null>(null);
   const [editCart, setEditCart] = useState<Record<string, number>>({});
   const [highlightedHistoryOrderId, setHighlightedHistoryOrderId] = useState<string | null>(null);
+  const clientMountedAtRef = useRef<number>(Date.now());
+  const hasReportedClientReadyRef = useRef(false);
 
   // Sync server session cookie after LIFF login.
+  useEffect(() => {
+    void reportOrderDebugClient("order_client_mounted", {
+      currentView,
+      hasInitialCustomer: Boolean(initialSessionCustomer),
+      hasInitialLineUserId: Boolean(initialSessionLineUserId),
+      isReady,
+    });
+  // Mount-only beacon for comparing against server and loader timings.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (currentView === "loading" || hasReportedClientReadyRef.current) {
+      return;
+    }
+
+    hasReportedClientReadyRef.current = true;
+    void reportOrderDebugClient("order_client_ready", {
+      currentView,
+      durationMs: Date.now() - clientMountedAtRef.current,
+      hasProfile: Boolean(profile?.userId),
+      hasSessionLineUserId: Boolean(sessionLineUserId),
+      isReady,
+    });
+  }, [currentView, isReady, profile?.userId, sessionLineUserId]);
+
   useEffect(() => {
     if (!isReady || !profile?.userId || !liffToken) return;
 
@@ -1989,10 +2017,17 @@ export default function OrderClient({
         console.error("[order-session:clear]", error);
       }
 
+      hasResolvedAuthRef.current = false;
+      hasReportedClientReadyRef.current = false;
       setLinkedCustomer(null);
       setSessionLineUserId(null);
+      setCanSubmitPendingLineOrder(false);
+      setPendingLineOrderId(null);
+      setCurrentView("login");
+      void reportOrderDebugClient("order_logout_complete", {
+        hasProfile: Boolean(profile?.userId),
+      });
       logout();
-      window.location.reload();
     });
   };
 
