@@ -455,10 +455,15 @@ async function OrderContent({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
+  console.info("[order-render:start]");
   const resolvedSearchParamsPromise: Promise<SearchParams> =
     searchParams ?? Promise.resolve({});
   const catalogDataPromise = getCatalogData();
   const resolvedSearchParams = await resolvedSearchParamsPromise;
+  console.info("[order-render:search-params-ready]", {
+    hasPreview: Boolean(resolvedSearchParams.preview),
+    hasProduct: Boolean(resolvedSearchParams.product),
+  });
   const {
     allowOrderAfterCutoff,
     catalogProducts,
@@ -467,12 +472,22 @@ async function OrderContent({
     organizationId,
     orgPhone,
   } = await catalogDataPromise;
+  console.info("[order-render:catalog-ready]", {
+    organizationId,
+    productCount: catalogProducts.length,
+  });
   const previewView = getSearchParamValue(resolvedSearchParams.preview);
   const isMock = process.env.NEXT_PUBLIC_LIFF_MOCK === "true";
   const initialAuth =
     isMock && previewView
       ? { customer: null, lineUserId: null }
       : await getInitialOrderAuth(organizationId);
+  console.info("[order-render:auth-ready]", {
+    hasInitialCustomer: Boolean(initialAuth.customer),
+    hasInitialLineUserId: Boolean(initialAuth.lineUserId),
+    isMock,
+    previewView: previewView ?? null,
+  });
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
