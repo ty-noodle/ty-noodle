@@ -160,6 +160,30 @@ export function LiffProvider({
     initLiff();
   }, [liffId, refreshProfile]);
 
+  useEffect(() => {
+    const onWindowError = (event: ErrorEvent) => {
+      void reportOrderDebugClient("order_window_error", {
+        filename: event.filename || "",
+        line: event.lineno || 0,
+        message: event.message || "",
+      });
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      void reportOrderDebugClient("order_unhandled_rejection", {
+        reason: summarizeError(event.reason),
+      });
+    };
+
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
+
   const login = async () => {
     const liff = liffRef.current;
     if (!liff || liff.isLoggedIn()) return;
