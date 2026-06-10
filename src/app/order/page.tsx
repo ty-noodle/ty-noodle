@@ -3,6 +3,7 @@ import { cache, Suspense } from "react";
 import OrderClient from "./order-client";
 import { PageLoader } from "@/components/page-loader";
 import { parseOrderWindowSettings } from "@/lib/order-window";
+import { maskLineUserId } from "@/lib/order-debug";
 import { getLinkedCustomerByLineUserId } from "@/lib/orders/line-pending";
 import { getSiteUrl } from "@/lib/site-url";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -39,6 +40,15 @@ type CatalogProduct = ProductWithRelations & {
   sale_unit_ratio: number;
   step_order_qty: number | null;
 };
+type ProductShareCandidate = {
+  id: string;
+  metadata: Database["public"]["Tables"]["products"]["Row"]["metadata"];
+  name: string;
+  product_id?: string;
+  product_images?: Array<Pick<ProductImageRow, "public_url" | "sort_order">>;
+  sale_unit_label?: string;
+  unit: string | null;
+};
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -55,13 +65,59 @@ type InitialOrderAuth = {
 };
 
 const siteUrl = getSiteUrl();
+const DEFAULT_ORDER_SHARE_METADATA = {
+  description: "ระบบสั่งสินค้าสำหรับลูกค้า T&Y Noodle",
+  image: `${siteUrl}/brand/1200x630.png`,
+  title: "สั่งสินค้า",
+  url: `${siteUrl}/order`,
+} as const;
+const ORDER_PRODUCT_SELECT = `
+  id,
+  organization_id,
+  name,
+  sku,
+  unit,
+  metadata,
+  created_at,
+  updated_at,
+  product_images (
+    public_url,
+    sort_order
+  ),
+  product_sale_units (
+    id,
+    organization_id,
+    product_id,
+    unit_label,
+    base_unit_quantity,
+    is_active,
+    is_default,
+    min_order_qty,
+    step_order_qty,
+    sort_order,
+    cost_mode,
+    fixed_cost_price,
+    created_at,
+    updated_at
+  )
+`;
+const ORDER_PRODUCT_SHARE_SELECT = `
+  id,
+  name,
+  unit,
+  metadata,
+  product_images (
+    public_url,
+    sort_order
+  )
+`;
 
 const getCatalogData = cache(async () => {
   const supabaseAdmin = getSupabaseAdmin();
 
   const { data: products, error } = await supabaseAdmin
     .from("products")
-    .select("*, product_images(*), product_sale_units(*)")
+    .select(ORDER_PRODUCT_SELECT)
     .eq("is_active", true)
     .order("display_order", { ascending: true })
     .order("name", { ascending: true });
@@ -223,6 +279,7 @@ async function getInitialOrderAuth(
   organizationId: string,
 ): Promise<InitialOrderAuth> {
   const session = await getOrderCustomerSession();
+  const startedAt = Date.now();
 
   if (!session?.lineUserId) {
     return { customer: null, lineUserId: null };
@@ -233,6 +290,11 @@ async function getInitialOrderAuth(
     : null;
 
   if (!data) {
+    console.info("[order-auth:session-unlinked]", {
+      durationMs: Date.now() - startedAt,
+      lineUserId: maskLineUserId(session.lineUserId),
+      organizationId,
+    });
     return {
       customer: null,
       lineUserId: session.lineUserId,
@@ -240,7 +302,23 @@ async function getInitialOrderAuth(
   }
 
   if (organizationId && data.organization_id !== organizationId) {
+    console.warn("[order-auth:organization-mismatch]", {
+      durationMs: Date.now() - startedAt,
+      lineUserId: maskLineUserId(session.lineUserId),
+      linkedOrganizationId: data.organization_id,
+      organizationId,
+    });
     return { customer: null, lineUserId: null };
+  }
+
+  const durationMs = Date.now() - startedAt;
+  if (durationMs >= 800) {
+    console.info("[order-auth:session-linked]", {
+      customerId: data.id,
+      durationMs,
+      lineUserId: maskLineUserId(session.lineUserId),
+      organizationId,
+    });
   }
 
   return {
@@ -254,7 +332,10 @@ async function getInitialOrderAuth(
   };
 }
 
-function getProductShareMetadata(idWithOptionalUnit: string | undefined, products: CatalogProduct[]) {
+function getProductShareMetadata(
+  idWithOptionalUnit: string | undefined,
+  products: ProductShareCandidate[],
+) {
   const productId = idWithOptionalUnit?.includes(":")
     ? idWithOptionalUnit.split(":")[0]
     : idWithOptionalUnit;
@@ -264,12 +345,7 @@ function getProductShareMetadata(idWithOptionalUnit: string | undefined, product
     : undefined;
 
   if (!selectedProduct) {
-    return {
-      title: "สั่งสินค้า",
-      description: "ระบบสั่งสินค้าสำหรับลูกค้า T&Y Noodle",
-      url: `${siteUrl}/order`,
-      image: `${siteUrl}/brand/1200x630.png`,
-    };
+    return DEFAULT_ORDER_SHARE_METADATA;
   }
 
   const metadata = (selectedProduct.metadata ?? {}) as Record<string, unknown>;
@@ -284,10 +360,45 @@ function getProductShareMetadata(idWithOptionalUnit: string | undefined, product
     description,
     url: `${siteUrl}/order?product=${encodeURIComponent(selectedProduct.id)}`,
     image:
-      selectedProduct.product_images[0]?.public_url ||
+      selectedProduct.product_images?.[0]?.public_url ||
       `${siteUrl}/brand/1200x630.png`,
   };
 }
+
+const getProductShareMetadataById = cache(async (idWithOptionalUnit: string | undefined) => {
+  if (!idWithOptionalUnit) {
+    return DEFAULT_ORDER_SHARE_METADATA;
+  }
+
+  const productId = idWithOptionalUnit.includes(":")
+    ? idWithOptionalUnit.split(":")[0]
+    : idWithOptionalUnit;
+
+  if (!productId) {
+    return DEFAULT_ORDER_SHARE_METADATA;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data: product } = await supabaseAdmin
+    .from("products")
+    .select(ORDER_PRODUCT_SHARE_SELECT)
+    .eq("id", productId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!product) {
+    return DEFAULT_ORDER_SHARE_METADATA;
+  }
+
+  const shareMeta = getProductShareMetadata(productId, [
+    {
+      ...product,
+      product_id: product.id,
+      sale_unit_label: product.unit,
+    },
+  ]);
+  return shareMeta;
+});
 
 export async function generateMetadata({
   searchParams,
@@ -296,8 +407,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const resolvedSearchParams = (await searchParams) ?? {};
   const productId = getSearchParamValue(resolvedSearchParams.product);
-  const { catalogProducts } = await getCatalogData();
-  const shareMeta = getProductShareMetadata(productId, catalogProducts);
+  const shareMeta = productId
+    ? await getProductShareMetadataById(productId)
+    : DEFAULT_ORDER_SHARE_METADATA;
 
   return {
     title: shareMeta.title,
@@ -343,6 +455,10 @@ async function OrderContent({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
+  const resolvedSearchParamsPromise: Promise<SearchParams> =
+    searchParams ?? Promise.resolve({});
+  const catalogDataPromise = getCatalogData();
+  const resolvedSearchParams = await resolvedSearchParamsPromise;
   const {
     allowOrderAfterCutoff,
     catalogProducts,
@@ -350,9 +466,7 @@ async function OrderContent({
     orderOpenTime,
     organizationId,
     orgPhone,
-  } =
-    await getCatalogData();
-  const resolvedSearchParams = (await searchParams) ?? {};
+  } = await catalogDataPromise;
   const previewView = getSearchParamValue(resolvedSearchParams.preview);
   const isMock = process.env.NEXT_PUBLIC_LIFF_MOCK === "true";
   const initialAuth =

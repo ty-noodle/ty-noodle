@@ -8,6 +8,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { reportOrderDebugClient, summarizeError } from "@/lib/order-debug";
 
 // @line/liff is loaded dynamically on mount — keeps it out of the initial JS bundle
 type LiffType = Awaited<typeof import("@line/liff")>["default"];
@@ -82,16 +83,23 @@ export function LiffProvider({
       setLiffToken(liff.getIDToken());
     } catch (err) {
       console.error("LIFF profile fetch error", err);
+      void reportOrderDebugClient("liff_profile_fetch_error", {
+        error: summarizeError(err),
+      });
     }
   }, []);
 
   useEffect(() => {
     if (!liffId) {
       console.error("LIFF ID is required");
+      void reportOrderDebugClient("liff_missing_id", {
+        href: typeof window === "undefined" ? "" : window.location.href,
+      });
       return;
     }
 
     const initLiff = async () => {
+      const startedAt = Date.now();
       try {
         const useMock = process.env.NEXT_PUBLIC_LIFF_MOCK === "true";
 
@@ -128,10 +136,23 @@ export function LiffProvider({
           await refreshProfile();
         }
 
+        const durationMs = Date.now() - startedAt;
+        if (durationMs >= 1500) {
+          void reportOrderDebugClient("liff_init_slow", {
+            durationMs,
+            isInClient: liff.isInClient(),
+            isLoggedIn: liff.isLoggedIn(),
+          });
+        }
+
         setIsReady(true);
       } catch (err) {
         console.error("LIFF init error", err);
         setError(err instanceof Error ? err : new Error(String(err)));
+        void reportOrderDebugClient("liff_init_error", {
+          error: summarizeError(err),
+          href: typeof window === "undefined" ? "" : window.location.href,
+        });
         setIsReady(true); // Still ready, just failed
       }
     };
@@ -143,6 +164,9 @@ export function LiffProvider({
     const liff = liffRef.current;
     if (!liff || liff.isLoggedIn()) return;
 
+    void reportOrderDebugClient("liff_login_click", {
+      href: typeof window === "undefined" ? "" : window.location.href,
+    });
     liff.login();
 
     // In mock mode there is no page redirect — update state manually
@@ -151,6 +175,9 @@ export function LiffProvider({
         await refreshProfile();
       } catch (err) {
         console.error("Mock login profile fetch error", err);
+        void reportOrderDebugClient("liff_mock_login_profile_error", {
+          error: summarizeError(err),
+        });
       }
     }
   };

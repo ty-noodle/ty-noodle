@@ -9,6 +9,7 @@ import {
 import type { Database } from "@/types/database";
 import { verifyLineIdToken } from "@/lib/line/id-token";
 import { getLinkedCustomerByLineUserId } from "@/lib/orders/line-pending";
+import { maskLineUserId } from "@/lib/order-debug";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -197,6 +198,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   const body = (await request.json().catch(() => null)) as
     | {
         displayName?: string;
@@ -209,8 +211,14 @@ export async function POST(request: NextRequest) {
   const lineUserId = body?.lineUserId?.trim() ?? "";
   const idToken = body?.idToken?.trim() ?? "";
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID?.trim() ?? "";
+  const maskedLineUserId = maskLineUserId(lineUserId);
 
   if (!lineUserId || !idToken || !liffId) {
+    console.warn("[order-session:missing-payload]", {
+      hasIdToken: Boolean(idToken),
+      hasLiffId: Boolean(liffId),
+      hasLineUserId: Boolean(lineUserId),
+    });
     return NextResponse.json(
       { error: "Missing required session payload." },
       { status: 400 },
@@ -219,6 +227,11 @@ export async function POST(request: NextRequest) {
 
   const verified = await verifyLineIdToken(idToken, liffId);
   if (!verified || verified.lineUserId !== lineUserId) {
+    console.warn("[order-session:invalid-token]", {
+      durationMs: Date.now() - startedAt,
+      lineUserId: maskedLineUserId,
+      verifiedLineUserId: maskLineUserId(verified?.lineUserId),
+    });
     return NextResponse.json({ error: "Invalid LINE token." }, { status: 401 });
   }
 
@@ -259,6 +272,12 @@ export async function POST(request: NextRequest) {
     ]);
   }
 
+  console.info("[order-session:sync]", {
+    durationMs: Date.now() - startedAt,
+    hasCustomer: Boolean(customer),
+    lineUserId: maskedLineUserId,
+    organizationId: customer?.organization_id ?? null,
+  });
   setOrderSessionCookie(response, payload);
   return response;
 }

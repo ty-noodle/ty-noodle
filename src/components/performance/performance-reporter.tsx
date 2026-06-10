@@ -1,9 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useReportWebVitals } from "next/web-vitals";
 
 export function PerformanceReporter() {
+  const pathname = usePathname();
+
   useReportWebVitals((metric) => {
+    if (pathname === "/login") {
+      return;
+    }
+
     // Collect only standard Core Web Vitals to keep telemetry lean
     if (
       metric.name !== "FCP" &&

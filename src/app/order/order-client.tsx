@@ -68,6 +68,7 @@ import {
   isCustomerOrderEditableAtTime,
   isOrderOpenAtMinutes,
 } from "@/lib/order-window";
+import { maskLineUserId, reportOrderDebugClient, summarizeError } from "@/lib/order-debug";
 
 const EditOrderProductSheet = dynamic(() =>
   import("@/app/order/customer/components/order-edit-view").then(
@@ -557,6 +558,7 @@ export default function OrderClient({
 
     let isActive = true;
     void (async () => {
+      const startedAt = Date.now();
       try {
         const response = await fetch("/api/order/session", {
           body: JSON.stringify({
@@ -568,7 +570,15 @@ export default function OrderClient({
           headers: { "Content-Type": "application/json" },
           method: "POST",
         });
-        if (!response.ok || !isActive) return;
+        if (!response.ok) {
+          void reportOrderDebugClient("order_session_sync_http_error", {
+            durationMs: Date.now() - startedAt,
+            lineUserId: maskLineUserId(profile.userId),
+            status: response.status,
+          });
+          return;
+        }
+        if (!isActive) return;
         setSessionLineUserId(profile.userId);
         if (profile.pictureUrl) {
           setLinkedCustomer((current) =>
@@ -577,6 +587,10 @@ export default function OrderClient({
         }
       } catch (error) {
         console.error("[order-session:sync]", error);
+        void reportOrderDebugClient("order_session_sync_fetch_error", {
+          error: summarizeError(error),
+          lineUserId: maskLineUserId(profile.userId),
+        });
       }
     })();
 
@@ -624,6 +638,10 @@ export default function OrderClient({
         }
       } catch (error) {
         console.error("[order-auth:bootstrap]", error);
+        void reportOrderDebugClient("order_auth_bootstrap_error", {
+          error: summarizeError(error),
+          lineUserId: maskLineUserId(lineUserId),
+        });
         setCurrentView("login");
       } finally {
         hasResolvedAuthRef.current = true;
