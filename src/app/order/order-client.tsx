@@ -299,7 +299,6 @@ export default function OrderClient({
     liffToken,
     profile,
     login,
-    logout,
     closeWindow,
     refreshProfile,
   } = useLiff();
@@ -2017,7 +2016,9 @@ export default function OrderClient({
         console.error("[order-session:clear]", error);
       }
 
-      hasResolvedAuthRef.current = false;
+      // Keep LIFF logged in, but do not immediately auto-resolve back to catalog
+      // in the same in-app browser session after a user taps logout.
+      hasResolvedAuthRef.current = true;
       hasReportedClientReadyRef.current = false;
       setLinkedCustomer(null);
       setSessionLineUserId(null);
@@ -2026,8 +2027,8 @@ export default function OrderClient({
       setCurrentView("login");
       void reportOrderDebugClient("order_logout_complete", {
         hasProfile: Boolean(profile?.userId),
+        preservedLiffSession: true,
       });
-      logout();
     });
   };
 
