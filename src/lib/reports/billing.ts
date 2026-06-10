@@ -31,6 +31,11 @@ type CustomerRecord = {
   name: string | null;
 };
 
+const customerCodeCollator = new Intl.Collator("th", {
+  numeric: true,
+  sensitivity: "base",
+});
+
 export async function getBillingReport(fromDate: string, toDate: string): Promise<BillingReportData> {
   const supabase = getSupabaseAdmin();
 
@@ -75,6 +80,14 @@ export async function getBillingReport(fromDate: string, toDate: string): Promis
       customerName: customer?.name ?? "ไม่ทราบชื่อ",
       totalAmount: Number(item.total_amount ?? 0),
     };
+  }).sort((left, right) => {
+    const customerOrder = customerCodeCollator.compare(left.customerCode, right.customerCode);
+    if (customerOrder !== 0) return customerOrder;
+
+    const dateOrder = left.billingDate.localeCompare(right.billingDate);
+    if (dateOrder !== 0) return dateOrder;
+
+    return left.id.localeCompare(right.id);
   });
 
   const totalAmount = rows.reduce((sum, row) => sum + row.totalAmount, 0);

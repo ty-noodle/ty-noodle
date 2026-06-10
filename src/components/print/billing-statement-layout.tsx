@@ -128,13 +128,13 @@ function BillPageView({
             <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "6%", textAlign: "center" })}>
               {renderHeaderLabel("ลำดับ")}
             </th>
-            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "50%", textAlign: "center" })}>
+            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "34%", textAlign: "center" })}>
               {renderHeaderLabel("เลขที่ใบจัดส่ง")}
             </th>
-            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "26%", textAlign: "center" })}>
+            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "20%", textAlign: "center" })}>
               {renderHeaderLabel("วันที่")}
             </th>
-            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "18%", textAlign: "right" })}>
+            <th style={headerCellStyle({ borderTop: DOTTED_LINE, width: "40%", textAlign: "right", paddingRight: "26mm" })}>
               {renderHeaderLabel("ยอดรวม")}
             </th>
           </tr>
@@ -159,11 +159,13 @@ function BillPageView({
                 {row.deliveryNumber}
               </td>
               <td style={{ padding: "0.8mm 2mm", textAlign: "center", color: "black" }}>
-                {formatDateShort(row.deliveryDate)}
+                <span style={{ display: "inline-block", minWidth: "20mm", textAlign: "left" }}>
+                  {formatDateShort(row.deliveryDate)}
+                </span>
               </td>
               <td
                 style={{
-                  padding: "0.8mm 2mm",
+                  padding: "0.8mm 26mm 0.8mm 2mm",
                   textAlign: "right",
                   fontWeight: 700,
                   color: "black",

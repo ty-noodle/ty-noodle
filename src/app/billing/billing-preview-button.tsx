@@ -365,7 +365,7 @@ export function BillingPreviewButton({
                                       color: "black",
                                       borderTop: DOTTED_LINE,
                                       borderBottom: DOTTED_LINE,
-                                      width: "50%",
+                                      width: "34%",
                                       textAlign: "center",
                                     }}
                                   >
@@ -377,7 +377,7 @@ export function BillingPreviewButton({
                                       color: "black",
                                       borderTop: DOTTED_LINE,
                                       borderBottom: DOTTED_LINE,
-                                      width: "26%",
+                                      width: "20%",
                                       textAlign: "center",
                                     }}
                                   >
@@ -385,11 +385,11 @@ export function BillingPreviewButton({
                                   </th>
                                   <th
                                     style={{
-                                      padding: "1mm 2mm",
+                                      padding: "1mm 26mm 1mm 2mm",
                                       color: "black",
                                       borderTop: DOTTED_LINE,
                                       borderBottom: DOTTED_LINE,
-                                      width: "18%",
+                                      width: "40%",
                                       textAlign: "right",
                                     }}
                                   >
@@ -417,11 +417,13 @@ export function BillingPreviewButton({
                                       {item.number}
                                     </td>
                                     <td style={{ padding: "0.8mm 2mm", textAlign: "center", color: "black" }}>
-                                      {formatDateShort(item.date)}
+                                      <span style={{ display: "inline-block", minWidth: "20mm", textAlign: "left" }}>
+                                        {formatDateShort(item.date)}
+                                      </span>
                                     </td>
                                     <td
                                       style={{
-                                        padding: "0.8mm 2mm",
+                                        padding: "0.8mm 26mm 0.8mm 2mm",
                                         textAlign: "right",
                                         fontWeight: 700,
                                         color: "black",
