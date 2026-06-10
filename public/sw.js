@@ -60,6 +60,32 @@ function parsePushPayload(event) {
   }
 }
 
+function isBypassedRequest(request, url) {
+  if (url.origin !== self.location.origin) {
+    return false;
+  }
+
+  if (
+    url.pathname === "/order" ||
+    url.pathname.startsWith("/order/") ||
+    url.pathname.startsWith("/api/order/") ||
+    url.pathname.startsWith("/_next/")
+  ) {
+    return true;
+  }
+
+  const acceptHeader = request.headers.get("accept") || "";
+  if (acceptHeader.includes("text/x-component")) {
+    return true;
+  }
+
+  if (request.headers.has("rsc") || request.headers.has("next-router-state-tree")) {
+    return true;
+  }
+
+  return false;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
@@ -90,6 +116,10 @@ self.addEventListener("fetch", (event) => {
 
   const { request } = event;
   const url = new URL(request.url);
+
+  if (isBypassedRequest(request, url)) {
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
