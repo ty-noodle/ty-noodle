@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { reportOrderDebugClient } from "@/lib/order-debug";
 
 export function PageLoader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [percent, setPercent] = useState(0);
 
   useEffect(() => {
@@ -44,6 +45,13 @@ export function PageLoader() {
         pathname,
         percent: 98,
       });
+
+      const key = `order-loader-refresh:${window.location.pathname}:${window.location.search}`;
+      const lastRefreshAt = Number(window.sessionStorage.getItem(key) ?? "0");
+      if (Date.now() - lastRefreshAt >= 30_000) {
+        window.sessionStorage.setItem(key, String(Date.now()));
+        router.refresh();
+      }
     }, 2200);
 
     return () => {
@@ -53,7 +61,7 @@ export function PageLoader() {
         pathname,
       });
     };
-  }, [pathname]);
+  }, [pathname, router]);
 
   // Safe CSS position calculation in JavaScript to prevent mobile parsing errors
   const slidingOffset = percent * 0.48;
