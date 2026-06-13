@@ -260,22 +260,6 @@ export function StockReceiveForm({
     <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-0 md:p-4 ${
       isClosing ? "animate-fade-out" : "animate-fade-in"
     }`}>
-      <style jsx global>{`
-        @keyframes float {
-          0% { transform: translateY(0px) translateX(0px) rotate(0deg); }
-          33% { transform: translateY(-20px) translateX(10px) rotate(2deg); }
-          66% { transform: translateY(10px) translateX(-10px) rotate(-1deg); }
-          100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
-        }
-        @keyframes drift {
-          0% { transform: scale(1) translate(0, 0); }
-          50% { transform: scale(1.1) translate(10%, 10%); }
-          100% { transform: scale(1) translate(0, 0); }
-        }
-        .animate-float { animation: float 15s ease-in-out infinite; }
-        .animate-float-slow { animation: float 25s ease-in-out infinite; }
-        .animate-drift { animation: drift 20s ease-in-out infinite; }
-      `}</style>
 
       <div 
         onClick={handleClose}

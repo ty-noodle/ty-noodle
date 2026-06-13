@@ -47,6 +47,10 @@ function formatTHB(v: number) {
   return v.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatPriceInputValue(value: number) {
+  return value > 0 ? String(value) : "";
+}
+
 function formatDisplayDate(value: string) {
   const [y, m, d] = value.split("-");
   if (!y || !m || !d) return value;
@@ -147,7 +151,7 @@ const EditItemsPanel = memo(({
     Object.fromEntries(detail.items.map((i) => [i.id, i.unitPrice])),
   );
   const [unitPriceInputs, setUnitPriceInputs] = useState<Record<string, string>>(
-    Object.fromEntries(detail.items.map((i) => [i.id, String(i.unitPrice)])),
+    Object.fromEntries(detail.items.map((i) => [i.id, formatPriceInputValue(i.unitPrice)])),
   );
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [addedItems, setAddedItems] = useState<AddedOrderItemDraft[]>([]);
@@ -166,7 +170,7 @@ const EditItemsPanel = memo(({
     setQuantities(Object.fromEntries(detail.items.map((i) => [i.id, i.quantity])));
     setQuantityInputs(Object.fromEntries(detail.items.map((i) => [i.id, String(i.quantity)])));
     setUnitPrices(Object.fromEntries(detail.items.map((i) => [i.id, i.unitPrice])));
-    setUnitPriceInputs(Object.fromEntries(detail.items.map((i) => [i.id, String(i.unitPrice)])));
+    setUnitPriceInputs(Object.fromEntries(detail.items.map((i) => [i.id, formatPriceInputValue(i.unitPrice)])));
     setRemoved(new Set());
     setAddedItems([]);
     setAddedQuantityInputs({});
@@ -532,7 +536,7 @@ const EditItemsPanel = memo(({
                             inputMode="decimal"
                             min={0}
                             step="0.01"
-                            value={addedUnitPriceInputs[item.key] ?? String(addedUnitPrice)}
+                            value={addedUnitPriceInputs[item.key] ?? formatPriceInputValue(addedUnitPrice)}
                             onChange={(e) => handleAddedUnitPriceInput(item.key, e.target.value)}
                             onBlur={() => commitAddedUnitPriceInput(item.key)}
                             className={`h-9 w-28 rounded-lg border px-2 text-center font-black outline-none transition mx-auto block focus:ring-2 ${
@@ -604,7 +608,7 @@ const EditItemsPanel = memo(({
                             inputMode="decimal"
                             min={0}
                             step="0.01"
-                            value={unitPriceInputs[item.id] ?? String(unitPrice)}
+                            value={unitPriceInputs[item.id] ?? formatPriceInputValue(unitPrice)}
                             onChange={(e) => handleUnitPriceInput(item.id, e.target.value)}
                             onBlur={() => commitUnitPriceInput(item.id)}
                             className={`h-9 w-28 rounded-lg border px-2 text-center font-black outline-none transition mx-auto block focus:ring-2 ${
@@ -723,7 +727,7 @@ const EditItemsPanel = memo(({
                               inputMode="decimal"
                               min={0}
                               step="0.01"
-                              value={addedUnitPriceInputs[item.key] ?? String(addedUnitPrice)}
+                              value={addedUnitPriceInputs[item.key] ?? formatPriceInputValue(addedUnitPrice)}
                               onChange={(e) => handleAddedUnitPriceInput(item.key, e.target.value)}
                               onBlur={() => commitAddedUnitPriceInput(item.key)}
                               className={`mt-1 h-9 w-full rounded-lg border px-2 text-right text-[15px] font-black outline-none transition focus:ring-2 ${
@@ -804,7 +808,7 @@ const EditItemsPanel = memo(({
                               inputMode="decimal"
                               min={0}
                               step="0.01"
-                              value={unitPriceInputs[item.id] ?? String(unitPrice)}
+                              value={unitPriceInputs[item.id] ?? formatPriceInputValue(unitPrice)}
                               onChange={(e) => handleUnitPriceInput(item.id, e.target.value)}
                               onBlur={() => commitUnitPriceInput(item.id)}
                               className={`mt-1 h-9 w-full rounded-lg border px-2 text-right text-[15px] font-black outline-none transition focus:ring-2 ${

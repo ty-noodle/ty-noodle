@@ -48,13 +48,34 @@ export function SettingsMobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { open: openCreateOrder, isOpen: isCreateModalOpen } = useCreateOrder();
 
   const moreActive = moreItems.some((item) => pathname.startsWith(item.href));
   const createOrderActive = pathname.startsWith("/orders/incoming");
+  const visiblePendingHref = pendingHref && pathname !== pendingHref ? pendingHref : null;
+
+  function markNavigationPending(href: string) {
+    if (pathname !== href) {
+      setPendingHref(href);
+    }
+  }
+
+  function isNavigationPending(href: string) {
+    return visiblePendingHref === href;
+  }
 
   return (
     <>
+      {visiblePendingHref ? (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[250] lg:hidden">
+          <div className="h-0.5 w-full overflow-hidden bg-[#003366]/10">
+            <div className="h-full w-2/5 animate-mobile-nav-progress rounded-full bg-[#003366]" />
+          </div>
+          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-[#003366]/25 shadow-[0_0_18px_rgba(0,51,102,0.25)]" />
+        </div>
+      ) : null}
+
       {moreOpen ? (
         <div
           className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm lg:hidden"
@@ -100,16 +121,19 @@ export function SettingsMobileBottomNav() {
                 <span>{label}</span>
               </button>
             ) : (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMoreOpen(false)}
-                className={`flex flex-col items-center gap-2.5 rounded-2xl px-3 py-5 text-sm font-semibold transition ${
-                  active
-                    ? "bg-[#003366]/10 text-[#003366]"
-                    : "bg-slate-50 text-slate-600 active:bg-slate-200"
-                }`}
-              >
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => {
+                      markNavigationPending(href);
+                      setMoreOpen(false);
+                    }}
+                    className={`flex flex-col items-center gap-2.5 rounded-2xl px-3 py-5 text-sm font-semibold transition ${
+                      active
+                        ? "bg-[#003366]/10 text-[#003366]"
+                        : "bg-slate-50 text-slate-600 active:bg-slate-200"
+                    } ${isNavigationPending(href) ? "scale-[0.98] opacity-70" : ""}`}
+                  >
                 <Icon className="h-7 w-7" strokeWidth={1.8} />
                 <span>{label}</span>
               </Link>
@@ -158,11 +182,12 @@ export function SettingsMobileBottomNav() {
                   <Link
                     key={href}
                     href={href}
+                    onClick={() => markNavigationPending(href)}
                     className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-medium transition ${
                       active
                         ? "text-[#003366]"
                         : "text-slate-500 hover:text-slate-900"
-                    }`}
+                    } ${isNavigationPending(href) ? "scale-95 opacity-70" : ""}`}
                   >
                     <Icon className={`h-5 w-5 transition-colors ${active ? "text-[#003366]" : "text-slate-500"}`} strokeWidth={active ? 2.8 : 2.2} />
                     <span className={`whitespace-nowrap transition-all ${active ? "font-bold scale-105" : ""}`}>{label}</span>
@@ -181,11 +206,12 @@ export function SettingsMobileBottomNav() {
                   <Link
                     key={href}
                     href={href}
+                    onClick={() => markNavigationPending(href)}
                     className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-medium transition ${
                       active
                         ? "text-[#003366]"
                         : "text-slate-500 hover:text-slate-900"
-                    }`}
+                    } ${isNavigationPending(href) ? "scale-95 opacity-70" : ""}`}
                   >
                     <Icon className={`h-5 w-5 transition-colors ${active ? "text-[#003366]" : "text-slate-500"}`} strokeWidth={active ? 2.8 : 2.2} />
                     <span className={`whitespace-nowrap transition-all ${active ? "font-bold scale-105" : ""}`}>{label}</span>
@@ -283,12 +309,15 @@ export function SettingsMobileBottomNav() {
                   label: "ตั้งค่า PIN",
                 },
               ].map((option) => (
-                <Link
-                  key={option.href}
-                  href={option.href}
-                  onClick={() => setSettingsOpen(false)}
-                  className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50"
-                >
+	                <Link
+	                  key={option.href}
+	                  href={option.href}
+	                  onClick={() => {
+                      markNavigationPending(option.href);
+                      setSettingsOpen(false);
+                    }}
+	                  className={`flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50 ${isNavigationPending(option.href) ? "scale-[0.99] opacity-70" : ""}`}
+	                >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#003366]/10 text-[#003366]">
                     <option.icon className="h-5 w-5" strokeWidth={2.2} />
                   </div>
@@ -302,7 +331,7 @@ export function SettingsMobileBottomNav() {
             </div>
           </div>
         </div>
-      )}
-    </>
-  );
-}
+	      )}
+	    </>
+	  );
+	}

@@ -269,6 +269,10 @@ function getUnitPrice(productId: string, unitId: string | null, priceMap: Record
   return priceMap[unitId ?? productId] ?? priceMap[productId] ?? 0;
 }
 
+function formatInitialUnitPrice(price: number) {
+  return price > 0 ? String(price) : "";
+}
+
 const ProductRow = React.memo(({
   product,
   isSelected,
@@ -567,7 +571,7 @@ function ProductSelectModal({
           ...prev,
           [productId]: {
             quantity: String(defaultUnit?.minOrderQty ?? 1),
-            unitPrice: String(price),
+            unitPrice: formatInitialUnitPrice(price),
             unitId: defaultUnit?.id ?? null,
             isPriceLocked: price > 0
           }

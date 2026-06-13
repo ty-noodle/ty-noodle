@@ -14,7 +14,8 @@ import {
 } from "@/components/print/print-shared";
 
 const ITEMS_PER_NOTE_PAGE = 10;
-const DOTTED_LINE = "4px dotted black";
+const THIN_LINE = "1px solid #000";
+const THIN_MUTED_LINE = "1px solid #000";
 
 type DeliveryNotePage = {
   key: string;
@@ -56,6 +57,7 @@ function DeliveryNotePageView({
   const { dn, items, pageIndex, totalPages, isLastPage } = notePage;
   const headerCellBase = {
     color: "black",
+    borderBottom: THIN_LINE,
     whiteSpace: "nowrap" as const,
   };
 
@@ -65,7 +67,6 @@ function DeliveryNotePageView({
         style={{
           display: "inline-block",
           paddingBottom: "0.2mm",
-          borderBottom: DOTTED_LINE,
           lineHeight: 1.1,
         }}
       >
@@ -111,71 +112,77 @@ function DeliveryNotePageView({
       >
         <thead>
           <tr>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 2mm", textAlign: "center", width: "6mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 2mm", textAlign: "center", width: "6mm" }}>
               {renderHeaderLabel("ลำดับ")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 2mm", textAlign: "center", width: "20mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 2mm", textAlign: "center", width: "20mm" }}>
               {renderHeaderLabel("รหัสสินค้า")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 1mm", textAlign: "left" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 1mm", textAlign: "left" }}>
               {renderHeaderLabel("รายการสินค้า")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 2mm", textAlign: "center", width: "12mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 2mm", textAlign: "center", width: "12mm" }}>
               {renderHeaderLabel("จำนวน")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 2mm", textAlign: "center", width: "10mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 2mm", textAlign: "center", width: "10mm" }}>
               {renderHeaderLabel("หน่วย")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 2mm", textAlign: "right", width: "22mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 2mm", textAlign: "right", width: "22mm" }}>
               {renderHeaderLabel("ราคา/หน่วย")}
             </th>
-            <th style={{ ...headerCellBase, borderTop: DOTTED_LINE, padding: "1mm 3mm", textAlign: "right", width: "28mm" }}>
+            <th style={{ ...headerCellBase, borderTop: THIN_LINE, padding: "1mm 3mm", textAlign: "right", width: "28mm" }}>
               {renderHeaderLabel("จำนวนเงิน")}
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {items.map((item, index) => {
+            const rowPaddingY = index === 0 ? "1.35mm" : "0.55mm";
+
+            return (
             <tr key={item.id}>
-              <td style={{ padding: "0.8mm 2mm", textAlign: "center", color: "black", fontSize: "11.8pt" }}>
+              <td style={{ padding: `${rowPaddingY} 2mm 0.55mm`, textAlign: "center", color: "black", fontSize: "12.3pt", fontWeight: 600 }}>
                 {item.lineNumber}
               </td>
               <td
                 style={{
-                  padding: "0.8mm 2mm",
+                  padding: `${rowPaddingY} 2mm 0.55mm`,
                   textAlign: "center",
                   fontFamily: "monospace",
                   color: "black",
-                  fontSize: "11.8pt",
+                  fontSize: "12.3pt",
+                  fontWeight: 600,
                 }}
               >
                 {item.productSku}
               </td>
-              <td style={{ padding: "0.8mm 1mm", fontWeight: 600, color: "black", fontSize: "11.8pt" }}>
+              <td style={{ padding: `${rowPaddingY} 1mm 0.55mm`, fontWeight: 550, color: "black", fontSize: "12.3pt" }}>
                 {item.productName}
               </td>
-              <td style={{ padding: "0.8mm 2mm", textAlign: "center", fontWeight: 700, color: "black" }}>
+              <td style={{ padding: `${rowPaddingY} 2mm 0.55mm`, textAlign: "center", fontWeight: 600, color: "black", fontSize: "12.3pt" }}>
                 {fmtQty(item.quantityDelivered)}
               </td>
-              <td style={{ padding: "0.8mm 2mm", textAlign: "center", color: "black" }}>
+              <td style={{ padding: `${rowPaddingY} 2mm 0.55mm`, textAlign: "center", color: "black", fontSize: "12.3pt", fontWeight: 550 }}>
                 {item.saleUnitLabel}
               </td>
-              <td style={{ padding: "0.8mm 2mm", textAlign: "right", color: "black" }}>
+              <td style={{ padding: `${rowPaddingY} 2mm 0.55mm`, textAlign: "right", color: "black", fontSize: "12.3pt", fontWeight: 550 }}>
                 {fmt(item.unitPrice)}
               </td>
               <td
                 style={{
-                  padding: "0.8mm 3mm",
+                  padding: `${rowPaddingY} 3mm 0.55mm`,
                   textAlign: "right",
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: "black",
                   whiteSpace: "nowrap",
+                  fontSize: "12.3pt",
                 }}
               >
                 {fmt(item.lineTotal)}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
 
@@ -183,18 +190,19 @@ function DeliveryNotePageView({
 
       {isLastPage ? (
         <>
-          <PrintTotalRow totalAmount={dn.totalAmount} dividerStyle="dotted" showBottomBorder={false} />
+          <PrintTotalRow totalAmount={dn.totalAmount} dividerStyle="solid" showBottomBorder={false} lineWidth="1px" />
           <PrintSignatureBlock
             notes={dn.notes}
             leftLabel="ผู้รับสินค้า"
             rightLabel="ผู้จัดสินค้า"
-            lineStyle="dotted"
+            lineStyle="solid"
+            lineWidth="1px"
           />
         </>
       ) : null}
 
       {!isLastPage && showIntermediateFooter ? (
-        <div style={{ borderTop: DOTTED_LINE, paddingTop: "2.5mm" }}>
+        <div style={{ borderTop: THIN_LINE, paddingTop: "2.5mm" }}>
           <div
             style={{
               display: "flex",
@@ -216,14 +224,14 @@ function DeliveryNotePageView({
                 <p style={{ fontSize: "8.8pt", fontWeight: 700, color: "#1e3a5f", marginBottom: "6mm" }}>
                   ผู้รับสินค้า
                 </p>
-                <div style={{ borderTop: "4px dotted #334155" }} />
+                <div style={{ borderTop: THIN_MUTED_LINE }} />
               </div>
               <div style={{ width: "1px", background: "#e2e8f0" }} />
               <div style={{ flex: 1, textAlign: "center" }}>
                 <p style={{ fontSize: "8.8pt", fontWeight: 700, color: "#1e3a5f", marginBottom: "6mm" }}>
                   ผู้จัดสินค้า
                 </p>
-                <div style={{ borderTop: "4px dotted #334155" }} />
+                <div style={{ borderTop: THIN_MUTED_LINE }} />
               </div>
             </div>
           </div>

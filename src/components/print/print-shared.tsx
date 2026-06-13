@@ -318,10 +318,12 @@ export function PrintTotalRow({
   totalAmount,
   dividerStyle = "solid",
   showBottomBorder = true,
+  lineWidth = "1.5px",
 }: {
   totalAmount: number;
   dividerStyle?: Exclude<DividerStyle, "none">;
   showBottomBorder?: boolean;
+  lineWidth?: string;
 }) {
   const containerStyle: CSSProperties = {
     display: "flex",
@@ -333,9 +335,9 @@ export function PrintTotalRow({
   };
 
   if (dividerStyle === "solid") {
-    containerStyle.borderTop = "1.5px solid black";
+    containerStyle.borderTop = `${lineWidth} solid black`;
     if (showBottomBorder) {
-      containerStyle.borderBottom = "1.5px solid black";
+      containerStyle.borderBottom = `${lineWidth} solid black`;
     }
   } else {
     Object.assign(
@@ -370,17 +372,19 @@ export function PrintSignatureBlock({
   rightLabel,
   lineStyle = "solid",
   hideNotes = false,
+  lineWidth = "1px",
 }: {
   notes?: string | null;
   leftLabel: string;
   rightLabel: string;
   lineStyle?: Exclude<DividerStyle, "none">;
   hideNotes?: boolean;
+  lineWidth?: string;
 }) {
   const signatureLineStyle =
     lineStyle === "dotted"
       ? dottedHorizontalRuleStyle("#334155")
-      : { borderTop: "1px solid #334155", width: "100%" };
+      : { borderTop: `${lineWidth} solid #334155`, width: "100%" };
 
   return (
     <div style={{ display: "flex", gap: "6mm", alignItems: "flex-start" }}>

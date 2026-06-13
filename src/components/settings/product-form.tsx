@@ -1374,12 +1374,6 @@ function ProductFormBody({
               />
             </div>
           </div>
-          <style jsx>{`
-            @keyframes successPopupProgress {
-              from { width: 0%; }
-              to { width: 100%; }
-            }
-          `}</style>
         </>
       ) : null}
 
