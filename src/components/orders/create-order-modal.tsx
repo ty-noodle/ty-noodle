@@ -517,6 +517,10 @@ function ProductSelectModal({
   const [popupMessage, setPopupMessage] = useState<string | null>(null);
   const [costWarningInfo, setCostWarningInfo] = useState<{ items: { name: string; cost: number; price: number }[] } | null>(null);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productsById = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
 
   const showPopup = (message: string) => {
     setPopupMessage(message);
@@ -561,13 +565,15 @@ function ProductSelectModal({
       return next;
     });
 
-    if (selected && !selections[productId]) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
+    if (selected) {
+      setSelections((prev) => {
+        if (prev[productId]) return prev;
+        const product = productsById.get(productId);
+        if (!product) return prev;
         const units = getUnits(product);
         const defaultUnit = units.find(u => u.isDefault) ?? units[0] ?? null;
         const price = defaultUnit ? getUnitPrice(productId, defaultUnit.id, priceMap) : 0;
-        setSelections(prev => ({
+        return {
           ...prev,
           [productId]: {
             quantity: String(defaultUnit?.minOrderQty ?? 1),
@@ -575,10 +581,47 @@ function ProductSelectModal({
             unitId: defaultUnit?.id ?? null,
             isPriceLocked: price > 0
           }
-        }));
-      }
+        };
+      });
     }
-  }, [products, priceMap, selections]);
+  }, [productsById, priceMap]);
+
+  useEffect(() => {
+    if (!open || selectedIds.size === 0) return;
+
+    setSelections((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      for (const productId of selectedIds) {
+        const selection = prev[productId];
+        const product = productsById.get(productId);
+        if (!selection || !product) continue;
+
+        const units = getUnits(product);
+        const unit =
+          units.find(u => u.id === selection.unitId) ??
+          units.find(u => u.isDefault) ??
+          units[0] ??
+          null;
+        const price = unit ? getUnitPrice(productId, unit.id, priceMap) : 0;
+        if (price <= 0) continue;
+
+        const nextUnitPrice = String(price);
+        if (selection.unitPrice !== nextUnitPrice || !selection.isPriceLocked) {
+          next[productId] = {
+            ...selection,
+            unitId: unit.id,
+            unitPrice: nextUnitPrice,
+            isPriceLocked: true,
+          };
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [open, priceMap, productsById, selectedIds]);
 
   const handleUpdateSelection = useCallback((
     productId: string,

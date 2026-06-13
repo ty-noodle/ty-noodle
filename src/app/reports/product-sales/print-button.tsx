@@ -2,7 +2,6 @@
 
 import { Printer, Image as ImageIcon, X, Loader2, Download } from "lucide-react";
 import { useRef, useState } from "react";
-import * as htmlToImage from "html-to-image";
 import { createPortal } from "react-dom";
 
 type PreviewImage = {
@@ -73,6 +72,7 @@ export function PrintButton({
     setPreviewImages([]);
 
     try {
+      const htmlToImage = await import("html-to-image");
       // Find original pages
       const originalPages = targetElement.querySelectorAll('[data-print-page="true"]');
       const pageCount = originalPages.length > 0 ? originalPages.length : 1;

@@ -85,17 +85,7 @@ export type DashboardOverview = {
   lineOrders: LineOrderOverviewItem[];
 };
 
-type DeliveryNoteRow = {
-  id: string;
-  total_amount: number | string | null;
-};
 
-type DeliveryNoteItemRow = {
-  delivery_note_id: string;
-  quantity_delivered: number | string | null;
-  product_sale_unit_id: string | null;
-  cost_price: number | string | null;
-};
 
 
 type LinePendingOrderDashboardRow = {
@@ -160,31 +150,40 @@ async function loadTodayNetProfit(
   const supabase = getSupabaseAdmin();
   const { data: notes } = await supabase
     .from("delivery_notes")
-    .select("id, total_amount")
+    .select(`
+      id,
+      total_amount,
+      delivery_note_items (
+        quantity_delivered,
+        cost_price
+      )
+    `)
     .eq("organization_id", organizationId)
     .eq("status", "confirmed")
     .eq("delivery_date", isoDate);
 
-  const typedNotes = (notes ?? []) as DeliveryNoteRow[];
+  const typedNotes = (notes ?? []) as unknown as Array<{
+    id: string;
+    total_amount: number | string | null;
+    delivery_note_items: Array<{
+      quantity_delivered: number | string | null;
+      cost_price: number | string | null;
+    }>;
+  }>;
+
   if (typedNotes.length === 0) {
     return { netProfit: 0, totalCost: 0, totalRevenue: 0 };
   }
 
-  const noteIds = typedNotes.map((note) => note.id);
-  const { data: items } = await supabase
-    .from("delivery_note_items")
-    .select("delivery_note_id, quantity_delivered, cost_price")
-    .in("delivery_note_id", noteIds);
+  let totalRevenue = 0;
+  let totalCost = 0;
 
-  const typedItems = (items ?? []) as DeliveryNoteItemRow[];
-
-  const totalRevenue = typedNotes.reduce((sum, note) => sum + toNum(note.total_amount), 0);
-  const totalCost = typedItems.reduce((sum, item) => {
-    const quantity = toNum(item.quantity_delivered);
-    const unitCost = toNum(item.cost_price);
-
-    return sum + unitCost * quantity;
-  }, 0);
+  for (const note of typedNotes) {
+    totalRevenue += toNum(note.total_amount);
+    for (const item of note.delivery_note_items ?? []) {
+      totalCost += toNum(item.quantity_delivered) * toNum(item.cost_price);
+    }
+  }
 
   return { netProfit: totalRevenue - totalCost, totalCost, totalRevenue };
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import * as htmlToImage from "html-to-image";
 import { AlertTriangle, Download, Image as ImageIcon, Loader2, Printer, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -62,6 +61,7 @@ export function PackingListPrintButton({
       const preloadFonts = async () => {
         try {
           await document.fonts.ready;
+          const htmlToImage = await import("html-to-image");
           const css = await htmlToImage.getFontEmbedCSS(document.body);
           cachedFontEmbedCSS = css;
           console.log("[FontPreloader:PrintButton] Web fonts pre-loaded and cached successfully.");
@@ -133,6 +133,7 @@ export function PackingListPrintButton({
     setPreviewImages([]);
 
     try {
+      const htmlToImage = await import("html-to-image");
       const targets = Array.from(document.querySelectorAll<HTMLElement>(".packing-sheet"));
 
       if (targets.length === 0) {

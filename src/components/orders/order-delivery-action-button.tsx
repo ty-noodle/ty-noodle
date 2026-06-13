@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Loader2, ReceiptText, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import * as htmlToImage from "html-to-image";
 import { fetchIncomingOrderDetailAction } from "@/app/orders/incoming/actions";
 import { formatDisplayUnit } from "@/app/order/customer/unit-label";
 import { PrintStoreDeliveryButton } from "@/components/orders/print-store-delivery-button";
@@ -99,6 +98,7 @@ export function OrderDeliveryActionButton({
 
     setIsSaving(true);
     try {
+      const htmlToImage = await import("html-to-image");
       let fontEmbedCSS: string | undefined = undefined;
       if (cachedFontEmbedCSS) {
         fontEmbedCSS = cachedFontEmbedCSS;

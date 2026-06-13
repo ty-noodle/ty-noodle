@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, FileText, Loader2, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import * as htmlToImage from "html-to-image";
 import {
   HALF_SHEET_HEIGHT_MM,
   PRINT_ORGANIZATION_NAME,
@@ -76,6 +75,7 @@ export function BillingPreviewButton({
       const preloadFonts = async () => {
         try {
           await document.fonts.ready;
+          const htmlToImage = await import("html-to-image");
           const css = await htmlToImage.getFontEmbedCSS(document.body);
           cachedFontEmbedCSS = css;
         } catch (error) {
@@ -148,6 +148,7 @@ export function BillingPreviewButton({
 
     setIsSaving(true);
     try {
+      const htmlToImage = await import("html-to-image");
       let fontEmbedCSS: string | undefined;
       if (cachedFontEmbedCSS) {
         fontEmbedCSS = cachedFontEmbedCSS;
