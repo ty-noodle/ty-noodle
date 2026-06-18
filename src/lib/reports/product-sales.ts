@@ -3,6 +3,9 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeSearch } from "@/lib/utils/search";
 
+const DELIVERY_NOTE_BATCH_SIZE = 400;
+const DELIVERY_NOTE_ITEM_BATCH_SIZE = 150;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ProductSalesRow = {
@@ -30,6 +33,65 @@ export type ProductSalesSummary = {
 function toNum(v: unknown): number {
   const n = Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+type DeliveryNoteHeaderRow = {
+  id: string;
+  customer_id: string;
+};
+
+type DeliveryNoteItemRow = {
+  delivery_note_id: string;
+  quantity_delivered: unknown;
+  quantity_in_base_unit: unknown;
+  unit_price: unknown;
+  line_total: unknown;
+  sale_unit_label: string;
+  cost_price: unknown;
+  products: {
+    id: string;
+    name: string;
+    sku: string;
+    unit: string;
+    cost_price: unknown;
+    product_images: Array<{ public_url: string; sort_order: number }>;
+  } | null;
+};
+
+async function fetchDeliveryNoteItemsForIds(
+  noteIds: string[],
+): Promise<DeliveryNoteItemRow[]> {
+  if (noteIds.length === 0) {
+    return [];
+  }
+
+  const supabase = getSupabaseAdmin();
+  const rows: DeliveryNoteItemRow[] = [];
+
+  for (let index = 0; index < noteIds.length; index += DELIVERY_NOTE_ITEM_BATCH_SIZE) {
+    const chunk = noteIds.slice(index, index + DELIVERY_NOTE_ITEM_BATCH_SIZE);
+    const { data, error } = await supabase
+      .from("delivery_note_items")
+      .select(`
+        delivery_note_id,
+        quantity_delivered,
+        quantity_in_base_unit,
+        unit_price,
+        line_total,
+        sale_unit_label,
+        cost_price,
+        products!inner(id, name, sku, unit, cost_price, product_images(public_url, sort_order))
+      `)
+      .in("delivery_note_id", chunk);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    rows.push(...((data ?? []) as DeliveryNoteItemRow[]));
+  }
+
+  return rows;
 }
 
 // ─── Customer list for filter ─────────────────────────────────────────────────
@@ -153,54 +215,6 @@ export async function getProductSalesRanking(params: {
 
   const supabase = getSupabaseAdmin();
 
-    let query = supabase
-    .from("delivery_notes")
-    .select(`
-      customer_id,
-      delivery_note_items(
-        quantity_delivered,
-        quantity_in_base_unit,
-        unit_price,
-        line_total,
-        sale_unit_label,
-        cost_price,
-        products!inner(id, name, sku, unit, cost_price, product_images(public_url, sort_order))
-      )
-    `)
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .gte("delivery_date", fromDate)
-    .lte("delivery_date", toDate);
-
-  if (customerIds.length > 0) {
-    query = query.in("customer_id", customerIds);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  type RawDeliveryNote = {
-    customer_id: string;
-    delivery_note_items: Array<{
-      quantity_delivered: unknown;
-      quantity_in_base_unit: unknown;
-      unit_price: unknown;
-      line_total: unknown;
-      sale_unit_label: string;
-      cost_price: unknown;
-      products: {
-        id: string;
-        name: string;
-        sku: string;
-        unit: string;
-        cost_price: unknown;
-        product_images: Array<{ public_url: string; sort_order: number }>;
-      };
-    }>;
-  };
-
-  const rawNotes = (data ?? []) as RawDeliveryNote[];
-
   // Aggregate by product_id
   const productMap = new Map<
     string,
@@ -218,10 +232,42 @@ export async function getProductSalesRanking(params: {
     }
   >();
 
-  for (const note of rawNotes) {
-    for (const item of note.delivery_note_items ?? []) {
+  let noteRangeFrom = 0;
+
+  while (true) {
+    let noteQuery = supabase
+      .from("delivery_notes")
+      .select("id, customer_id")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .gte("delivery_date", fromDate)
+      .lte("delivery_date", toDate)
+      .order("delivery_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(noteRangeFrom, noteRangeFrom + DELIVERY_NOTE_BATCH_SIZE - 1);
+
+    if (customerIds.length > 0) {
+      noteQuery = noteQuery.in("customer_id", customerIds);
+    }
+
+    const { data: noteBatch, error: noteError } = await noteQuery;
+    if (noteError) {
+      throw new Error(noteError.message);
+    }
+
+    const typedNoteBatch = (noteBatch ?? []) as DeliveryNoteHeaderRow[];
+    if (typedNoteBatch.length === 0) {
+      break;
+    }
+
+    const noteIds = typedNoteBatch.map((note) => note.id);
+    const deliveryItems = await fetchDeliveryNoteItemsForIds(noteIds);
+
+    for (const item of deliveryItems) {
       const product = item.products;
-      if (!product) continue;
+      if (!product) {
+        continue;
+      }
 
       const sortedImages = [...(product.product_images ?? [])].sort(
         (a, b) => a.sort_order - b.sort_order,
@@ -257,6 +303,12 @@ export async function getProductSalesRanking(params: {
         });
       }
     }
+
+    if (typedNoteBatch.length < DELIVERY_NOTE_BATCH_SIZE) {
+      break;
+    }
+
+    noteRangeFrom += DELIVERY_NOTE_BATCH_SIZE;
   }
 
   // Convert to sorted array

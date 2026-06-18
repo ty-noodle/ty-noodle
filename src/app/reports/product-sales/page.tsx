@@ -18,6 +18,7 @@ import { ProductFilter } from "./product-filter";
 import { PrintButton } from "./print-button";
 import { StoreFilter } from "./store-filter";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
+import { ReportGetForm } from "@/components/report-get-form";
 
 export const metadata = { title: "รายงานยอดขายตามอันดับสินค้า" };
 
@@ -383,7 +384,7 @@ async function ProductSalesReportContent({ searchParams }: PageProps) {
           </header>
 
           <MobileSearchDrawer title="ค้นหารายงานยอดขาย">
-            <form method="GET" action="/reports/product-sales" className="flex flex-col gap-4 pb-32">
+            <ReportGetForm action="/reports/product-sales" className="flex flex-col gap-4 pb-32">
               <div>
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-400">สินค้า</label>
                 <ProductFilter products={products} selectedIds={selectedProductIds} />
@@ -401,13 +402,13 @@ async function ProductSalesReportContent({ searchParams }: PageProps) {
                 </div>
               </div>
               <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#003366] py-3.5 text-base font-bold text-white transition hover:bg-[#1a237e]"><Filter className="h-4 w-4" strokeWidth={2} />ค้นหา</button>
-            </form>
+            </ReportGetForm>
           </MobileSearchDrawer>
 
           {/* Desktop Filter Card */}
           <section className="hidden md:block bg-white shadow-[0_4px_20px_rgba(27,27,33,0.05)] rounded-2xl mb-6">
             <div className="px-5 py-4 sm:px-6 sm:py-5">
-              <form method="GET" action="/reports/product-sales" className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end lg:flex-nowrap">
+              <ReportGetForm action="/reports/product-sales" className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end lg:flex-nowrap">
                 <div className="w-full sm:min-w-[200px] sm:flex-1 lg:min-w-[260px] lg:max-w-[340px] lg:flex-[1.05]">
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-400">สินค้า</label>
                   <ProductFilter products={products} selectedIds={selectedProductIds} />
@@ -428,7 +429,7 @@ async function ProductSalesReportContent({ searchParams }: PageProps) {
                   <button type="submit" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#003366] px-6 text-sm font-bold text-white transition hover:bg-[#1a237e] active:scale-95 sm:w-auto"><Filter className="h-4 w-4" strokeWidth={2.2} />ค้นหา</button>
                   <Link href={`${paginationBase}&pageSize=9999`} className="flex h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-500 transition hover:border-[#003366] hover:text-[#003366] active:scale-95 sm:w-auto">แสดงทั้งหมด</Link>
                 </div>
-              </form>
+              </ReportGetForm>
             </div>
           </section>
 

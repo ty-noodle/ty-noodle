@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { ArrowRight, Clock3, KeyRound, MessageCircleMore, Package2, Store, Truck, Factory, Gauge } from "lucide-react";
+import {
+  ArrowRight,
+  Clock3,
+  Factory,
+  KeyRound,
+  MessageCircleMore,
+  Package2,
+  Store,
+  Truck,
+} from "lucide-react";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { requireAppRole } from "@/lib/auth/authorization";
 
@@ -17,25 +26,25 @@ const options = [
     label: "จัดการร้านค้า",
   },
   {
-    description: "เพิ่มรายชื่อผู้ขายหรือโรงงานที่คุณสั่งซื้อสินค้า เพื่อใช้บันทึกรับเข้าสต็อก",
+    description: "เพิ่มรายชื่อผู้ขายหรือโรงงานที่ใช้สั่งซื้อสินค้าเพื่อบันทึกรับเข้าสินค้า",
     href: "/settings/suppliers",
     icon: Factory,
     label: "จัดการผู้ขาย",
   },
   {
-    description: "ดูชื่อ LINE รูปโปรไฟล์ สถานะการใช้งาน และจัดการสิทธิ์ลูกค้าที่เข้ามาผ่าน LINE",
+    description: "ดูชื่อ LINE รูปโปรไฟล์ สถานะการใช้งาน และจัดการสิทธิ์ลูกค้าที่เข้าผ่าน LINE",
     href: "/settings/customer-data",
     icon: MessageCircleMore,
     label: "ข้อมูลลูกค้า",
   },
   {
-    description: "เพิ่มรถส่งของแบบง่าย เพื่อเอาไปผูกร้านค้าและใช้ต่อยอดกับงานจัดส่ง",
+    description: "เพิ่มรถส่งของและผูกกับร้านค้าเพื่อใช้ต่อยอดงานจัดส่ง",
     href: "/settings/vehicles",
     icon: Truck,
     label: "จัดการรถ",
   },
   {
-    description: "ตั้งเวลาเปิด-ปิดรับออเดอร์ และจัดการแจ้งเตือนออเดอร์ใหม่ของอุปกรณ์นี้ได้ในหน้าเดียว",
+    description: "ตั้งเวลาเปิด-ปิดรับออเดอร์ และจัดการการแจ้งเตือนออเดอร์ใหม่",
     href: "/settings/order-window",
     icon: Clock3,
     label: "เวลารับออเดอร์และแจ้งเตือน",
@@ -45,12 +54,6 @@ const options = [
     href: "/settings/login-pin",
     icon: KeyRound,
     label: "ตั้งค่า PIN",
-  },
-  {
-    description: "ตรวจสอบสุขภาพระบบ ความเร็วในการตอบสนอง และสถิติการใช้งานตารางฐานข้อมูล",
-    href: "/settings/performance",
-    icon: Gauge,
-    label: "ประสิทธิภาพระบบ",
   },
 ] as const;
 

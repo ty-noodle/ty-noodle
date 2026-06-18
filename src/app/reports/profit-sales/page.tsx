@@ -11,6 +11,7 @@ import { getProfitSalesReport } from "@/lib/reports/profit-sales";
 import { PrintButton } from "../product-sales/print-button";
 import { ProfitViewSwitcher } from "./profit-view-switcher";
 import styles from "../product-sales/print.module.css";
+import { ReportGetForm } from "@/components/report-get-form";
 
 export const metadata = {
   title: "รายงานกำไรขาย",
@@ -186,7 +187,7 @@ async function ProfitSalesContent({ searchParams }: PageProps) {
           </header>
 
           <MobileSearchDrawer title="ค้นหารายงานกำไรขาย">
-            <form method="GET" action="/reports/profit-sales" className="flex flex-col gap-4 pb-32">
+            <ReportGetForm action="/reports/profit-sales" className="flex flex-col gap-4 pb-32">
               <input type="hidden" name="view" value={view} />
               <div>
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">ช่วงวันที่</label>
@@ -200,13 +201,13 @@ async function ProfitSalesContent({ searchParams }: PageProps) {
                 <Filter className="h-4 w-4" strokeWidth={2} />
                 ค้นหา
               </button>
-            </form>
+            </ReportGetForm>
           </MobileSearchDrawer>
 
           {/* Desktop Filter Card */}
           <section className="hidden md:block overflow-hidden bg-white shadow-sm sm:rounded-sm border border-slate-200 mb-6 no-print">
             <div className="px-4 py-4">
-              <form method="GET" action="/reports/profit-sales" className="flex flex-col gap-4 lg:flex-row lg:items-end">
+              <ReportGetForm action="/reports/profit-sales" className="flex flex-col gap-4 lg:flex-row lg:items-end">
                 <input type="hidden" name="view" value={view} />
                 <div className="min-w-[420px] flex-1">
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">ช่วงวันที่</label>
@@ -225,7 +226,7 @@ async function ProfitSalesContent({ searchParams }: PageProps) {
                     ล้างตัวกรอง
                   </Link>
                 </div>
-              </form>
+              </ReportGetForm>
             </div>
           </section>
 

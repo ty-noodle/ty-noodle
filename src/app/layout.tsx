@@ -6,7 +6,6 @@ import { PwaProvider } from "@/components/pwa-provider";
 import { getSiteUrl } from "@/lib/site-url";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { RootAppLayoutShell } from "@/components/root-layout-shell";
-import { PerformanceReporter } from "@/components/performance/performance-reporter";
 
 const sukhumvit = localFont({
   src: [
@@ -107,9 +106,6 @@ export default function RootLayout({
         className={`${sukhumvit.variable} ${sukhumvit.className} bg-background text-foreground antialiased`}
       >
         <PwaProvider />
-        <Suspense fallback={null}>
-          <PerformanceReporter />
-        </Suspense>
         <main>
           <PullToRefresh>
             <Suspense fallback={null}>

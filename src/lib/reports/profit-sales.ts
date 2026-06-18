@@ -2,6 +2,8 @@ import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
+const PROFIT_SALES_RPC_WINDOW_DAYS = 365;
+
 export type ProfitSalesRow = {
   isoDate: string;
   orderCount: number;
@@ -63,6 +65,29 @@ function eachDate(fromDate: string, toDate: string) {
   return dates;
 }
 
+function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function splitDateWindows(fromDate: string, toDate: string, windowDays: number) {
+  const windows: Array<{ fromDate: string; toDate: string }> = [];
+  let currentFromDate = fromDate;
+
+  while (currentFromDate <= toDate) {
+    const currentToDate = addDays(currentFromDate, windowDays - 1);
+    windows.push({
+      fromDate: currentFromDate,
+      toDate: currentToDate < toDate ? currentToDate : toDate,
+    });
+
+    currentFromDate = addDays(currentToDate, 1);
+  }
+
+  return windows;
+}
+
 export async function getProfitSalesReport(params: {
   organizationId: string;
   fromDate: string;
@@ -71,29 +96,38 @@ export async function getProfitSalesReport(params: {
 }): Promise<ProfitSalesReportData> {
   const { organizationId, fromDate, toDate, customerIds = [] } = params;
   const supabase = getSupabaseAdmin() as unknown as RpcClient;
-
-  const { data, error } = await supabase.rpc("get_profit_sales_report", {
-    p_organization_id: organizationId,
-    p_from_date: fromDate,
-    p_to_date: toDate,
-    p_customer_ids: customerIds.length > 0 ? customerIds : null,
-  });
-
-  if (error) throw new Error(error.message);
+  const windows = splitDateWindows(fromDate, toDate, PROFIT_SALES_RPC_WINDOW_DAYS);
+  const rpcResults = await Promise.all(
+    windows.map((window) =>
+      supabase.rpc("get_profit_sales_report", {
+        p_organization_id: organizationId,
+        p_from_date: window.fromDate,
+        p_to_date: window.toDate,
+        p_customer_ids: customerIds.length > 0 ? customerIds : null,
+      }),
+    ),
+  );
 
   const rowsByDate = new Map<string, ProfitSalesRow>();
-  for (const row of data ?? []) {
-    const sales = toNumber(row.sales);
-    const cost = toNumber(row.cost);
-    const netProfit = toNumber(row.net_profit);
-    rowsByDate.set(String(row.iso_date), {
-      isoDate: String(row.iso_date),
-      orderCount: toNumber(row.order_count),
-      sales,
-      cost,
-      netProfit,
-      marginPercent: sales > 0 ? toNumber(row.margin_percent) : 0,
-    });
+
+  for (const result of rpcResults) {
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    for (const row of result.data ?? []) {
+      const sales = toNumber(row.sales);
+      const cost = toNumber(row.cost);
+      const netProfit = toNumber(row.net_profit);
+      rowsByDate.set(String(row.iso_date), {
+        isoDate: String(row.iso_date),
+        orderCount: toNumber(row.order_count),
+        sales,
+        cost,
+        netProfit,
+        marginPercent: sales > 0 ? toNumber(row.margin_percent) : 0,
+      });
+    }
   }
 
   const rows = eachDate(fromDate, toDate).map((isoDate) => {
