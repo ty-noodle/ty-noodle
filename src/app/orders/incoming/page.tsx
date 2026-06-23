@@ -1,7 +1,7 @@
 import { ClipboardList, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SettingsShell } from "@/components/settings/settings-shell";
-import { IncomingOrdersMobileList } from "@/components/orders/incoming-orders-mobile-list";
+import { IncomingOrdersInfiniteList } from "@/components/orders/incoming-orders-infinite-list";
 import { IncomingOrderDateFilter } from "@/components/orders/incoming-order-date-filter";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
 import { OrderCustomerFilter } from "@/components/orders/order-customer-filter";
@@ -11,7 +11,6 @@ import { getCustomerOrderCountsByDate, getIncomingOrders, getOrderDetailById } f
 import { getBilledDeliveryNumbersForRange } from "@/lib/billing/billing-statement";
 import { getPendingLineOrders } from "@/lib/orders/line-pending";
 import { getCustomersForOrder, getProductsForOrder, getVehiclesForOrder } from "@/lib/orders/manage";
-import { getDeliveryList } from "@/lib/delivery/delivery-list";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { IncomingOrdersDeliveryActions } from "@/components/orders/incoming-orders-delivery-actions";
 import type {
@@ -21,9 +20,6 @@ import type {
 
 const CreateOrderModal = dynamic(() =>
   import("@/components/orders/create-order-modal").then((mod) => mod.CreateOrderModal),
-);
-const IncomingOrdersDesktopTable = dynamic(() =>
-  import("@/components/orders/incoming-orders-desktop-table").then((mod) => mod.IncomingOrdersDesktopTable),
 );
 const IncomingOrderModal = dynamic(() =>
   import("@/components/orders/incoming-order-modal").then((mod) => mod.IncomingOrderModal),
@@ -71,7 +67,16 @@ type IncomingOrderSummaryItemRow = {
   } | null;
 };
 
+type IncomingDeliveryNoteRow = {
+  id: string;
+  order_id: string | null;
+  customer_id: string;
+  delivery_date: string;
+  delivery_number: string;
+};
+
 const ORDER_SUMMARY_ITEM_CHUNK_SIZE = 50;
+const INCOMING_ORDERS_PAGE_SIZE = 30;
 
 async function getOrderSummaryItems(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -114,14 +119,67 @@ async function getOrderSummaryItems(
   };
 }
 
-function formatCurrency(value: number) {
-  return value.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 function formatDisplayDate(value: string) {
   const [y, m, d] = value.split("-");
   if (!y || !m || !d) return value;
   return `${d}/${m}/${parseInt(y, 10) + 543}`;
+}
+
+async function getIncomingDeliveryNoteRows(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  fromDate: string,
+  toDate: string,
+  customerIds: string[],
+) {
+  let query = admin
+    .from("delivery_notes")
+    .select("id, order_id, customer_id, delivery_date, delivery_number")
+    .eq("organization_id", organizationId)
+    .eq("status", "confirmed")
+    .gte("delivery_date", fromDate)
+    .lte("delivery_date", toDate);
+
+  if (customerIds.length > 0) {
+    query = query.in("customer_id", customerIds);
+  }
+
+  const { data, error } = await query.order("delivery_date", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message ?? "Failed to load delivery note numbers.");
+  }
+
+  return (data ?? []) as IncomingDeliveryNoteRow[];
+}
+
+async function getDirectDeliveryNoteRowsByOrderIds(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  orderIds: string[],
+) {
+  if (orderIds.length === 0) {
+    return [] as IncomingDeliveryNoteRow[];
+  }
+
+  const rows: IncomingDeliveryNoteRow[] = [];
+  for (let index = 0; index < orderIds.length; index += 40) {
+    const chunk = orderIds.slice(index, index + 40);
+    const { data, error } = await admin
+      .from("delivery_notes")
+      .select("id, order_id, customer_id, delivery_date, delivery_number")
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .in("order_id", chunk);
+
+    if (error) {
+      throw new Error(error.message ?? "Failed to load direct delivery note numbers.");
+    }
+
+    rows.push(...((data ?? []) as IncomingDeliveryNoteRow[]));
+  }
+
+  return rows;
 }
 
 export default async function IncomingOrdersPage({ searchParams }: IncomingOrdersPageProps) {
@@ -150,17 +208,23 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     vehicles,
     pendingLineOrders,
     customerOrderCountsToday,
-    deliveryData,
     billedDeliveryNumbers,
   ] = await Promise.all([
-    getIncomingOrders(session.organizationId, { orderDate, endDate, searchTerm }),
+    getIncomingOrders(session.organizationId, {
+      orderDate,
+      endDate,
+      searchTerm,
+      customerIds: selectedCustomerIds,
+      excludeCancelled: true,
+      limit: INCOMING_ORDERS_PAGE_SIZE + 1,
+      offset: 0,
+    }),
     expandedOrderId ? getOrderDetailById(session.organizationId, expandedOrderId) : Promise.resolve(null),
     getCustomersForOrder(session.organizationId),
     getProductsForOrder(session.organizationId),
     getVehiclesForOrder(session.organizationId),
     getPendingLineOrders(session.organizationId, { orderDate, endDate, searchTerm }),
     getCustomerOrderCountsByDate(session.organizationId, orderDate, endDate),
-    getDeliveryList(session.organizationId, orderDate, endDate, searchTerm || ""),
     getBilledDeliveryNumbersForRange(session.organizationId, orderDate, endDate),
   ]);
 
@@ -171,7 +235,27 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
   }));
   const productImageById = new Map(products.map((product) => [product.id, product.imageUrl ?? null]));
 
-  const activeOrders = orders.filter((order) => order.status !== "cancelled");
+  const hasMoreOrders = orders.length > INCOMING_ORDERS_PAGE_SIZE;
+  const initialOrders = orders.slice(0, INCOMING_ORDERS_PAGE_SIZE);
+  const activeOrders = initialOrders.filter((order) => order.status !== "cancelled");
+  const activeOrderIds = activeOrders.map((order) => order.id);
+  const deliveryCustomerIds =
+    selectedCustomerIds.length > 0
+      ? selectedCustomerIds
+      : Array.from(new Set(activeOrders.map((order) => order.customerId)));
+  const [rangeDeliveryData, directDeliveryData] = await Promise.all([
+    getIncomingDeliveryNoteRows(
+      admin,
+      session.organizationId,
+      orderDate,
+      endDate,
+      deliveryCustomerIds,
+    ),
+    getDirectDeliveryNoteRowsByOrderIds(admin, session.organizationId, activeOrderIds),
+  ]);
+  const deliveryData = Array.from(
+    new Map([...rangeDeliveryData, ...directDeliveryData].map((note) => [note.id, note])).values(),
+  );
 
   const filteredOrders =
     selectedCustomerIds.length > 0
@@ -185,7 +269,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       ? expandedDetail
       : null;
 
-  const activeOrderIds = activeOrders.map((order) => order.id);
   const orderSummaryItemsResult = await getOrderSummaryItems(admin, activeOrderIds);
 
   if (orderSummaryItemsResult.error) {
@@ -282,72 +365,49 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     return `${a.customerCode} ${a.customerName}`.localeCompare(`${b.customerCode} ${b.customerName}`, "th");
   });
 
-  type DirectDeliveryRow = {
-    id: string;
-    order_id: string | null;
-    customer_id: string;
-    delivery_date: string;
-    delivery_number: string;
-  };
-
-  // Fetch direct delivery notes by activeOrderIds in chunks of 40 to solve any deliveryDate vs orderDate mismatches and URL limit errors
-  const directDeliveries: DirectDeliveryRow[] = [];
-  if (activeOrderIds.length > 0) {
-    const orderIdChunks: string[][] = [];
-    for (let i = 0; i < activeOrderIds.length; i += 40) {
-      orderIdChunks.push(activeOrderIds.slice(i, i + 40));
-    }
-
-    for (const chunk of orderIdChunks) {
-      const { data, error } = await admin
-        .from("delivery_notes")
-        .select("id, order_id, customer_id, delivery_date, delivery_number")
-        .eq("organization_id", session.organizationId)
-        .in("order_id", chunk)
-        .eq("status", "confirmed");
-
-      if (!error && data) {
-        directDeliveries.push(...data);
-      }
-    }
-  }
-
   const deliveryMap = new Map<string, string[]>();
   const deliveryIdMap = new Map<string, string[]>();
+  const activeOrderById = new Map(activeOrders.map((order) => [order.id, order]));
 
   for (const item of deliveryData) {
-    const key = `${item.customerId}_${item.deliveryDate}`;
+    const key = `${item.customer_id}_${item.delivery_date}`;
+    const currentNumbers = deliveryMap.get(key) ?? [];
+    const currentIds = deliveryIdMap.get(key) ?? [];
+    if (!currentNumbers.includes(item.delivery_number)) {
+      currentNumbers.push(item.delivery_number);
+    }
+    if (!currentIds.includes(item.id)) {
+      currentIds.push(item.id);
+    }
     deliveryMap.set(
       key,
-      item.deliveryNotes.map((note) => note.deliveryNumber),
+      currentNumbers,
     );
     deliveryIdMap.set(
       key,
-      item.deliveryNotes.map((note) => note.id),
+      currentIds,
     );
   }
 
   // Enrich with direct deliveries using orderDate!
-  if (directDeliveries) {
-    for (const note of directDeliveries) {
-      if (!note.order_id) continue;
-      const matchedOrder = activeOrders.find((o) => o.id === note.order_id);
-      if (matchedOrder) {
-        // We map under key: customerId_orderDate
-        const key = `${matchedOrder.customerId}_${matchedOrder.orderDate}`;
-        
-        const existingNumbers = deliveryMap.get(key) ?? [];
-        if (!existingNumbers.includes(note.delivery_number)) {
-          existingNumbers.push(note.delivery_number);
-        }
-        deliveryMap.set(key, existingNumbers);
+  for (const note of deliveryData) {
+    if (!note.order_id) continue;
+    const matchedOrder = activeOrderById.get(note.order_id);
+    if (matchedOrder) {
+      // We map under key: customerId_orderDate
+      const key = `${matchedOrder.customerId}_${matchedOrder.orderDate}`;
 
-        const existingIds = deliveryIdMap.get(key) ?? [];
-        if (!existingIds.includes(note.id)) {
-          existingIds.push(note.id);
-        }
-        deliveryIdMap.set(key, existingIds);
+      const existingNumbers = deliveryMap.get(key) ?? [];
+      if (!existingNumbers.includes(note.delivery_number)) {
+        existingNumbers.push(note.delivery_number);
       }
+      deliveryMap.set(key, existingNumbers);
+
+      const existingIds = deliveryIdMap.get(key) ?? [];
+      if (!existingIds.includes(note.id)) {
+        existingIds.push(note.id);
+      }
+      deliveryIdMap.set(key, existingIds);
     }
   }
 
@@ -407,28 +467,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       deliveryNumbers.some((deliveryNumber) => billedDeliveryNumbers.has(deliveryNumber)),
     ]),
   );
-
-  const mobileMappedOrders = filteredOrders.map((order) => {
-    const deliveryNumbers = deliveryMap.get(`${order.customerId}_${order.orderDate}`);
-    const isBilled = billedDeliveryByCustomerDate[`${order.customerId}_${order.orderDate}`] ?? false;
-    return {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      customerId: order.customerId,
-      customerName: order.customerName,
-      customerCode: order.customerCode,
-      channelLabel: order.channelLabel,
-      orderDate: order.orderDate,
-      notes: order.notes,
-      productCount: order.productCount,
-      totalAmount: order.totalAmount,
-      totalAmountText: `${formatCurrency(order.totalAmount)} บาท`,
-      vehicleId: order.vehicleId,
-      vehicleName: order.vehicleName,
-      deliveryNumbers,
-      isBilled,
-    };
-  });
 
   return (
     <SettingsShell
@@ -603,33 +641,20 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
           </div>
 
           {filteredOrders.length > 0 ? (
-            <>
-              <div className="relative left-1/2 w-screen -translate-x-1/2 lg:hidden">
-                <IncomingOrdersMobileList
-                  orders={mobileMappedOrders}
-                  vehicles={vehicles}
-                  currentListDate={orderDate}
-                  searchTerm={searchTerm}
-                  selectedCustomerIds={selectedCustomerIds}
-                />
-              </div>
-
-              <div className="hidden overflow-x-auto no-scrollbar lg:block">
-                <div className="lg:min-w-0 xl:min-w-[1100px]">
-                  <IncomingOrdersDesktopTable
-                    billedByCustomerDate={billedDeliveryByCustomerDate}
-                    deliveryByCustomerId={deliveryByCustomerId}
-                    initialExpandedDetail={filteredExpandedDetail}
-                    initialExpandedOrderId={expandedOrderId}
-                    orderDate={orderDate}
-                    orders={filteredOrders}
-                    searchTerm={searchTerm}
-                    selectedCustomerIds={selectedCustomerIds}
-                    vehicles={vehicles}
-                  />
-                </div>
-              </div>
-            </>
+            <IncomingOrdersInfiniteList
+              billedByCustomerDate={billedDeliveryByCustomerDate}
+              deliveryByCustomerId={deliveryByCustomerId}
+              endDate={endDate}
+              hasMore={hasMoreOrders}
+              initialExpandedDetail={filteredExpandedDetail}
+              initialExpandedOrderId={expandedOrderId}
+              key={`${orderDate}:${endDate}:${searchTerm}:${selectedCustomerIds.join(",")}`}
+              orderDate={orderDate}
+              orders={filteredOrders}
+              searchTerm={searchTerm}
+              selectedCustomerIds={selectedCustomerIds}
+              vehicles={vehicles}
+            />
           ) : (
             <div className="px-6 py-16 text-center">
               <p className="text-lg font-semibold text-slate-950">ยังไม่มีออเดอร์เข้าในช่วงวันที่เลือก</p>

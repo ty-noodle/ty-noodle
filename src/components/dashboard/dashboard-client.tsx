@@ -54,6 +54,8 @@ type StoreListModalState = {
     name: string;
     code?: string;
     latestOrderId?: string | null;
+    vehicleId?: string | null;
+    vehicleName?: string | null;
   }>;
 };
 
@@ -63,6 +65,12 @@ type LineOrderModalState = {
   expandedId: string;
   products: OrderProductOption[];
 };
+
+const ALL_STORE_VEHICLES = "__all_store_vehicles__";
+const UNASSIGNED_STORE_VEHICLE = "__unassigned_store_vehicle__";
+const ALL_STORE_VEHICLES_LABEL = "\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14";
+const UNASSIGNED_STORE_VEHICLE_LABEL = "\u0e44\u0e21\u0e48\u0e23\u0e30\u0e1a\u0e38\u0e23\u0e16";
+const STORE_VEHICLE_FILTER_LABEL = "\u0e2a\u0e32\u0e22\u0e23\u0e16";
 
 function DashboardStatCard({
   title,
@@ -217,6 +225,13 @@ export function DashboardClient({
   }
   const [viewingStores, setViewingStores] = useState<StoreListModalState | null>(null);
   const [isViewingStoresClosing, setIsViewingStoresClosing] = useState(false);
+  const [selectedStoreVehicleId, setSelectedStoreVehicleId] = useState(ALL_STORE_VEHICLES);
+
+  function openStoreList(nextViewingStores: StoreListModalState) {
+    setIsViewingStoresClosing(false);
+    setSelectedStoreVehicleId(ALL_STORE_VEHICLES);
+    setViewingStores(nextViewingStores);
+  }
 
   function closeViewingStores() {
     if (isViewingStoresClosing) return;
@@ -242,6 +257,60 @@ export function DashboardClient({
     () => new Set(storeStatusSummary.orderedStores.map((store) => store.id)),
     [storeStatusSummary.orderedStores],
   );
+
+  const storeVehicleFilters = useMemo(() => {
+    const stores = viewingStores?.stores ?? [];
+    const vehicleMap = new Map<string, { id: string; name: string }>();
+    let hasUnassigned = false;
+
+    for (const store of stores) {
+      if (store.vehicleId) {
+        vehicleMap.set(store.vehicleId, {
+          id: store.vehicleId,
+          name: store.vehicleName ?? UNASSIGNED_STORE_VEHICLE_LABEL,
+        });
+      } else {
+        hasUnassigned = true;
+      }
+    }
+
+    const filters = [
+      {
+        count: stores.length,
+        id: ALL_STORE_VEHICLES,
+        name: ALL_STORE_VEHICLES_LABEL,
+      },
+      ...Array.from(vehicleMap.values())
+        .sort((left, right) => left.name.localeCompare(right.name, "th"))
+        .map((vehicle) => ({
+          count: stores.filter((store) => store.vehicleId === vehicle.id).length,
+          id: vehicle.id,
+          name: vehicle.name,
+        })),
+    ];
+
+    if (hasUnassigned) {
+      filters.push({
+        count: stores.filter((store) => !store.vehicleId).length,
+        id: UNASSIGNED_STORE_VEHICLE,
+        name: UNASSIGNED_STORE_VEHICLE_LABEL,
+      });
+    }
+
+    return filters;
+  }, [viewingStores]);
+
+  const filteredViewingStores = useMemo(() => {
+    const stores = viewingStores?.stores ?? [];
+    if (selectedStoreVehicleId === ALL_STORE_VEHICLES) {
+      return stores;
+    }
+    if (selectedStoreVehicleId === UNASSIGNED_STORE_VEHICLE) {
+      return stores.filter((store) => !store.vehicleId);
+    }
+
+    return stores.filter((store) => store.vehicleId === selectedStoreVehicleId);
+  }, [selectedStoreVehicleId, viewingStores]);
 
   const {
     kpi,
@@ -406,8 +475,7 @@ export function DashboardClient({
           <section className="order-2 flex flex-col gap-4 md:gap-6 xl:order-1 xl:col-span-8">
             <button
               onClick={() => {
-                setIsViewingStoresClosing(false);
-                setViewingStores({
+                openStoreList({
                   title: "ร้านค้าทั้งหมด",
                   stores: storeStatusSummary.allStores,
                 });
@@ -437,8 +505,7 @@ export function DashboardClient({
             <div className="grid grid-cols-2 gap-4 md:gap-6">
               <button
                 onClick={() => {
-                  setIsViewingStoresClosing(false);
-                  setViewingStores({
+                  openStoreList({
                     title: "ร้านค้าที่ยังไม่ได้สั่ง",
                     stores: storeStatusSummary.unorderedStores,
                   });
@@ -460,8 +527,7 @@ export function DashboardClient({
 
               <button
                 onClick={() => {
-                  setIsViewingStoresClosing(false);
-                  setViewingStores({
+                  openStoreList({
                     title: "ร้านค้าที่สั่งแล้ว",
                     stores: storeStatusSummary.orderedStores,
                   });
@@ -647,8 +713,42 @@ export function DashboardClient({
               </button>
             </div>
 
+            {storeVehicleFilters.length > 1 ? (
+              <div className="mb-5 px-8">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  {STORE_VEHICLE_FILTER_LABEL}
+                </p>
+                <div className="no-scrollbar flex gap-6 overflow-x-auto border-b border-slate-100">
+                  {storeVehicleFilters.map((vehicle) => {
+                    const isActive = selectedStoreVehicleId === vehicle.id;
+
+                    return (
+                      <button
+                        key={vehicle.id}
+                        type="button"
+                        onClick={() => setSelectedStoreVehicleId(vehicle.id)}
+                        className={`relative flex shrink-0 items-center gap-2 pb-3 text-sm font-black transition-colors ${
+                          isActive ? "text-[#001E5D]" : "text-slate-400 hover:text-slate-700"
+                        }`}
+                      >
+                        <span>{vehicle.name}</span>
+                        <span className={`text-xs font-black tabular-nums ${isActive ? "text-[#001E5D]" : "text-slate-300"}`}>
+                          {vehicle.count.toLocaleString("th-TH")}
+                        </span>
+                        <span
+                          className={`absolute inset-x-0 bottom-[-1px] h-[3px] rounded-full transition-opacity ${
+                            isActive ? "bg-[#001E5D] opacity-100" : "bg-transparent opacity-0"
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <div className="no-scrollbar max-h-[60vh] space-y-px overflow-y-auto pb-10">
-              {!viewingStores || viewingStores.stores.length === 0 ? (
+              {!viewingStores || filteredViewingStores.length === 0 ? (
                 <div className="flex flex-col items-center py-24 text-center">
                   <div className="mb-5 rounded-full bg-slate-50 p-7">
                     <Store className="h-14 w-14 text-slate-200" />
@@ -662,7 +762,7 @@ export function DashboardClient({
                       <Loader2 className="h-10 w-10 animate-spin text-[#001E5D]" strokeWidth={3} />
                     </div>
                   ) : null}
-                  {viewingStores.stores.map((store) => {
+                  {filteredViewingStores.map((store) => {
                     const isOrdered = orderedStoreIds.has(store.id);
 
                     return (
@@ -704,6 +804,10 @@ export function DashboardClient({
                                 ยังไม่สั่ง
                               </span>
                             )}
+                          </div>
+                          <div className="mt-2 flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                            <Truck className="h-3.5 w-3.5" strokeWidth={2.3} />
+                            <span>{STORE_VEHICLE_FILTER_LABEL}: {store.vehicleName ?? UNASSIGNED_STORE_VEHICLE_LABEL}</span>
                           </div>
                         </div>
                         <ChevronRight

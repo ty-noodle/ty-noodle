@@ -65,6 +65,7 @@ function LoginShell({
           <OtpPinForm
             disabled={!configured || !action}
             error={error}
+            errorMessages={ERROR_MESSAGES}
             next={next}
             action={action}
           />

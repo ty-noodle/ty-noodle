@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -36,8 +37,11 @@ import { OrdersMobileTabs } from "@/components/orders/orders-mobile-tabs";
 import { ReportsMobileTabs } from "@/components/reports/reports-mobile-tabs";
 import { MobileSearchProvider, useMobileSearch } from "@/components/mobile-search/mobile-search-context";
 import { CreateOrderProvider } from "@/components/orders/create-order-context";
-import { GlobalCreateOrderModal } from "@/components/orders/create-order-modal";
 import { ScrollToTopButton } from "@/components/ui/scroll-to-top-button";
+
+const GlobalCreateOrderModal = dynamic(() =>
+  import("@/components/orders/create-order-modal").then((mod) => mod.GlobalCreateOrderModal),
+);
 
 // ─── Page title map (mobile top bar) ─────────────────────────────────────────
 

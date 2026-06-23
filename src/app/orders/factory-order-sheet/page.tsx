@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AutoPrint, PackingListPrintButton } from "@/app/orders/packing-list/preview/print-button";
 import { PageLoader } from "@/components/page-loader";
 import { FactoryOrderSheetLayout } from "@/components/print/factory-order-sheet-layout";
+import { MobilePinchZoom } from "@/components/print/mobile-pinch-zoom";
 import { requireAnyRole } from "@/lib/auth/authorization";
 import { getVehicleProductSummaryData, VehicleSummaryProduct } from "@/lib/orders/vehicle-product-summary";
 
@@ -168,8 +169,10 @@ async function FactoryOrderSheetPage({ searchParams }: Props) {
           </a>
         </div>
       ) : (
-        <div className="vehicle-summary-page packing-print-container">
-          <FactoryOrderSheetLayout data={filteredSummaryData} />
+        <div className="vehicle-summary-page">
+          <MobilePinchZoom className="packing-print-container">
+            <FactoryOrderSheetLayout data={filteredSummaryData} />
+          </MobilePinchZoom>
         </div>
       )}
     </>

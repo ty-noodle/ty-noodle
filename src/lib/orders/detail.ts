@@ -19,7 +19,9 @@ type SelectChain<T> = {
   in: (column: string, values: Array<string | number>) => SelectChain<T>;
   ilike: (column: string, pattern: string) => SelectChain<T>;
   limit: (count: number) => SelectChain<T>;
+  neq: (column: string, value: string | number | boolean | null) => SelectChain<T>;
   order: (column: string, options?: { ascending: boolean }) => SelectChain<T>;
+  range: (from: number, to: number) => SelectChain<T>;
   maybeSingle: () => SingleResult<T>;
   single: () => SingleResult<T>;
 } & Promise<{ data: T[] | null; error: QueryError }>;
@@ -380,10 +382,18 @@ export async function getIncomingOrders(
     orderDate,
     endDate,
     searchTerm,
+    customerIds,
+    excludeCancelled,
+    limit,
+    offset,
   }: {
     orderDate: string;
     endDate?: string | null;
     searchTerm?: string | null;
+    customerIds?: string[];
+    excludeCancelled?: boolean;
+    limit?: number;
+    offset?: number;
   },
 ): Promise<IncomingOrderListItem[]> {
   "use cache";
@@ -398,6 +408,14 @@ export async function getIncomingOrders(
     .select("id, customer_id, order_number, order_date, status, fulfillment_status, total_amount, metadata, created_at, notes")
     .eq("organization_id", organizationId);
 
+  if (customerIds && customerIds.length > 0) {
+    query = query.in("customer_id", customerIds);
+  }
+
+  if (excludeCancelled) {
+    query = query.neq("status", "cancelled");
+  }
+
   // If searchTerm is provided, we search across all dates (Global Search)
   if (!searchTerm) {
     if (endDate && endDate !== orderDate) {
@@ -410,9 +428,16 @@ export async function getIncomingOrders(
     query = query.limit(100);
   }
 
-  const ordersResult = await query
+  query = query
     .order("order_date", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (typeof limit === "number") {
+    const from = Math.max(0, offset ?? 0);
+    query = query.range(from, from + Math.max(1, limit) - 1);
+  }
+
+  const ordersResult = await query;
 
   if (ordersResult.error) {
     throw new Error(ordersResult.error.message ?? "Failed to load incoming orders.");
@@ -437,10 +462,17 @@ export async function getIncomingOrders(
       const missingOrderIds = dnOrderIds.filter(id => !orders.some(o => o.id === id));
       
       if (missingOrderIds.length > 0) {
-        const { data: additionalOrders } = await admin
+        let additionalOrdersQuery = admin
           .from("orders")
           .select("id, customer_id, order_number, order_date, status, fulfillment_status, total_amount, metadata, created_at, notes")
+          .eq("organization_id", organizationId)
           .in("id", missingOrderIds);
+
+        if (customerIds && customerIds.length > 0) {
+          additionalOrdersQuery = additionalOrdersQuery.in("customer_id", customerIds);
+        }
+
+        const { data: additionalOrders } = await additionalOrdersQuery;
           
         if (additionalOrders) {
           orders = [...orders, ...additionalOrders];
@@ -449,14 +481,14 @@ export async function getIncomingOrders(
     }
   }
 
-  const customerIds = Array.from(new Set(orders.map((order: OrderRow) => order.customer_id)));
+  const orderCustomerIds = Array.from(new Set(orders.map((order: OrderRow) => order.customer_id)));
 
   const customersResult =
-    customerIds.length > 0
+    orderCustomerIds.length > 0
       ? await admin
           .from("customers")
           .select("id, customer_code, name, address, default_vehicle_id")
-          .in("id", customerIds)
+          .in("id", orderCustomerIds)
           .order("name", { ascending: true })
       : { data: [], error: null };
 

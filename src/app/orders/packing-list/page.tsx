@@ -8,6 +8,7 @@ import {
   type PackingListStore,
   type PackingListVehicle,
 } from "@/components/print/packing-list-layout";
+import { MobilePinchZoom } from "@/components/print/mobile-pinch-zoom";
 import { requireAnyRole } from "@/lib/auth/authorization";
 import { sortProductsByCategory } from "@/lib/products/sort-by-category";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -448,7 +449,7 @@ async function PackingListPage({ searchParams }: Props) {
           </a>
         </div>
       ) : (
-        <div className="packing-print-container">
+        <MobilePinchZoom className="packing-print-container">
           {allPackingData.map((packingData) => (
             <PackingListLayout
               key={`${layout}-${packingData.date}`}
@@ -456,7 +457,7 @@ async function PackingListPage({ searchParams }: Props) {
               layout={layout}
             />
           ))}
-        </div>
+        </MobilePinchZoom>
       )}
     </>
   );

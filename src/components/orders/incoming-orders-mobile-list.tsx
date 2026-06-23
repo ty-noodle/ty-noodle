@@ -33,6 +33,7 @@ type IncomingOrdersMobileListProps = {
   orders: MobileListOrder[];
   vehicles: OrderVehicleOption[];
   currentListDate: string;
+  currentEndDate?: string;
   searchTerm?: string;
   selectedCustomerIds?: string[];
 };
@@ -41,6 +42,7 @@ export function IncomingOrdersMobileList({
   orders,
   vehicles,
   currentListDate,
+  currentEndDate,
   searchTerm,
   selectedCustomerIds = [],
 }: IncomingOrdersMobileListProps) {
@@ -76,6 +78,26 @@ export function IncomingOrdersMobileList({
   const visibleOrders = orders.slice(0, visibleCount);
   const hasMore = visibleCount < orders.length;
 
+  function buildDetailHref(orderId: string) {
+    const params = new URLSearchParams();
+    params.set("expanded", orderId);
+
+    if (searchTerm?.trim()) {
+      params.set("q", searchTerm.trim());
+    }
+    if (currentListDate) {
+      params.set("date", currentListDate);
+    }
+    if (currentEndDate && currentEndDate !== currentListDate) {
+      params.set("endDate", currentEndDate);
+    }
+    if (selectedCustomerIds.length > 0) {
+      params.set("customers", selectedCustomerIds.join(","));
+    }
+
+    return `/orders/incoming?${params.toString()}`;
+  }
+
   return (
     <div className="grid grid-cols-1 divide-y divide-slate-200 border-t border-slate-200 sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-slate-200">
       {visibleOrders.map((order, index) => {
@@ -96,7 +118,7 @@ export function IncomingOrdersMobileList({
             ) : null}
 
             <IncomingOrderOpenCard
-              href={`/orders/incoming?expanded=${order.id}${searchTerm ? `&q=${searchTerm}` : ""}${currentListDate ? `&date=${currentListDate}` : ""}`}
+              href={buildDetailHref(order.id)}
               orderId={order.id}
               orderNumber={order.orderNumber}
               customerId={order.customerId}

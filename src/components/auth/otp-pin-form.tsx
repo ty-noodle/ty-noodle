@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 type OtpPinFormProps = {
   disabled: boolean;
+  errorMessages?: Record<string, string>;
   error?: string;
   next?: string;
   action?: (formData: FormData) => void;
@@ -12,14 +14,21 @@ type OtpPinFormProps = {
 const keypad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "delete"] as const;
 const instrumentSansClass = "font-[family-name:var(--font-instrument-sans)]";
 
-export function OtpPinForm({ disabled, error, next, action }: OtpPinFormProps) {
+type PinLoginResponse =
+  | { ok: true; redirectTo: string }
+  | { ok: false; error: string };
+
+export function OtpPinForm({ disabled, errorMessages, error, next, action }: OtpPinFormProps) {
+  const router = useRouter();
   const [digits, setDigits] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   function appendDigit(value: string) {
     if (disabled || isSubmitting) return;
 
+    setLocalError(null);
     setDigits((current) => {
       if (current.length >= 6) return current;
       return [...current, value];
@@ -28,6 +37,7 @@ export function OtpPinForm({ disabled, error, next, action }: OtpPinFormProps) {
 
   function removeDigit() {
     if (disabled || isSubmitting) return;
+    setLocalError(null);
     setDigits((current) => current.slice(0, -1));
   }
 
@@ -68,11 +78,49 @@ export function OtpPinForm({ disabled, error, next, action }: OtpPinFormProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [disabled]);
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (disabled || isSubmitting || token.length !== 6) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    setIsSubmitting(true);
+    setLocalError(null);
+
+    try {
+      const response = await fetch("/api/auth/pin-login", {
+        method: "POST",
+        body: new FormData(event.currentTarget),
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as PinLoginResponse;
+
+      if (payload.ok) {
+        setDigits([]);
+        setLocalError(null);
+        setIsSubmitting(false);
+        router.replace(payload.redirectTo);
+        return;
+      }
+
+      setDigits([]);
+      setLocalError(errorMessages?.[payload.error] ?? payload.error);
+      setIsSubmitting(false);
+    } catch {
+      setDigits([]);
+      setLocalError(errorMessages?.["login-unavailable"] ?? "login-unavailable");
+      setIsSubmitting(false);
+    }
+  }
+
+  const visibleError = localError ?? error;
+
   return (
     <form
       ref={formRef}
       action={action}
-      onSubmit={() => setIsSubmitting(true)}
+      onSubmit={handleSubmit}
       className="w-full"
     >
       <input type="hidden" name="token" value={token} />
@@ -97,8 +145,8 @@ export function OtpPinForm({ disabled, error, next, action }: OtpPinFormProps) {
       <div className="mt-5 h-6 text-center">
         {isSubmitting ? (
           <p className="text-sm font-semibold text-[#003366]">กำลังเข้า...</p>
-        ) : error ? (
-          <p className="text-sm font-semibold text-rose-600">{error}</p>
+        ) : visibleError ? (
+          <p className="text-sm font-semibold text-rose-600">{visibleError}</p>
         ) : null}
       </div>
 

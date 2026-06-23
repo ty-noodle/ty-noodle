@@ -9,6 +9,8 @@ export type OrderStoreStatusItem = {
   latestOrderId: string | null;
   name: string;
   orderCount: number;
+  vehicleId: string | null;
+  vehicleName: string | null;
 };
 
 export type OrderStoreStatusSummary = {
@@ -19,8 +21,10 @@ export type OrderStoreStatusSummary = {
 
 type CustomerRow = {
   customer_code: string | null;
+  default_vehicle_id: string | null;
   id: string;
   name: string | null;
+  vehicles: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
 };
 
 type OrderRow = {
@@ -55,6 +59,14 @@ function compareStore(left: OrderStoreStatusItem, right: OrderStoreStatusItem) {
   return left.name.localeCompare(right.name, "th");
 }
 
+function getVehicleName(vehicle: CustomerRow["vehicles"]) {
+  if (Array.isArray(vehicle)) {
+    return vehicle[0]?.name ?? null;
+  }
+
+  return vehicle?.name ?? null;
+}
+
 export async function getOrderStoreStatusSummary(
   organizationId: string,
   orderDate: string,
@@ -64,7 +76,7 @@ export async function getOrderStoreStatusSummary(
   const [customersResult, ordersResult] = await Promise.all([
     admin
       .from("customers")
-      .select("id, customer_code, name")
+      .select("id, customer_code, name, default_vehicle_id, vehicles(id, name)")
       .eq("organization_id", organizationId)
       .eq("is_active", true)
       .order("customer_code", { ascending: true }),
@@ -115,6 +127,8 @@ export async function getOrderStoreStatusSummary(
         latestOrderId: stats?.latestOrderId ?? null,
         name: customer.name ?? "-",
         orderCount: stats?.orderCount ?? 0,
+        vehicleId: customer.default_vehicle_id ?? null,
+        vehicleName: getVehicleName(customer.vehicles),
       };
     })
     .toSorted(compareStore);

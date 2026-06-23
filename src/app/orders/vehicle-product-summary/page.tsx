@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AutoPrint, PackingListPrintButton } from "@/app/orders/packing-list/preview/print-button";
 import { PageLoader } from "@/components/page-loader";
+import { MobilePinchZoom } from "@/components/print/mobile-pinch-zoom";
 import { VehicleProductSummaryLayout } from "@/components/print/vehicle-product-summary-layout";
 import { requireAnyRole } from "@/lib/auth/authorization";
 import { getVehicleProductSummaryData } from "@/lib/orders/vehicle-product-summary";
@@ -136,8 +137,10 @@ async function VehicleProductSummaryPage({ searchParams }: Props) {
           </a>
         </div>
       ) : (
-        <div className="vehicle-summary-page packing-print-container">
-          <VehicleProductSummaryLayout data={summaryData} />
+        <div className="vehicle-summary-page">
+          <MobilePinchZoom className="packing-print-container">
+            <VehicleProductSummaryLayout data={summaryData} />
+          </MobilePinchZoom>
         </div>
       )}
     </>
