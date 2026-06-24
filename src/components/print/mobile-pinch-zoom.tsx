@@ -150,40 +150,6 @@ export function MobilePinchZoom({ children, className = "" }: MobilePinchZoomPro
       >
         {children}
       </div>
-      <style jsx global>{`
-        @media screen and (max-width: 767px) {
-          .mobile-pinch-zoom-viewport {
-            overflow: hidden;
-            overscroll-behavior: contain;
-            touch-action: pan-y;
-          }
-
-          .mobile-pinch-zoom-content {
-            min-width: max-content;
-            transform-origin: 0 0;
-            will-change: transform;
-          }
-        }
-
-        @media screen and (min-width: 768px) {
-          .mobile-pinch-zoom-content {
-            transform: none !important;
-          }
-        }
-
-        @media print {
-          .mobile-pinch-zoom-viewport {
-            display: block !important;
-            overflow: visible !important;
-            touch-action: auto !important;
-          }
-
-          .mobile-pinch-zoom-content {
-            min-width: 0 !important;
-            transform: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

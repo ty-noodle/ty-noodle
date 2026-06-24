@@ -1,7 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Fragment } from "react";
 import { IncomingOrderOpenCard } from "./incoming-order-open-card";
 import type { OrderVehicleOption } from "@/lib/orders/manage";
 
@@ -46,38 +45,6 @@ export function IncomingOrdersMobileList({
   searchTerm,
   selectedCustomerIds = [],
 }: IncomingOrdersMobileListProps) {
-  const [visibleCount, setVisibleCount] = useState(15);
-  const [prevOrders, setPrevOrders] = useState(orders);
-  const sensorRef = useRef<HTMLDivElement | null>(null);
-
-  // Reset pagination count when orders list changes (e.g. new search or date filter)
-  if (orders !== prevOrders) {
-    setPrevOrders(orders);
-    setVisibleCount(15);
-  }
-
-  useEffect(() => {
-    const sensor = sensorRef.current;
-    if (!sensor || visibleCount >= orders.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + 15, orders.length));
-        }
-      },
-      { rootMargin: "200px" } // Pre-load when within 200px of bottom
-    );
-
-    observer.observe(sensor);
-    return () => {
-      observer.unobserve(sensor);
-    };
-  }, [orders.length, visibleCount]);
-
-  const visibleOrders = orders.slice(0, visibleCount);
-  const hasMore = visibleCount < orders.length;
-
   function buildDetailHref(orderId: string) {
     const params = new URLSearchParams();
     params.set("expanded", orderId);
@@ -100,8 +67,8 @@ export function IncomingOrdersMobileList({
 
   return (
     <div className="grid grid-cols-1 divide-y divide-slate-200 border-t border-slate-200 sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-slate-200">
-      {visibleOrders.map((order, index) => {
-        const showDivider = index === 0 || order.orderDate !== visibleOrders[index - 1].orderDate;
+      {orders.map((order, index) => {
+        const showDivider = index === 0 || order.orderDate !== orders[index - 1].orderDate;
 
         return (
           <Fragment key={order.id}>
@@ -142,14 +109,6 @@ export function IncomingOrdersMobileList({
           </Fragment>
         );
       })}
-
-      {/* Sensor for Infinite Scrolling */}
-      {hasMore && (
-        <div ref={sensorRef} className="col-span-full flex items-center justify-center py-6 bg-white gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-[#003366]" strokeWidth={2.4} />
-          <span className="text-sm font-semibold text-slate-500">กำลังโหลดออเดอร์เพิ่ม...</span>
-        </div>
-      )}
     </div>
   );
 }

@@ -201,7 +201,8 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
   );
 
   const [
-    orders,
+    initialPageOrders,
+    printOrders,
     expandedDetail,
     customers,
     products,
@@ -219,6 +220,13 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       limit: INCOMING_ORDERS_PAGE_SIZE + 1,
       offset: 0,
     }),
+    getIncomingOrders(session.organizationId, {
+      orderDate,
+      endDate,
+      searchTerm,
+      customerIds: selectedCustomerIds,
+      excludeCancelled: true,
+    }),
     expandedOrderId ? getOrderDetailById(session.organizationId, expandedOrderId) : Promise.resolve(null),
     getCustomersForOrder(session.organizationId),
     getProductsForOrder(session.organizationId),
@@ -235,14 +243,15 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
   }));
   const productImageById = new Map(products.map((product) => [product.id, product.imageUrl ?? null]));
 
-  const hasMoreOrders = orders.length > INCOMING_ORDERS_PAGE_SIZE;
-  const initialOrders = orders.slice(0, INCOMING_ORDERS_PAGE_SIZE);
+  const hasMoreOrders = initialPageOrders.length > INCOMING_ORDERS_PAGE_SIZE;
+  const initialOrders = initialPageOrders.slice(0, INCOMING_ORDERS_PAGE_SIZE);
   const activeOrders = initialOrders.filter((order) => order.status !== "cancelled");
-  const activeOrderIds = activeOrders.map((order) => order.id);
+  const printActiveOrders = printOrders.filter((order) => order.status !== "cancelled");
+  const printActiveOrderIds = printActiveOrders.map((order) => order.id);
   const deliveryCustomerIds =
     selectedCustomerIds.length > 0
       ? selectedCustomerIds
-      : Array.from(new Set(activeOrders.map((order) => order.customerId)));
+      : Array.from(new Set(printActiveOrders.map((order) => order.customerId)));
   const [rangeDeliveryData, directDeliveryData] = await Promise.all([
     getIncomingDeliveryNoteRows(
       admin,
@@ -251,7 +260,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       endDate,
       deliveryCustomerIds,
     ),
-    getDirectDeliveryNoteRowsByOrderIds(admin, session.organizationId, activeOrderIds),
+    getDirectDeliveryNoteRowsByOrderIds(admin, session.organizationId, printActiveOrderIds),
   ]);
   const deliveryData = Array.from(
     new Map([...rangeDeliveryData, ...directDeliveryData].map((note) => [note.id, note])).values(),
@@ -261,6 +270,10 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     selectedCustomerIds.length > 0
       ? activeOrders.filter((order) => selectedCustomerIds.includes(order.customerId))
       : activeOrders;
+  const filteredPrintOrders =
+    selectedCustomerIds.length > 0
+      ? printActiveOrders.filter((order) => selectedCustomerIds.includes(order.customerId))
+      : printActiveOrders;
 
   const filteredExpandedDetail =
     expandedDetail &&
@@ -269,7 +282,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       ? expandedDetail
       : null;
 
-  const orderSummaryItemsResult = await getOrderSummaryItems(admin, activeOrderIds);
+  const orderSummaryItemsResult = await getOrderSummaryItems(admin, printActiveOrderIds);
 
   if (orderSummaryItemsResult.error) {
     throw new Error(orderSummaryItemsResult.error.message ?? "Failed to load order summary items.");
@@ -285,7 +298,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
   const summaryProductMap = new Map<string, PackingListSummaryProduct>();
   const summaryStoreMap = new Map<string, PackingListSummaryStore>();
 
-  for (const order of filteredOrders) {
+  for (const order of filteredPrintOrders) {
     const orderItems = itemsByOrderId.get(order.id) ?? [];
     const storeKey = `${order.customerId}_${order.orderDate}_${order.vehicleId ?? "unassigned"}`;
     const existingStore = summaryStoreMap.get(storeKey) ?? {
@@ -367,7 +380,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
 
   const deliveryMap = new Map<string, string[]>();
   const deliveryIdMap = new Map<string, string[]>();
-  const activeOrderById = new Map(activeOrders.map((order) => [order.id, order]));
+  const activeOrderById = new Map(printActiveOrders.map((order) => [order.id, order]));
 
   for (const item of deliveryData) {
     const key = `${item.customer_id}_${item.delivery_date}`;
@@ -427,7 +440,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
   };
 
   const visibleOrderStores = Array.from(
-    filteredOrders
+    filteredPrintOrders
       .filter((order) => order.status === "submitted" || order.status === "confirmed")
       .reduce((storeMap, order) => {
         const groupKey = `${order.customerId}_${order.orderDate}`;
@@ -605,11 +618,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
             <div className="flex items-center justify-center gap-2 w-full">
               <ClipboardList className="h-5 w-5 text-[#003366] sm:h-6 sm:w-6" strokeWidth={2.5} />
               <h2 className="text-base font-bold text-slate-950 sm:text-xl">รายการออเดอร์เข้า</h2>
-              {filteredOrders.length > 0 ? (
-                <span className="rounded-md bg-slate-100 px-1 py-0.5 text-[9px] font-bold text-slate-950 ring-1 ring-slate-200 sm:text-xs">
-                  {filteredOrders.length}
-                </span>
-              ) : null}
             </div>
 
             {/* Mobile View: Premium Actions Bottom Sheet */}
