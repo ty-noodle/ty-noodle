@@ -378,6 +378,13 @@ const EditItemsPanel = memo(({
       });
 
       if ("error" in result) throw new Error(result.error);
+      if (result.updatedOrder && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("incoming-order-updated", {
+            detail: result.updatedOrder,
+          }),
+        );
+      }
       onDone("บันทึกรายการสำเร็จแล้ว");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
@@ -913,16 +920,26 @@ type Props = {
   date: string;
   detail: OrderDetailData | null;
   expandedId: string;
+  initialEditMode?: boolean;
   onAfterClose?: () => void;
   products: OrderProductOption[];
+  routeManaged?: boolean;
   searchTerm: string;
 };
 
-export function IncomingOrderModal({ allOrders, detail, expandedId, onAfterClose, products }: Props) {
+export function IncomingOrderModal({
+  allOrders,
+  detail,
+  expandedId,
+  initialEditMode,
+  onAfterClose,
+  products,
+  routeManaged = true,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const startInEditMode = searchParams.get("edit") === "1";
+  const startInEditMode = initialEditMode ?? searchParams.get("edit") === "1";
   const startInDeleteMode = searchParams.get("delete") === "1";
 
   const [isOpen, setIsOpen] = useState(true);
@@ -994,9 +1011,11 @@ export function IncomingOrderModal({ allOrders, detail, expandedId, onAfterClose
     setIsClosing(true);
     setTimeout(() => {
       setIsOpen(false);
-      const p = new URLSearchParams(searchParams.toString());
-      p.delete("expanded"); p.delete("edit"); p.delete("delete");
-      router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+      if (routeManaged) {
+        const p = new URLSearchParams(searchParams.toString());
+        p.delete("expanded"); p.delete("edit"); p.delete("delete");
+        router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+      }
       onAfterClose?.();
     }, 350);
   }
@@ -1278,11 +1297,11 @@ export function IncomingOrderModal({ allOrders, detail, expandedId, onAfterClose
               onDone={(message) => {
                 if (message) {
                   setSaveToast(message);
-                  router.refresh();
+                  close();
                   window.setTimeout(() => {
                     setSaveToast(null);
-                    close();
-                  }, 1200);
+                    router.refresh();
+                  }, 450);
                 } else {
                   if (!isDesktopViewport) {
                     setEditMode(false);

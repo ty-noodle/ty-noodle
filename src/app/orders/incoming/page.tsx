@@ -659,6 +659,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
               key={`${orderDate}:${endDate}:${searchTerm}:${selectedCustomerIds.join(",")}`}
               orderDate={orderDate}
               orders={filteredOrders}
+              products={products}
               searchTerm={searchTerm}
               selectedCustomerIds={selectedCustomerIds}
               vehicles={vehicles}

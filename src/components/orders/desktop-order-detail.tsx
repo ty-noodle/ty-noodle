@@ -15,6 +15,7 @@ function formatCurrency(value: number) {
 type Props = {
   detail: OrderDetailData;
   deliveryNumbers?: string[];
+  onEdit: (detail: OrderDetailData) => void;
 };
 
 const TABLE_COLUMNS = [
@@ -27,7 +28,7 @@ const TABLE_COLUMNS = [
   "รวม",
 ] as const;
 
-export function DesktopOrderDetail({ detail, deliveryNumbers }: Props) {
+export function DesktopOrderDetail({ detail, deliveryNumbers, onEdit }: Props) {
   const router = useRouter();
   const canEdit = detail.status !== "cancelled";
   const canDelete = detail.status !== "cancelled";
@@ -37,11 +38,7 @@ export function DesktopOrderDetail({ detail, deliveryNumbers }: Props) {
     "";
 
   function handleEditInModal() {
-    const params = new URLSearchParams(window.location.search);
-    params.set("expanded", detail.id);
-    params.set("edit", "1");
-    params.delete("delete");
-    router.replace(`/orders/incoming?${params.toString()}`, { scroll: false });
+    onEdit(detail);
   }
 
   function handleDeleteInModal() {

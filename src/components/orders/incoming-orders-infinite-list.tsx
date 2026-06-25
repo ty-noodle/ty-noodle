@@ -6,7 +6,7 @@ import { loadMoreIncomingOrdersAction } from "@/app/orders/incoming/load-more-ac
 import { IncomingOrdersDesktopTable } from "@/components/orders/incoming-orders-desktop-table";
 import { IncomingOrdersMobileList } from "@/components/orders/incoming-orders-mobile-list";
 import type { IncomingOrderListItem, OrderDetailData } from "@/lib/orders/detail";
-import type { OrderVehicleOption } from "@/lib/orders/manage";
+import type { OrderProductOption, OrderVehicleOption } from "@/lib/orders/manage";
 
 type IncomingOrdersInfiniteListProps = {
   billedByCustomerDate: Record<string, boolean>;
@@ -17,9 +17,17 @@ type IncomingOrdersInfiniteListProps = {
   initialExpandedOrderId: string;
   orderDate: string;
   orders: IncomingOrderListItem[];
+  products: OrderProductOption[];
   searchTerm: string;
   selectedCustomerIds: string[];
   vehicles: OrderVehicleOption[];
+};
+
+type IncomingOrderUpdatedEventDetail = {
+  id: string;
+  notes: string | null;
+  productCount: number;
+  totalAmount: number;
 };
 
 const PAGE_SIZE = 30;
@@ -38,6 +46,7 @@ export function IncomingOrdersInfiniteList({
   initialExpandedOrderId,
   orderDate,
   orders,
+  products,
   searchTerm,
   selectedCustomerIds,
   vehicles,
@@ -48,6 +57,29 @@ export function IncomingOrdersInfiniteList({
   const [canLoadMore, setCanLoadMore] = useState(hasMore);
   const [loadMorePending, startLoadMoreTransition] = useTransition();
   const sensorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleIncomingOrderUpdated(event: Event) {
+      const updatedOrder = (event as CustomEvent<IncomingOrderUpdatedEventDetail>).detail;
+      if (!updatedOrder?.id) return;
+
+      setLoadedOrders((current) =>
+        current.map((order) =>
+          order.id === updatedOrder.id
+            ? {
+                ...order,
+                notes: updatedOrder.notes,
+                productCount: updatedOrder.productCount,
+                totalAmount: updatedOrder.totalAmount,
+              }
+            : order,
+        ),
+      );
+    }
+
+    window.addEventListener("incoming-order-updated", handleIncomingOrderUpdated);
+    return () => window.removeEventListener("incoming-order-updated", handleIncomingOrderUpdated);
+  }, []);
 
   useEffect(() => {
     const sensor = sensorRef.current;
@@ -142,6 +174,7 @@ export function IncomingOrdersInfiniteList({
             initialExpandedOrderId={initialExpandedOrderId}
             orderDate={orderDate}
             orders={loadedOrders}
+            products={products}
             searchTerm={searchTerm}
             selectedCustomerIds={selectedCustomerIds}
             vehicles={vehicles}

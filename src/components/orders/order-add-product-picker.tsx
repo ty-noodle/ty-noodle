@@ -308,14 +308,14 @@ export function OrderAddProductPicker({
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center overflow-x-hidden bg-slate-950/55 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[80] flex items-end justify-center overflow-x-hidden bg-slate-950/55 sm:items-center sm:p-2 xl:p-4">
           <button
             type="button"
             className="absolute inset-0"
             onClick={() => setOpen(false)}
             aria-label="ปิดหน้าต่างเพิ่มสินค้า"
           />
-          <div className="relative flex h-[92dvh] w-full max-w-[100vw] min-w-0 flex-col overflow-x-hidden overflow-y-hidden rounded-t-[2rem] bg-white shadow-2xl sm:h-[86dvh] sm:max-w-[calc(100vw-2rem)] sm:rounded-[2rem]">
+          <div className="relative flex h-[92dvh] w-full max-w-[100vw] min-w-0 flex-col overflow-x-hidden overflow-y-hidden rounded-t-[2rem] bg-white shadow-2xl sm:h-[88dvh] sm:w-[min(1500px,calc(100vw-1rem))] sm:max-w-none sm:rounded-[2rem] xl:h-[86dvh] xl:w-[min(1760px,calc(100vw-1rem))]">
             <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#003366]/8 text-[#003366]">
                 <ShoppingBag className="h-5 w-5" strokeWidth={2.3} />
@@ -432,7 +432,7 @@ export function OrderAddProductPicker({
                             </div>
                           )}
                         </div>
-                        <div className="w-full min-w-0 text-center md:flex-1 md:text-left">
+                        <div className="w-full min-w-0 text-center md:flex-1 md:pr-9 md:text-left">
                           <p className="text-[11px] font-black uppercase tracking-tight text-slate-500 md:hidden">
                             {product.sku}
                           </p>

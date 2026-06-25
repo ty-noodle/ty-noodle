@@ -4,11 +4,12 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState, useTransition } f
 import { Building2, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { fetchIncomingOrderDetailAction } from "@/app/orders/incoming/actions";
 import { DesktopOrderDetail } from "@/components/orders/desktop-order-detail";
+import { IncomingOrderModal } from "@/components/orders/incoming-order-modal";
 import { IncomingOrderDateButton } from "@/components/orders/incoming-order-date-button";
 import { IncomingOrderVehicleSelect } from "@/components/orders/incoming-order-vehicle-select";
 import { OrderDeliveryActionButton } from "@/components/orders/order-delivery-action-button";
 import type { IncomingOrderListItem, OrderDetailData } from "@/lib/orders/detail";
-import type { OrderVehicleOption } from "@/lib/orders/manage";
+import type { OrderProductOption, OrderVehicleOption } from "@/lib/orders/manage";
 
 type IncomingOrdersDesktopTableProps = {
   billedByCustomerDate: Record<string, boolean>;
@@ -17,6 +18,7 @@ type IncomingOrdersDesktopTableProps = {
   initialExpandedOrderId: string;
   orderDate: string;
   orders: IncomingOrderListItem[];
+  products: OrderProductOption[];
   searchTerm: string;
   selectedCustomerIds: string[];
   vehicles: OrderVehicleOption[];
@@ -47,6 +49,7 @@ type IncomingOrderRowProps = {
   searchTerm: string;
   selectedCustomerIds: string[];
   toggleOrder: (orderId: string) => void;
+  onEdit: (detail: OrderDetailData) => void;
 };
 
 const IncomingOrderRow = memo(function IncomingOrderRow({
@@ -64,6 +67,7 @@ const IncomingOrderRow = memo(function IncomingOrderRow({
   searchTerm,
   selectedCustomerIds,
   toggleOrder,
+  onEdit,
 }: IncomingOrderRowProps) {
   const hasDelivery = Boolean(deliveryNumbers && deliveryNumbers.length > 0);
   const fallbackDeliveryNumber =
@@ -198,7 +202,11 @@ const IncomingOrderRow = memo(function IncomingOrderRow({
         <tr className="bg-white">
           <td colSpan={7} className="p-0">
             {detail ? (
-              <DesktopOrderDetail detail={detail} deliveryNumbers={deliveryNumbers} />
+              <DesktopOrderDetail
+                detail={detail}
+                deliveryNumbers={deliveryNumbers}
+                onEdit={onEdit}
+              />
             ) : (
               <div className="flex items-center justify-center gap-3 border-y border-slate-300 bg-white px-6 py-8 text-base font-semibold text-slate-700">
                 <Loader2 className="h-5 w-5 animate-spin text-[#003366]" strokeWidth={2.4} />
@@ -224,6 +232,7 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
   initialExpandedOrderId,
   orderDate,
   orders,
+  products,
   searchTerm,
   selectedCustomerIds,
   vehicles,
@@ -236,6 +245,7 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
   );
   const [loadingOrderId, setLoadingOrderId] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [editingDetail, setEditingDetail] = useState<OrderDetailData | null>(null);
   const [isPending, startTransition] = useTransition();
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -410,6 +420,7 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
                     searchTerm={searchTerm}
                     selectedCustomerIds={selectedCustomerIds}
                     toggleOrder={toggleOrder}
+                    onEdit={setEditingDetail}
                   />
                 );
               })}
@@ -433,6 +444,19 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
           </div>
         </div>
       </div>
+      {editingDetail ? (
+        <IncomingOrderModal
+          allOrders={orders}
+          date={orderDate}
+          detail={editingDetail}
+          expandedId={editingDetail.id}
+          initialEditMode
+          onAfterClose={() => setEditingDetail(null)}
+          products={products}
+          routeManaged={false}
+          searchTerm={searchTerm}
+        />
+      ) : null}
     </div>
   );
 });

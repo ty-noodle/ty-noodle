@@ -1,6 +1,18 @@
 export type ActionResult =
   | { error: string }
-  | { receiptWarning?: string; success: true; orderDate?: string; orderNumber?: string; deliveryNumber?: string };
+  | {
+      receiptWarning?: string;
+      success: true;
+      orderDate?: string;
+      orderNumber?: string;
+      deliveryNumber?: string;
+      updatedOrder?: {
+        id: string;
+        notes: string | null;
+        productCount: number;
+        totalAmount: number;
+      };
+    };
 
 export type CustomerLastOrderItem = {
   productId: string;

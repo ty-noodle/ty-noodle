@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { after } from "next/server";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { linkLineCustomerAndConvertPendingOrders } from "@/lib/orders/line-pending";
@@ -749,11 +749,13 @@ export async function updateOrderItemsBatchAction(input: {
   }
 
   // 5. Recalculate Order Total
-  const { data: finalItems } = await admin.from("order_items").select("line_total").eq("order_id", orderId);
+  const { data: finalItems } = await admin.from("order_items").select("line_total, product_id").eq("order_id", orderId);
   const finalTotal = (finalItems ?? []).reduce((sum, i) => sum + Number(i.line_total), 0);
+  const finalProductCount = new Set((finalItems ?? []).map((item) => item.product_id)).size;
+  const finalNotes = notes?.trim() ? notes.trim() : null;
 
   await admin.from("orders").update({
-    notes: notes?.trim() ? notes.trim() : null,
+    notes: finalNotes,
     subtotal_amount: finalTotal,
     total_amount: finalTotal,
   }).eq("id", orderId);
@@ -778,8 +780,18 @@ export async function updateOrderItemsBatchAction(input: {
   revalidatePath("/orders/incoming");
   revalidatePath("/orders");
   revalidatePath("/billing");
+  revalidateTag(`orders-${session.organizationId}`, "max");
+  updateTag(`orders-${session.organizationId}`);
   revalidateDashboardPages();
-  return { success: true };
+  return {
+    success: true,
+    updatedOrder: {
+      id: orderId,
+      notes: finalNotes,
+      productCount: finalProductCount,
+      totalAmount: finalTotal,
+    },
+  };
 }
 
 export async function addOrderItemAction(formData: FormData): Promise<ActionResult> {
