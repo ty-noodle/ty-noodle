@@ -122,9 +122,13 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
+    const fetchPromise = fetch(request).then(cleanResponse);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), 4000)
+    );
+
     event.respondWith(
-      fetch(request)
-        .then(cleanResponse)
+      Promise.race([fetchPromise, timeoutPromise])
         .catch(async () => {
           const offlinePage = await caches.match("/offline");
           if (offlinePage) {

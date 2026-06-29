@@ -2,9 +2,15 @@
 
 import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
+import {
+  getNextCustomerCode,
+  normalizeCustomerCode,
+  validateCustomerCode,
+} from "@/lib/settings/customer-code";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type CreateCustomerField = "address" | "customerCode" | "defaultVehicleId" | "name";
+type CustomerCodeMode = "auto" | "manual";
 
 export type CreateCustomerActionState = {
   fieldErrors: Partial<Record<CreateCustomerField, string>>;
@@ -60,19 +66,8 @@ function revalidateCustomerSettings(organizationId: string) {
   revalidateTag(`settings-${organizationId}`, "max");
 }
 
-function getNextCustomerCode(codes: string[]) {
-  const maxSequence = codes.reduce((max, code) => {
-    const match = /^TYS(\d+)$/i.exec(code.trim());
-
-    if (!match) {
-      return max;
-    }
-
-    const sequence = Number.parseInt(match[1], 10);
-    return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
-  }, 0);
-
-  return `TYS${String(maxSequence + 1).padStart(3, "0")}`;
+function getCustomerCodeMode(value: FormDataEntryValue | null): CustomerCodeMode {
+  return value === "manual" ? "manual" : "auto";
 }
 
 async function generateCustomerCode(organizationId: string) {
@@ -87,6 +82,27 @@ async function generateCustomerCode(organizationId: string) {
   }
 
   return getNextCustomerCode((data ?? []).map((customer) => customer.customer_code ?? ""));
+}
+
+async function customerCodeExists(
+  organizationId: string,
+  customerCode: string,
+  excludedCustomerId?: string,
+) {
+  const admin = getSupabaseAdmin();
+  const query = admin
+    .from("customers")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .ilike("customer_code", customerCode);
+  const { data, error } = excludedCustomerId
+    ? await query.neq("id", excludedCustomerId).limit(1)
+    : await query.limit(1);
+
+  return {
+    error: Boolean(error),
+    exists: Boolean(data?.length),
+  };
 }
 
 function getAddressPayload(value: FormDataEntryValue | null): AddressPayload | null {
@@ -120,11 +136,23 @@ function getAddressPayload(value: FormDataEntryValue | null): AddressPayload | n
   }
 }
 
-function validateCustomerForm(formData: FormData) {
+function validateCustomerForm(formData: FormData, options: { isEditMode: boolean }) {
+  const customerCodeMode = options.isEditMode
+    ? "manual"
+    : getCustomerCodeMode(formData.get("customerCodeMode"));
+  const customerCode = normalizeCustomerCode(formData.get("customerCode"));
   const defaultVehicleId = getTrimmedText(formData.get("defaultVehicleId"));
   const name = getTrimmedText(formData.get("name"));
   const address = getAddressPayload(formData.get("addressPayload"));
   const fieldErrors: Partial<Record<CreateCustomerField, string>> = {};
+
+  if (customerCodeMode === "manual") {
+    const customerCodeError = validateCustomerCode(customerCode);
+
+    if (customerCodeError) {
+      fieldErrors.customerCode = customerCodeError;
+    }
+  }
 
   if (!name) {
     fieldErrors.name = "กรอกชื่อร้านค้าก่อนบันทึก";
@@ -146,6 +174,8 @@ function validateCustomerForm(formData: FormData) {
 
   return {
     address,
+    customerCode,
+    customerCodeMode,
     defaultVehicleId: defaultVehicleId || null,
     fieldErrors,
     name,
@@ -158,7 +188,7 @@ export async function createCustomerAction(
   formData: FormData,
 ): Promise<CreateCustomerActionState> {
   const session = await requireAppRole("admin");
-  const validation = validateCustomerForm(formData);
+  const validation = validateCustomerForm(formData, { isEditMode: false });
 
   if (!validation.success || !validation.address) {
     return {
@@ -170,7 +200,10 @@ export async function createCustomerAction(
 
   const admin = getSupabaseAdmin();
   const { address, defaultVehicleId, name } = validation;
-  const customerCode = await generateCustomerCode(session.organizationId);
+  const customerCode =
+    validation.customerCodeMode === "auto"
+      ? await generateCustomerCode(session.organizationId)
+      : validation.customerCode;
 
   if (!customerCode) {
     return {
@@ -178,6 +211,28 @@ export async function createCustomerAction(
       message: "ระบบยังสร้างรหัสร้านค้าอัตโนมัติไม่สำเร็จ กรุณาลองอีกครั้ง",
       status: "error",
     };
+  }
+
+  if (validation.customerCodeMode === "manual") {
+    const duplicateCheck = await customerCodeExists(session.organizationId, customerCode);
+
+    if (duplicateCheck.error) {
+      return {
+        fieldErrors: {},
+        message: "ระบบตรวจสอบรหัสร้านไม่สำเร็จ กรุณาลองอีกครั้ง",
+        status: "error",
+      };
+    }
+
+    if (duplicateCheck.exists) {
+      return {
+        fieldErrors: {
+          customerCode: "รหัสร้านนี้ถูกใช้งานแล้ว",
+        },
+        message: "บันทึกไม่สำเร็จ เพราะมีรหัสร้านนี้อยู่แล้ว",
+        status: "error",
+      };
+    }
   }
 
   if (defaultVehicleId) {
@@ -249,7 +304,7 @@ export async function updateCustomerAction(
   formData: FormData,
 ): Promise<CreateCustomerActionState> {
   const session = await requireAppRole("admin");
-  const validation = validateCustomerForm(formData);
+  const validation = validateCustomerForm(formData, { isEditMode: true });
 
   if (!validation.success || !validation.address) {
     return {
@@ -260,11 +315,11 @@ export async function updateCustomerAction(
   }
 
   const admin = getSupabaseAdmin();
-  const { address, defaultVehicleId, name } = validation;
+  const { address, customerCode, defaultVehicleId, name } = validation;
 
   const { data: customer, error: customerLookupError } = await admin
     .from("customers")
-    .select("id, metadata")
+    .select("id, customer_code, metadata")
     .eq("id", customerId)
     .eq("organization_id", session.organizationId)
     .eq("is_active", true)
@@ -276,6 +331,32 @@ export async function updateCustomerAction(
       message: "ไม่พบร้านค้าที่ต้องการแก้ไข",
       status: "error",
     };
+  }
+
+  if (customerCode !== customer.customer_code) {
+    const duplicateCheck = await customerCodeExists(
+      session.organizationId,
+      customerCode,
+      customerId,
+    );
+
+    if (duplicateCheck.error) {
+      return {
+        fieldErrors: {},
+        message: "ระบบตรวจสอบรหัสร้านไม่สำเร็จ กรุณาลองอีกครั้ง",
+        status: "error",
+      };
+    }
+
+    if (duplicateCheck.exists) {
+      return {
+        fieldErrors: {
+          customerCode: "รหัสร้านนี้ถูกใช้งานแล้ว",
+        },
+        message: "บันทึกไม่สำเร็จ เพราะมีรหัสร้านนี้อยู่แล้ว",
+        status: "error",
+      };
+    }
   }
 
   if (defaultVehicleId) {
@@ -303,6 +384,7 @@ export async function updateCustomerAction(
     .from("customers")
     .update({
       address: address.addressSummary,
+      customer_code: customerCode,
       default_vehicle_id: defaultVehicleId,
       district: address.districtName || null,
       metadata: {
@@ -319,6 +401,16 @@ export async function updateCustomerAction(
     .eq("organization_id", session.organizationId);
 
   if (error) {
+    if (error.code === "23505") {
+      return {
+        fieldErrors: {
+          customerCode: "รหัสร้านนี้ถูกใช้งานแล้ว",
+        },
+        message: "บันทึกไม่สำเร็จ เพราะมีรหัสร้านนี้อยู่แล้ว",
+        status: "error",
+      };
+    }
+
     return {
       fieldErrors: {},
       message: "ระบบบันทึกการแก้ไขร้านค้าไม่สำเร็จ กรุณาลองอีกครั้ง",

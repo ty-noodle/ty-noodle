@@ -296,13 +296,15 @@ export const getStockDashboardData = cache(
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .order("sort_order", { ascending: true }),
-      admin.from("inventory_movements")
-        .select(
-          "id, product_id, movement_type, quantity_delta, stock_before, stock_after, reference_number, notes, created_at, inventory_receipts(receipt_url)",
-        )
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false })
-        .range(movementOffset, movementOffset + movementLimit - 1),
+      movementLimit > 0
+        ? admin.from("inventory_movements")
+            .select(
+              "id, product_id, movement_type, quantity_delta, stock_before, stock_after, reference_number, notes, created_at, inventory_receipts(receipt_url)",
+            )
+            .eq("organization_id", organizationId)
+            .order("created_at", { ascending: false })
+            .range(movementOffset, movementOffset + movementLimit - 1)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
       admin.from("suppliers")
         .select("id, name, supplier_code")
         .eq("organization_id", organizationId)

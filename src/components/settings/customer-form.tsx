@@ -47,8 +47,11 @@ export function CustomerForm({
     action,
     initialCreateCustomerState,
   );
+  const [customerCodeMode, setCustomerCodeMode] = useState<"auto" | "manual">("auto");
+  const [customerCode, setCustomerCode] = useState(initialCustomer?.code ?? defaultCode);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const hasSubmittedRef = useRef(false);
+  const customerCodeIsAutomatic = !isEditMode && customerCodeMode === "auto";
   const fieldErrors =
     actionState && typeof actionState === "object" && "fieldErrors" in actionState
       ? (actionState.fieldErrors ?? initialCreateCustomerState.fieldErrors)
@@ -151,17 +154,57 @@ export function CustomerForm({
                     <label className={settingsFieldLabelClass} htmlFor="customer-code">
                       รหัสร้าน
                     </label>
+                    {!isEditMode ? (
+                      <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                        <button
+                          type="button"
+                          aria-pressed={customerCodeMode === "auto"}
+                          onClick={() => {
+                            setCustomerCodeMode("auto");
+                            setCustomerCode(defaultCode);
+                          }}
+                          className={
+                            customerCodeMode === "auto"
+                              ? "rounded-lg bg-white px-3 py-2 text-sm font-semibold text-[#003366] shadow-sm"
+                              : "rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:text-slate-700"
+                          }
+                        >
+                          อัตโนมัติ
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={customerCodeMode === "manual"}
+                          onClick={() => setCustomerCodeMode("manual")}
+                          className={
+                            customerCodeMode === "manual"
+                              ? "rounded-lg bg-white px-3 py-2 text-sm font-semibold text-[#003366] shadow-sm"
+                              : "rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:text-slate-700"
+                          }
+                        >
+                          กรอกเอง
+                        </button>
+                        <input type="hidden" name="customerCodeMode" value={customerCodeMode} />
+                      </div>
+                    ) : null}
                     <input
                       id="customer-code"
                       name="customerCode"
-                      required
-                      readOnly
-                      defaultValue={initialCustomer?.code ?? defaultCode}
+                      required={!customerCodeIsAutomatic}
+                      readOnly={customerCodeIsAutomatic}
+                      value={customerCode}
+                      onChange={(event) => setCustomerCode(event.target.value.toUpperCase())}
                       className={getInputClass(showFieldErrors && Boolean(fieldErrors?.customerCode))}
                       placeholder="TYS001"
+                      autoCapitalize="characters"
+                      pattern="TYS[0-9]+"
                     />
+                    {showFieldErrors && fieldErrors?.customerCode ? (
+                      <p className="text-sm font-medium text-red-600">{fieldErrors.customerCode}</p>
+                    ) : null}
                     <p className="text-sm text-slate-500">
-                      ระบบกำหนดรหัสร้านค้าให้อัตโนมัติตามลำดับถัดไป
+                      {customerCodeIsAutomatic
+                        ? "ระบบจะกำหนดรหัสร้านตามลำดับถัดไปเมื่อบันทึก"
+                        : "ใช้รูปแบบ TYS ตามด้วยตัวเลข เช่น TYS125"}
                     </p>
                   </div>
 

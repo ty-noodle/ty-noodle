@@ -2,6 +2,7 @@ import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
 import { sortProductsByCategory } from "@/lib/products/sort-by-category";
+import { getNextCustomerCode } from "@/lib/settings/customer-code";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -184,6 +185,7 @@ type CustomerRow = {
   default_vehicle_id: string | null;
   district: string | null;
   id: string;
+  is_active: boolean;
   metadata: Record<string, unknown> | null;
   name: string;
   postal_code: string | null;
@@ -236,21 +238,6 @@ function getNextProductSku(skus: string[]) {
   }, 0);
 
   return `TYN${String(maxSequence + 1).padStart(3, "0")}`;
-}
-
-function getNextCustomerCode(codes: string[]) {
-  const maxSequence = codes.reduce((max, code) => {
-    const match = /^TYS(\d+)$/i.exec(code.trim());
-
-    if (!match) {
-      return max;
-    }
-
-    const sequence = Number.parseInt(match[1], 10);
-    return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
-  }, 0);
-
-  return `TYS${String(maxSequence + 1).padStart(3, "0")}`;
 }
 
 const skuCollator = new Intl.Collator("th", {
@@ -385,10 +372,9 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
       admin
         .from("customers")
         .select(
-          "id, customer_code, name, address, province, district, subdistrict, postal_code, metadata, default_vehicle_id",
+          "id, customer_code, name, address, province, district, subdistrict, postal_code, metadata, default_vehicle_id, is_active",
         )
         .eq("organization_id", organizationId)
-        .eq("is_active", true)
         .order("customer_code", { ascending: true }),
       admin
         .from("suppliers")
@@ -452,7 +438,8 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
   );
   const images = (imagesResult.data ?? []) as ProductImageRow[];
   const saleUnits = (saleUnitsResult.data ?? []) as ProductSaleUnitRow[];
-  const customers = (customersResult.data ?? []) as CustomerRow[];
+  const allCustomers = (customersResult.data ?? []) as CustomerRow[];
+  const customers = allCustomers.filter((customer) => customer.is_active);
   const suppliers = (suppliersResult.data ?? []) as SupplierRow[];
   const activeProductIds = new Set(
     products.filter((product) => product.is_active).map((product) => product.id),
@@ -609,7 +596,7 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
       id: supplier.id,
       name: supplier.name,
     })),
-    nextCustomerCode: getNextCustomerCode(customers.map((customer) => customer.customer_code)),
+    nextCustomerCode: getNextCustomerCode(allCustomers.map((customer) => customer.customer_code)),
     nextSupplierCode: getNextSupplierCode(suppliers.map((supplier) => supplier.supplier_code)),
     prices: prices.map((price) => ({
       customerId: price.customer_id,
