@@ -99,6 +99,23 @@ function parseSaleUnits(formData: FormData, fallbackBaseUnit: string) {
   return saleUnits;
 }
 
+function normalizeProductFormSaleUnits(
+  saleUnits: ReturnType<typeof parseSaleUnits>,
+  baseUnit: string,
+) {
+  return saleUnits.map((saleUnit, index) =>
+    index === 0
+      ? {
+        ...saleUnit,
+        baseUnitQuantity: 1,
+        costMode: "derived" as const,
+        fixedCostPrice: null,
+        label: baseUnit,
+      }
+      : saleUnit,
+  );
+}
+
 function getNextProductSku(skus: string[]) {
   const maxSequence = skus.reduce((max, sku) => {
     const match = /^TYN(\d+)$/i.exec(sku.trim());
@@ -412,7 +429,7 @@ export async function createProduct(formData: FormData): Promise<boolean> {
   const costPrice = safePrice(formData.get("costPrice"));
   const stockQuantity = safeInteger(formData.get("stockQuantity"));
   const baseUnit = safeText(formData.get("baseUnit"));
-  const saleUnits = parseSaleUnits(formData, baseUnit);
+  const saleUnits = normalizeProductFormSaleUnits(parseSaleUnits(formData, baseUnit), baseUnit);
   const files = formData
     .getAll("images")
     .filter((value): value is File => value instanceof File && value.size > 0);
@@ -578,7 +595,7 @@ export async function updateProduct(formData: FormData): Promise<boolean> {
   const costPrice = safePrice(formData.get("costPrice"));
   const stockQuantity = safeInteger(formData.get("stockQuantity"));
   const baseUnit = safeText(formData.get("baseUnit"));
-  const saleUnits = parseSaleUnits(formData, baseUnit);
+  const saleUnits = normalizeProductFormSaleUnits(parseSaleUnits(formData, baseUnit), baseUnit);
   const removedSaleUnitIds = new Set(
     formData
       .getAll("removedSaleUnitId")

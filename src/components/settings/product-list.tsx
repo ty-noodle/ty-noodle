@@ -398,7 +398,8 @@ export function ProductList({ products, baseListHref = "/settings/products" }: P
 
       <SettingsPanelBody className="p-0">
         {localProducts.length > 0 ? (
-          <DndContext 
+          <DndContext
+            id="settings-product-list"
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
