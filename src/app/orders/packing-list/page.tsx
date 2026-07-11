@@ -12,6 +12,7 @@ import { MobilePinchZoom } from "@/components/print/mobile-pinch-zoom";
 import { requireAnyRole } from "@/lib/auth/authorization";
 import { sortProductsByCategory } from "@/lib/products/sort-by-category";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { AutoPrint, PackingListPrintButton } from "./preview/print-button";
 
 export const metadata = { title: "ใบจัดของ" };
@@ -29,6 +30,7 @@ type OrderCustomer = {
   id: string;
   name: string;
   customer_code: string;
+  sort_order: number | string;
   default_vehicle_id: string | null;
   vehicles: unknown;
 };
@@ -142,7 +144,7 @@ async function PackingListPage({ searchParams }: Props) {
     .select(`
       id,
       order_date,
-      customers!inner(id, name, customer_code, default_vehicle_id, vehicles(id, name)),
+      customers!inner(id, name, customer_code, sort_order, default_vehicle_id, vehicles(id, name)),
       delivery_notes!order_id(vehicle_id, status, vehicles(id, name)),
       order_items(
         product_id,
@@ -235,7 +237,7 @@ async function PackingListPage({ searchParams }: Props) {
     productSortIndexMap.set(product.id, index);
   });
 
-  const rawOrders = (ordersResult.data ?? []) as OrderWithRelations[];
+  const rawOrders = (ordersResult.data ?? []) as unknown as OrderWithRelations[];
   const ordersByDate = new Map<string, OrderWithRelations[]>();
 
   for (const order of rawOrders) {
@@ -305,7 +307,7 @@ async function PackingListPage({ searchParams }: Props) {
           const indexB =
             b.vehicleId === null ? 999 : (vehicleSortIndexMap.get(b.vehicleId) ?? 998);
           if (indexA !== indexB) return indexA - indexB;
-          return a.customer.customer_code.localeCompare(b.customer.customer_code);
+          return compareCustomerOrder(a.customer, b.customer);
         })
         .map(
           (group): PackingListStore & { consolidatedItems: Map<string, number> } => ({

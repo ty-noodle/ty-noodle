@@ -1,16 +1,18 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { notifyCustomerReceiptImageDetailed } from "@/lib/line/notify";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const RECEIPT_IMAGE_BUCKET = "customer-receipts";
 const RECEIPT_EXPORT_WIDTH = 360;
 
 type ReceiptImageItem = {
+  lineTotal?: number;
   name: string;
   quantity: number;
   saleUnitLabel: string;
+  unitPrice?: number;
 };
 
 type GeneratedReceiptInput = {
@@ -74,6 +76,23 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatMoney(value: number) {
+  return value.toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function getPricedTotal(items: ReceiptImageItem[], fallbackTotal?: number) {
+  const hasUnpricedItems = items.some((item) => Number(item.unitPrice ?? 0) <= 0);
+  const pricedTotal = items.reduce(
+    (sum, item) => sum + (Number(item.unitPrice ?? 0) > 0 ? Number(item.lineTotal ?? 0) : 0),
+    0,
+  );
+
+  return hasUnpricedItems ? pricedTotal : Number(fallbackTotal ?? 0) || pricedTotal;
+}
+
 function toArrayBuffer(buffer: Buffer) {
   return buffer.buffer.slice(
     buffer.byteOffset,
@@ -101,9 +120,11 @@ function ReceiptImage({
   logoDataUrl,
   orderDate,
   orderNumber,
+  totalAmount,
 }: GeneratedReceiptInput & { logoDataUrl: string }) {
   const sidePadding = 18;
   const rowBorder = { borderTop: "1px solid #cccccc" };
+  const displayTotal = getPricedTotal(items, totalAmount);
 
   return (
     <div
@@ -167,15 +188,18 @@ function ReceiptImage({
         <span style={{ marginLeft: 4 }}>{customerName}</span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, padding: `6px ${sidePadding}px` }}>
+      <div style={{ display: "flex", gap: 6, padding: `6px ${sidePadding}px` }}>
         <span style={{ flex: 1, fontSize: 14, fontWeight: 800, textAlign: "left" }}>
           สินค้า
         </span>
-        <span style={{ fontSize: 14, fontWeight: 800, textAlign: "right", width: 60 }}>
+        <span style={{ fontSize: 14, fontWeight: 800, textAlign: "right", width: 52 }}>
           จำนวน
         </span>
-        <span style={{ fontSize: 14, fontWeight: 800, textAlign: "right", width: 48 }}>
+        <span style={{ fontSize: 14, fontWeight: 800, textAlign: "right", width: 42 }}>
           หน่วย
+        </span>
+        <span style={{ fontSize: 14, fontWeight: 800, textAlign: "right", width: 68 }}>
+          รวม
         </span>
       </div>
 
@@ -187,7 +211,7 @@ function ReceiptImage({
             style={{
               alignItems: "center",
               display: "flex",
-              gap: 8,
+              gap: 6,
               padding: `10px ${sidePadding}px`,
             }}
           >
@@ -196,23 +220,39 @@ function ReceiptImage({
                 flex: 1,
                 fontSize: 13,
                 lineHeight: 1.4,
+                overflow: "visible",
                 whiteSpace: "normal",
                 wordBreak: "break-word",
-                overflow: "visible",
               }}
             >
               {item.name}
             </div>
-            <div style={{ fontSize: 14, textAlign: "right", width: 60 }}>
+            <div style={{ fontSize: 14, textAlign: "right", width: 52 }}>
               {item.quantity.toLocaleString("th-TH")}
             </div>
-            <div style={{ fontSize: 14, textAlign: "right", width: 48 }}>
+            <div style={{ fontSize: 14, textAlign: "right", width: 42 }}>
               {item.saleUnitLabel}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, textAlign: "right", width: 68 }}>
+              {Number(item.unitPrice ?? 0) > 0 ? formatMoney(Number(item.lineTotal ?? 0)) : "-"}
             </div>
           </div>
           <div style={{ ...rowBorder, margin: "0 16px" }} />
         </div>
       ))}
+
+      <div
+        style={{
+          display: "flex",
+          fontSize: 15,
+          fontWeight: 800,
+          justifyContent: "space-between",
+          padding: `14px ${sidePadding}px 0`,
+        }}
+      >
+        <span>รวมทั้งหมด</span>
+        <span>{displayTotal > 0 ? formatMoney(displayTotal) : "-"}</span>
+      </div>
 
       <div
         style={{
@@ -236,7 +276,7 @@ function ReceiptImage({
 
 export async function generateCustomerReceiptPng(input: GeneratedReceiptInput) {
   const { boldFont, logoDataUrl, regularFont } = await getReceiptAssets();
-  const height = Math.max(350, 238 + input.items.length * 42 + 96);
+  const height = Math.max(390, 260 + input.items.length * 42 + 108);
   const response = new ImageResponse(
     <ReceiptImage {...input} logoDataUrl={logoDataUrl} />,
     {

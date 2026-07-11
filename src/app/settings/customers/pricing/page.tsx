@@ -15,6 +15,7 @@ export default async function SettingsCustomerPricingPage() {
     customerId: customer.id,
     customerCode: customer.code,
     customerName: customer.name,
+    sortOrder: customer.sortOrder,
     prices: data.prices.filter((p) => p.customerId === customer.id),
   }));
 

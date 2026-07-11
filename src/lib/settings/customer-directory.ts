@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Database } from "@/types/database";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 type CustomerRow = Pick<
   Database["public"]["Tables"]["customers"]["Row"],
@@ -14,6 +15,7 @@ type CustomerRow = Pick<
   | "name"
   | "phone"
 >;
+type CustomerOrderRow = CustomerRow & { sort_order: number | string };
 type LineOrderCustomerRow = Pick<
   Database["public"]["Tables"]["line_order_customers"]["Row"],
   | "created_at"
@@ -43,6 +45,7 @@ export type CustomerDirectoryItem = {
   lineUserId: string;
   name: string;
   phone: string | null;
+  sortOrder?: number;
 };
 
 export type CustomerDirectoryData = {
@@ -111,7 +114,7 @@ export async function getCustomerDirectoryData(
   const { data: customerRows, error: customerError } = customerIds.length
     ? await admin
         .from("customers")
-        .select("id, customer_code, name, phone, created_at, is_active, line_user_id, metadata")
+        .select("id, customer_code, name, phone, created_at, is_active, line_user_id, metadata, sort_order")
         .eq("organization_id", organizationId)
         .in("id", customerIds)
     : { data: [] as CustomerRow[], error: null };
@@ -126,7 +129,7 @@ export async function getCustomerDirectoryData(
   }
 
   const customerById = new Map(
-    ((customerRows ?? []) as CustomerRow[]).map((customer) => [customer.id, customer]),
+    ((customerRows ?? []) as unknown as CustomerOrderRow[]).map((customer) => [customer.id, customer]),
   );
   const customers = links
     .map((link) => {
@@ -148,6 +151,7 @@ export async function getCustomerDirectoryData(
         lineUserId: link.line_user_id.trim(),
         name: customer?.name ?? "ยังไม่ผูกร้านค้า",
         phone: customer?.phone ?? null,
+        sortOrder: customer ? Number((customer as CustomerOrderRow).sort_order) : undefined,
       } satisfies CustomerDirectoryItem;
     })
     .sort((left, right) => {
@@ -159,6 +163,8 @@ export async function getCustomerDirectoryData(
         return left.isActive ? -1 : 1;
       }
 
+      const customerOrder = compareCustomerOrder(left, right);
+      if (customerOrder !== 0) return customerOrder;
       return right.createdAt.localeCompare(left.createdAt);
     });
 

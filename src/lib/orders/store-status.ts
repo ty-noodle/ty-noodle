@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 export type OrderStoreStatusItem = {
   code: string;
@@ -9,6 +10,7 @@ export type OrderStoreStatusItem = {
   latestOrderId: string | null;
   name: string;
   orderCount: number;
+  sortOrder: number;
   vehicleId: string | null;
   vehicleName: string | null;
 };
@@ -24,6 +26,7 @@ type CustomerRow = {
   default_vehicle_id: string | null;
   id: string;
   name: string | null;
+  sort_order: number | string;
   vehicles: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
 };
 
@@ -32,32 +35,6 @@ type OrderRow = {
   created_at: string | null;
   customer_id: string;
 };
-
-const codeCollator = new Intl.Collator("th", {
-  numeric: true,
-  sensitivity: "base",
-});
-
-function getCodeSequence(code: string) {
-  const match = code.trim().match(/(\d+)/);
-  return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
-}
-
-function compareStore(left: OrderStoreStatusItem, right: OrderStoreStatusItem) {
-  const leftSequence = getCodeSequence(left.code);
-  const rightSequence = getCodeSequence(right.code);
-
-  if (leftSequence !== rightSequence) {
-    return leftSequence - rightSequence;
-  }
-
-  const codeComparison = codeCollator.compare(left.code.trim(), right.code.trim());
-  if (codeComparison !== 0) {
-    return codeComparison;
-  }
-
-  return left.name.localeCompare(right.name, "th");
-}
 
 function getVehicleName(vehicle: CustomerRow["vehicles"]) {
   if (Array.isArray(vehicle)) {
@@ -76,7 +53,7 @@ export async function getOrderStoreStatusSummary(
   const [customersResult, ordersResult] = await Promise.all([
     admin
       .from("customers")
-      .select("id, customer_code, name, default_vehicle_id, vehicles(id, name)")
+      .select("id, customer_code, name, sort_order, default_vehicle_id, vehicles(id, name)")
       .eq("organization_id", organizationId)
       .eq("is_active", true)
       .order("customer_code", { ascending: true }),
@@ -116,7 +93,7 @@ export async function getOrderStoreStatusSummary(
     });
   }
 
-  const allStores = ((customersResult.data ?? []) as CustomerRow[])
+  const allStores = ((customersResult.data ?? []) as unknown as CustomerRow[])
     .map((customer) => {
       const stats = orderStatsByCustomerId.get(customer.id);
 
@@ -127,20 +104,14 @@ export async function getOrderStoreStatusSummary(
         latestOrderId: stats?.latestOrderId ?? null,
         name: customer.name ?? "-",
         orderCount: stats?.orderCount ?? 0,
+        sortOrder: Number(customer.sort_order),
         vehicleId: customer.default_vehicle_id ?? null,
         vehicleName: getVehicleName(customer.vehicles),
       };
     })
-    .toSorted(compareStore);
+    .toSorted(compareCustomerOrder);
 
-  const orderedStores = allStores
-    .filter((store) => store.orderCount > 0)
-    .toSorted((left, right) => {
-      const rightTime = right.latestOrderAt ? new Date(right.latestOrderAt).getTime() : 0;
-      const leftTime = left.latestOrderAt ? new Date(left.latestOrderAt).getTime() : 0;
-      if (rightTime !== leftTime) return rightTime - leftTime;
-      return compareStore(left, right);
-    });
+  const orderedStores = allStores.filter((store) => store.orderCount > 0);
 
   const unorderedStores = allStores.filter((store) => store.orderCount === 0);
 

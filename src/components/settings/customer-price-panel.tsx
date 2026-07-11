@@ -23,12 +23,14 @@ import {
 import { confirmBelowCostSave, isBelowCostPrice } from "@/components/pricing/price-guard";
 import type { SettingsPriceRow, SettingsSaleUnitOption } from "@/lib/settings/admin";
 import { normalizeSearch } from "@/lib/utils/search";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { ProductPriceSelectorModal } from "./product-price-selector";
 
 export type CustomerPriceGroup = {
   customerId: string;
   customerCode: string;
   customerName: string;
+  sortOrder?: number;
   prices: SettingsPriceRow[];
 };
 
@@ -71,12 +73,7 @@ export function CustomerPricePanel({
       )
     : groups;
 
-  const sorted = [...filtered].sort((a, b) => {
-    const aHas = a.prices.length > 0;
-    const bHas = b.prices.length > 0;
-    if (aHas !== bHas) return aHas ? -1 : 1;
-    return a.customerName.localeCompare(b.customerName, "th");
-  });
+  const sorted = [...filtered].sort(compareCustomerOrder);
 
   function toggle(customerId: string) {
     setExpanded((prev) => {

@@ -24,6 +24,10 @@ function formatQuantity(value: number) {
   });
 }
 
+function formatLineTotal(unitPrice: number, lineTotal: number) {
+  return unitPrice > 0 ? formatCurrency(lineTotal) : "-";
+}
+
 type OrderDeliveryActionButtonProps = {
   customerId: string;
   customerName?: string;
@@ -284,10 +288,9 @@ export function OrderDeliveryActionButton({
                         <span className="text-[12px]"> {customerName}</span>
                       </div>
 
-                      <div className="grid grid-cols-[1fr_80px_60px_65px] gap-2 border-b border-[#cccccc] py-2">
+                      <div className="grid grid-cols-[1fr_88px_78px] gap-2 border-b border-[#cccccc] py-2">
                         <span className="text-left text-[12px] font-black">สินค้า</span>
                         <span className="text-right text-[12px] font-black">จำนวน</span>
-                        <span className="text-right text-[12px] font-black">ราคา</span>
                         <span className="text-right text-[12px] font-black">รวม</span>
                       </div>
 
@@ -295,17 +298,14 @@ export function OrderDeliveryActionButton({
                         {receiptItems.map((item, index) => (
                           <div
                             key={index}
-                            className="grid grid-cols-[1fr_80px_60px_65px] items-center gap-2 py-3"
+                            className="grid grid-cols-[1fr_88px_78px] items-center gap-2 py-3"
                           >
                             <div className="text-[11px] leading-[1.4] break-words whitespace-normal overflow-visible">{item.name}</div>
                             <div className="text-right text-[12px] font-medium">
                               {formatQuantity(item.quantity)} {item.saleUnitLabel}
                             </div>
-                            <div className="text-right text-[12px] text-slate-500">
-                              {formatCurrency(item.unitPrice)}
-                            </div>
                             <div className="text-right text-[12px] font-bold">
-                              {formatCurrency(item.lineTotal)}
+                              {formatLineTotal(item.unitPrice, item.lineTotal)}
                             </div>
                           </div>
                         ))}

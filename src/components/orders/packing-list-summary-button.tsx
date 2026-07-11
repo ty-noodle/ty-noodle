@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Boxes, Package, PackageSearch, Store, Truck, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 export type PackingListSummaryProduct = {
   key: string;
@@ -19,6 +20,7 @@ export type PackingListSummaryStore = {
   id: string;
   customerCode: string;
   customerName: string;
+  sortOrder?: number;
   date: string;
   dateLabel: string;
   itemCount: number;
@@ -151,8 +153,7 @@ export function PackingListSummaryButton({
       stores: [...group.stores].sort(
         (a, b) =>
           a.date.localeCompare(b.date) ||
-          a.customerCode.localeCompare(b.customerCode, "th") ||
-          a.customerName.localeCompare(b.customerName, "th"),
+          compareCustomerOrder(a, b),
       ),
     }));
   }, [stores]);

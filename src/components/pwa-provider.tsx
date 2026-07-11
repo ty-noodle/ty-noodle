@@ -32,9 +32,48 @@ export function PwaProvider() {
       return;
     }
 
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Ignore registration failures in the starter.
-    });
+    let idleId: number | undefined;
+    let timeoutId: number | undefined;
+    let cancelled = false;
+
+    const register = () => {
+      if (cancelled) return;
+
+      navigator.serviceWorker
+        .register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none",
+        })
+        .catch(() => {
+          // Ignore registration failures; the app remains usable online.
+        });
+    };
+
+    const schedule = () => {
+      const requestIdleCallback = window.requestIdleCallback;
+      if (typeof requestIdleCallback === "function") {
+        idleId = requestIdleCallback.call(window, register, { timeout: 2500 });
+      } else {
+        timeoutId = window.setTimeout(register, 1200);
+      }
+    };
+
+    if (document.readyState === "complete") {
+      schedule();
+    } else {
+      window.addEventListener("load", schedule, { once: true });
+    }
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", schedule);
+      if (idleId !== undefined && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   return null;

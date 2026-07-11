@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -8,6 +9,7 @@ export type StoreSalesRow = {
   customerId: string;
   customerCode: string;
   customerName: string;
+  sortOrder: number;
   totalRevenue: number;
   totalCost: number;
   totalQty: number;
@@ -57,7 +59,7 @@ export async function getStoreSalesRanking(params: {
     .select(`
       id,
       customer_id,
-      customers!inner(id, customer_code, name),
+      customers!inner(id, customer_code, name, sort_order),
       delivery_note_items(
         quantity_delivered,
         quantity_in_base_unit,
@@ -80,7 +82,7 @@ export async function getStoreSalesRanking(params: {
   type RawNote = {
     id: string;
     customer_id: string;
-    customers: { id: string; customer_code: string; name: string };
+    customers: { id: string; customer_code: string; name: string; sort_order: number | string };
     delivery_note_items: Array<{
       quantity_delivered: unknown;
       quantity_in_base_unit: unknown;
@@ -89,13 +91,14 @@ export async function getStoreSalesRanking(params: {
     }>;
   };
 
-  const rawNotes = (data ?? []) as RawNote[];
+  const rawNotes = (data ?? []) as unknown as RawNote[];
 
   const storeMap = new Map<
     string,
     {
       customerCode: string;
       customerName: string;
+      sortOrder: number;
       totalRevenue: number;
       totalCost: number;
       totalQty: number;
@@ -110,6 +113,7 @@ export async function getStoreSalesRanking(params: {
     const existing = storeMap.get(c.id) ?? {
       customerCode: c.customer_code,
       customerName: c.name,
+      sortOrder: Number(c.sort_order),
       totalRevenue: 0,
       totalCost: 0,
       totalQty: 0,
@@ -134,12 +138,13 @@ export async function getStoreSalesRanking(params: {
       customerId,
       customerCode: v.customerCode,
       customerName: v.customerName,
+      sortOrder: v.sortOrder,
       totalRevenue: v.totalRevenue,
       totalCost: v.totalCost,
       totalQty: v.totalQty,
       totalOrders: v.orderIds.size,
     }))
-    .sort((a, b) => b.totalRevenue - a.totalRevenue);
+    .sort(compareCustomerOrder);
 
   const summary: StoreSalesSummary = {
     totalRevenue: allRows.reduce((s, r) => s + r.totalRevenue, 0),

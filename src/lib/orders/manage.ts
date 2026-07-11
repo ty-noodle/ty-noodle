@@ -2,10 +2,11 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 // Row types
 
-type CustomerRow = { id: string; customer_code: string; name: string };
+type CustomerRow = { id: string; customer_code: string; name: string; sort_order: number | string };
 type ProductRow = {
   cost_price: number | string;
   id: string;
@@ -62,23 +63,6 @@ function getCodeSequence(code: string) {
   return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
 }
 
-function compareCustomerCode(left: OrderCustomerOption, right: OrderCustomerOption) {
-  const leftSequence = getCodeSequence(left.code);
-  const rightSequence = getCodeSequence(right.code);
-
-  if (leftSequence !== rightSequence) {
-    return leftSequence - rightSequence;
-  }
-
-  const codeComparison = codeCollator.compare(left.code.trim(), right.code.trim());
-
-  if (codeComparison !== 0) {
-    return codeComparison;
-  }
-
-  return left.name.localeCompare(right.name, "th");
-}
-
 function compareProductSku(left: OrderProductOption, right: OrderProductOption) {
   const leftSequence = getCodeSequence(left.sku);
   const rightSequence = getCodeSequence(right.sku);
@@ -98,7 +82,7 @@ function compareProductSku(left: OrderProductOption, right: OrderProductOption) 
 
 // Exported types
 
-export type OrderCustomerOption = { code: string; id: string; name: string };
+export type OrderCustomerOption = { code: string; id: string; name: string; sortOrder: number };
 
 export type OrderVehicleOption = { id: string; name: string };
 
@@ -135,14 +119,14 @@ export async function getCustomersForOrder(orgId: string): Promise<OrderCustomer
   const admin = getSupabaseAdmin() as unknown as ManageAdmin;
   const { data } = await admin
     .from("customers")
-    .select("id, customer_code, name")
+    .select("id, customer_code, name, sort_order")
     .eq("organization_id", orgId)
     .eq("is_active", true)
-    .order("customer_code", { ascending: true });
+    .order("sort_order", { ascending: true });
 
   return (data ?? [])
-    .map((c) => ({ code: c.customer_code, id: c.id, name: c.name }))
-    .toSorted(compareCustomerCode);
+    .map((c: CustomerRow) => ({ code: c.customer_code, id: c.id, name: c.name, sortOrder: Number(c.sort_order) }))
+    .toSorted(compareCustomerOrder);
 }
 
 export async function getVehiclesForOrder(orgId: string): Promise<OrderVehicleOption[]> {

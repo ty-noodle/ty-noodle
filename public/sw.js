@@ -1,4 +1,4 @@
-const CACHE_NAME = "T&Y Noodle-v7";
+const CACHE_NAME = "T&Y Noodle-v8";
 const APP_SHELL = [
   "/offline",
   "/manifest.webmanifest",
@@ -93,17 +93,16 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-
-          return Promise.resolve(false);
-        }),
+    Promise.all([
+      self.registration.navigationPreload
+        ? self.registration.navigationPreload.enable()
+        : Promise.resolve(),
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : Promise.resolve(false))),
+        ),
       ),
-    ),
+    ]),
   );
 
   self.clients.claim();
@@ -122,9 +121,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    const fetchPromise = fetch(request).then(cleanResponse);
+    const fetchPromise = (async () => {
+      const preloaded = await event.preloadResponse;
+      return cleanResponse(preloaded || (await fetch(request)));
+    })();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout")), 4000)
+      setTimeout(() => reject(new Error("Navigation timeout")), 1800)
     );
 
     event.respondWith(

@@ -642,7 +642,7 @@ async function convertSinglePendingOrder(input: {
 
   const { data: finalItems, error: finalItemsError } = await input.admin
     .from("order_items")
-    .select("product_id, sale_unit_label, quantity, line_total")
+    .select("product_id, sale_unit_label, quantity, unit_price, line_total")
     .eq("order_id", targetOrder.id)
     .order("created_at", { ascending: true });
 
@@ -655,6 +655,7 @@ async function convertSinglePendingOrder(input: {
       product_id: string;
       sale_unit_label: string;
       quantity: number | string | null;
+      unit_price: number | string | null;
       line_total: number | string | null;
     }[]
   ).reduce((sum, item) => sum + Number(item.line_total ?? 0), 0);
@@ -713,11 +714,14 @@ async function convertSinglePendingOrder(input: {
     product_id: string;
     sale_unit_label: string;
     quantity: number | string | null;
+    unit_price: number | string | null;
     line_total: number | string | null;
   }[]).map((item) => ({
+    lineTotal: Number(item.line_total ?? 0),
     name: finalProductMap.get(item.product_id)?.name ?? "-",
     quantity: Number(item.quantity) || 0,
     saleUnitLabel: item.sale_unit_label,
+    unitPrice: Number(item.unit_price ?? 0),
   }));
 
   await input.admin
@@ -735,7 +739,7 @@ async function convertSinglePendingOrder(input: {
       customerName: input.customer.name,
       items: finalReceiptItems,
       lineUserId: input.lineUserId,
-      orderDate: new Date().toISOString(),
+      orderDate: targetOrder.order_date,
       orderNumber: targetOrder.order_number,
       organizationId: input.organizationId,
       totalAmount: finalTotal,

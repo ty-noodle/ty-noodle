@@ -62,6 +62,7 @@ type CustomerRow = {
   default_vehicle_id: string | null;
   id: string;
   name: string;
+  sort_order: number | string;
 };
 
 type VehicleRow = {
@@ -145,6 +146,7 @@ export type IncomingOrderListItem = {
   customerCode: string;
   customerId: string;
   customerName: string;
+  sortOrder: number;
   id: string;
   notes: string | null;
   orderDate: string;
@@ -487,9 +489,10 @@ export async function getIncomingOrders(
     orderCustomerIds.length > 0
       ? await admin
           .from("customers")
-          .select("id, customer_code, name, address, default_vehicle_id")
+          .select("id, customer_code, name, address, default_vehicle_id, sort_order")
           .in("id", orderCustomerIds)
-          .order("name", { ascending: true })
+          .order("sort_order", { ascending: true })
+          .order("customer_code", { ascending: true })
       : { data: [], error: null };
 
   if (customersResult.error) {
@@ -551,6 +554,7 @@ export async function getIncomingOrders(
         customerCode: customer?.customer_code ?? "-",
         customerId: order.customer_id,
         customerName: customer?.name ?? "ร้านค้าไม่ทราบชื่อ",
+        sortOrder: Number(customer?.sort_order ?? Number.MAX_SAFE_INTEGER),
         id: order.id,
         notes: order.notes,
         orderDate: order.order_date,

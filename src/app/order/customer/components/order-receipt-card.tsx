@@ -3,6 +3,23 @@ import type { ReceiptItem } from "@/app/order/customer/order-client-types";
 
 const RECEIPT_DISPLAY_MAX_WIDTH = 620;
 
+function formatMoney(value: number) {
+  return value.toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function getPricedTotal(items: ReceiptItem[], fallbackTotal: number) {
+  const hasUnpricedItems = items.some((item) => item.unitPrice <= 0);
+  const pricedTotal = items.reduce(
+    (sum, item) => sum + (item.unitPrice > 0 ? item.lineTotal : 0),
+    0,
+  );
+
+  return hasUnpricedItems ? pricedTotal : fallbackTotal || pricedTotal;
+}
+
 export function OrderReceiptCard({
   receiptRef,
   orderNumber,
@@ -18,8 +35,6 @@ export function OrderReceiptCard({
   items: ReceiptItem[];
   totalAmount: number;
 }) {
-  void totalAmount;
-
   const fmtDate = (iso: string) =>
     new Intl.DateTimeFormat("th-TH", {
       day: "2-digit",
@@ -36,12 +51,13 @@ export function OrderReceiptCard({
       hour12: false,
     }).format(new Date(iso));
 
-  const FONT = "'Sarabun','Noto Sans Thai',sans-serif";
-  const COL = "1fr 60px 48px";
-  const SIDE_PADDING = "20px";
-  const RULE_MARGIN = "0 16px";
-  const LINE: CSSProperties = { borderTop: "1px solid #cccccc", margin: RULE_MARGIN };
-  const LINE_THICK: CSSProperties = { borderTop: "2px solid #000000", margin: RULE_MARGIN };
+  const font = "'Sarabun','Noto Sans Thai',sans-serif";
+  const columns = "1fr 58px 48px 76px";
+  const sidePadding = "20px";
+  const ruleMargin = "0 16px";
+  const line: CSSProperties = { borderTop: "1px solid #cccccc", margin: ruleMargin };
+  const lineThick: CSSProperties = { borderTop: "2px solid #000000", margin: ruleMargin };
+  const displayTotal = getPricedTotal(items, totalAmount);
 
   return (
     <div
@@ -53,7 +69,7 @@ export function OrderReceiptCard({
         flexShrink: 0,
         boxSizing: "border-box",
         backgroundColor: "#ffffff",
-        fontFamily: FONT,
+        fontFamily: font,
         color: "#000000",
         boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
         margin: "0 auto",
@@ -68,7 +84,7 @@ export function OrderReceiptCard({
         />
       </div>
 
-      <div style={{ textAlign: "center", padding: `0 ${SIDE_PADDING} 10px` }}>
+      <div style={{ textAlign: "center", padding: `0 ${sidePadding} 10px` }}>
         <div style={{ fontSize: "12px", lineHeight: 1.6 }}>T&amp;Y Noodle - ใบยืนยันคำสั่งซื้อ</div>
         <div style={{ fontSize: "16px", fontWeight: 800, lineHeight: 1.3, marginTop: "2px" }}>
           เลขที่ใบจัดส่ง: {orderNumber}
@@ -78,15 +94,15 @@ export function OrderReceiptCard({
         </div>
       </div>
 
-      <div style={LINE_THICK} />
+      <div style={lineThick} />
 
-      <div style={{ padding: `10px ${SIDE_PADDING} 12px` }}>
+      <div style={{ padding: `10px ${sidePadding} 12px` }}>
         <span style={{ fontWeight: 700, fontSize: "14px" }}>ร้านค้า:</span>
         <span style={{ fontSize: "14px" }}> {storeName}</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: COL, padding: `6px ${SIDE_PADDING}`, gap: "0 8px" }}>
-        {(["สินค้า", "จำนวน", "หน่วย"] as const).map((label, index) => (
+      <div style={{ display: "grid", gridTemplateColumns: columns, padding: `6px ${sidePadding}`, gap: "0 8px" }}>
+        {(["สินค้า", "จำนวน", "หน่วย", "รวม"] as const).map((label, index) => (
           <span
             key={label}
             style={{
@@ -100,15 +116,15 @@ export function OrderReceiptCard({
         ))}
       </div>
 
-      <div style={LINE} />
+      <div style={line} />
 
       {items.map((item, index) => (
         <div key={`${item.name}-${item.saleUnitLabel}-${index}`}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: COL,
-              padding: `10px ${SIDE_PADDING}`,
+              gridTemplateColumns: columns,
+              padding: `10px ${sidePadding}`,
               gap: "0 8px",
               alignItems: "center",
             }}
@@ -130,12 +146,29 @@ export function OrderReceiptCard({
             <div style={{ fontSize: "14px", textAlign: "right" }}>
               {item.saleUnitLabel}
             </div>
+            <div style={{ fontSize: "14px", fontWeight: 700, textAlign: "right" }}>
+              {item.unitPrice > 0 ? formatMoney(item.lineTotal) : "-"}
+            </div>
           </div>
-          <div style={LINE} />
+          <div style={line} />
         </div>
       ))}
 
-      <div style={{ padding: `36px ${SIDE_PADDING} 32px`, textAlign: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "12px",
+          padding: `14px ${sidePadding} 0`,
+        }}
+      >
+        <span style={{ fontSize: "14px", fontWeight: 800 }}>รวมทั้งหมด</span>
+        <span style={{ fontSize: "16px", fontWeight: 800 }}>
+          {displayTotal > 0 ? formatMoney(displayTotal) : "-"}
+        </span>
+      </div>
+
+      <div style={{ padding: `36px ${sidePadding} 32px`, textAlign: "center" }}>
         <div style={{ fontSize: "14px", fontWeight: 800, lineHeight: 1.6 }}>T&amp;Y Noodle</div>
         <div style={{ fontSize: "13px", marginTop: "2px", lineHeight: 1.6 }}>ขอบคุณสำหรับการสั่งซื้อครับ</div>
       </div>

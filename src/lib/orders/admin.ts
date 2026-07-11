@@ -2,6 +2,7 @@ import "server-only";
 
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 type QueryError = {
   message?: string;
@@ -79,6 +80,7 @@ export type OrderStoreSummary = {
   customerCode: string;
   customerId: string;
   customerName: string;
+  sortOrder: number;
   isComplete: boolean;
   latestOrderAt: string;
   orderRounds: number;
@@ -157,17 +159,10 @@ function normalizeSearchTerm(value: string | null | undefined) {
   return nextValue ? nextValue : null;
 }
 
-function sortOrderStores(a: OrderStoreSummary, b: OrderStoreSummary) {
-  const timeA = new Date(a.latestOrderAt).getTime();
-  const timeB = new Date(b.latestOrderAt).getTime();
-  if (timeB !== timeA) return timeB - timeA;
-  return a.customerName.localeCompare(b.customerName, "th");
-}
-
 function normalizeVisibleStores(stores: OrderStoreSummary[]) {
   const uniqueStores = new Map<string, OrderStoreSummary>();
 
-  for (const store of [...stores].filter((entry) => !entry.isComplete).sort(sortOrderStores)) {
+  for (const store of [...stores].filter((entry) => !entry.isComplete).sort(compareCustomerOrder)) {
     if (!uniqueStores.has(store.customerId)) {
       uniqueStores.set(store.customerId, store);
     }
@@ -204,7 +199,7 @@ async function getOrderStoreSummaries(
   const [customersResult, vehiclesResult] = await Promise.all([
     admin
       .from("customers")
-      .select("id, default_vehicle_id")
+      .select("id, default_vehicle_id, sort_order")
       .eq("organization_id", organizationId)
       .in("id", customerIds),
     admin
@@ -217,18 +212,22 @@ async function getOrderStoreSummaries(
 
   const vehicles = ((vehiclesResult.data ?? []) as { id: string; name: string }[]);
   const vehicleNameMap = new Map(vehicles.map((v) => [v.id, v.name]));
-  const customerVehicleMap = new Map(
-    ((customersResult.data ?? []) as { id: string; default_vehicle_id: string | null }[]).map(
-      (c) => [c.id, c.default_vehicle_id],
-    ),
+  const customerMap = new Map(
+    ((customersResult.data ?? []) as unknown as Array<{
+      id: string;
+      default_vehicle_id: string | null;
+      sort_order: number | string;
+    }>).map((c) => [c.id, c]),
   );
 
   const stores = rows.map((row) => {
-    const vehicleId = customerVehicleMap.get(row.customer_id) ?? null;
+    const customer = customerMap.get(row.customer_id);
+    const vehicleId = customer?.default_vehicle_id ?? null;
     return {
       customerCode: row.customer_code,
       customerId: row.customer_id,
       customerName: row.customer_name,
+      sortOrder: Number(customer?.sort_order ?? Number.MAX_SAFE_INTEGER),
       isComplete: !!row.is_complete,
       latestOrderAt: row.latest_order_at,
       orderRounds: normalizeNumeric(row.order_rounds),
@@ -241,7 +240,7 @@ async function getOrderStoreSummaries(
     };
   });
 
-  return { stores, vehicles };
+  return { stores: stores.toSorted(compareCustomerOrder), vehicles };
 }
 
 async function getOrderStoreDetail(

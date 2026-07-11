@@ -18,6 +18,7 @@ export type DeliveryNotePrintData = {
     name: string;
     code: string;
     address: string;
+    sortOrder?: number;
     vehicleId: string | null;
     vehicleName: string | null;
   };

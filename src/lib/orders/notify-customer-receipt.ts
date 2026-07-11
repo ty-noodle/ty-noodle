@@ -44,7 +44,7 @@ export async function notifyUpdatedCustomerReceiptForOrder(
 
   const { data: orderItems, error: orderItemsError } = await admin
     .from("order_items")
-    .select("product_id, quantity, sale_unit_label")
+    .select("product_id, quantity, sale_unit_label, unit_price, line_total")
     .eq("order_id", input.orderId)
     .eq("organization_id", input.organizationId);
 
@@ -69,16 +69,18 @@ export async function notifyUpdatedCustomerReceiptForOrder(
 
   const productNameById = new Map((products ?? []).map((product) => [product.id, product.name]));
   const receiptItems = orderItems.map((item) => ({
+    lineTotal: Number(item.line_total ?? 0),
     name: productNameById.get(item.product_id) ?? "-",
     quantity: Number(item.quantity ?? 0),
     saleUnitLabel: item.sale_unit_label ?? "",
+    unitPrice: Number(item.unit_price ?? 0),
   }));
 
   const receiptResult = await generateUploadAndNotifyCustomerReceiptImage({
     customerName: customer?.name?.trim() || "ลูกค้า",
     items: receiptItems,
     lineUserId,
-    orderDate: new Date().toISOString(),
+    orderDate: order.order_date,
     orderNumber: order.order_number,
     organizationId: input.organizationId,
     totalAmount: Number(order.total_amount ?? 0),

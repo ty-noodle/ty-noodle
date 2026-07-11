@@ -71,6 +71,7 @@ export function SettingsCustomersPageClient({
 	        <CustomerListPanel 
 	          customers={initialCustomers} 
           vehicles={vehicles} 
+          reorderEnabled={true}
 	          searchTerm={searchTerm}
 	        />
 	      </div>

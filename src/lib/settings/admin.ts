@@ -69,6 +69,7 @@ export type SettingsCustomer = {
   id: string;
   name: string;
   pricingCount: number;
+  sortOrder: number;
 };
 
 export type SettingsCustomerAddress = {
@@ -190,6 +191,7 @@ type CustomerRow = {
   name: string;
   postal_code: string | null;
   province: string | null;
+  sort_order: number | string;
   subdistrict: string | null;
 };
 
@@ -372,9 +374,10 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
       admin
         .from("customers")
         .select(
-          "id, customer_code, name, address, province, district, subdistrict, postal_code, metadata, default_vehicle_id, is_active",
+          "id, customer_code, name, address, province, district, subdistrict, postal_code, metadata, default_vehicle_id, is_active, sort_order",
         )
         .eq("organization_id", organizationId)
+        .order("sort_order", { ascending: true })
         .order("customer_code", { ascending: true }),
       admin
         .from("suppliers")
@@ -438,7 +441,7 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
   );
   const images = (imagesResult.data ?? []) as ProductImageRow[];
   const saleUnits = (saleUnitsResult.data ?? []) as ProductSaleUnitRow[];
-  const allCustomers = (customersResult.data ?? []) as CustomerRow[];
+  const allCustomers = (customersResult.data ?? []) as unknown as CustomerRow[];
   const customers = allCustomers.filter((customer) => customer.is_active);
   const suppliers = (suppliersResult.data ?? []) as SupplierRow[];
   const activeProductIds = new Set(
@@ -588,6 +591,7 @@ async function fetchSettingsData(organizationId: string): Promise<SettingsData> 
       id: customer.id,
       name: customer.name,
       pricingCount: customerPricingCount.get(customer.id) ?? 0,
+      sortOrder: Number(customer.sort_order),
     })),
     suppliers: suppliers.map((supplier) => ({
       address: supplier.address,

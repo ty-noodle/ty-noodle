@@ -11,6 +11,7 @@ import { getCustomerOrderCountsByDate, getIncomingOrders, getOrderDetailById } f
 import { getBilledDeliveryNumbersForRange } from "@/lib/billing/billing-statement";
 import { getPendingLineOrders } from "@/lib/orders/line-pending";
 import { getCustomersForOrder, getProductsForOrder, getVehiclesForOrder } from "@/lib/orders/manage";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { IncomingOrdersDeliveryActions } from "@/components/orders/incoming-orders-delivery-actions";
 import type {
@@ -375,7 +376,7 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     if (dateCompare !== 0) return dateCompare;
     const vehicleCompare = (a.vehicleName ?? "").localeCompare(b.vehicleName ?? "", "th");
     if (vehicleCompare !== 0) return vehicleCompare;
-    return `${a.customerCode} ${a.customerName}`.localeCompare(`${b.customerCode} ${b.customerName}`, "th");
+    return compareCustomerOrder(a, b);
   });
 
   const deliveryMap = new Map<string, string[]>();

@@ -66,6 +66,61 @@ function revalidateCustomerSettings(organizationId: string) {
   revalidateTag(`settings-${organizationId}`, "max");
 }
 
+export async function updateCustomerOrderAction(
+  customerIds: string[],
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await requireAppRole("admin");
+  const normalizedIds = Array.from(
+    new Set(
+      customerIds
+        .map((customerId) => String(customerId ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (normalizedIds.length === 0 || normalizedIds.length !== customerIds.length) {
+    return { error: "ลำดับร้านค้าไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง" };
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: customers, error: lookupError } = await admin
+    .from("customers")
+    .select("id")
+    .eq("organization_id", session.organizationId)
+    .eq("is_active", true);
+
+  const activeCustomerIds = new Set((customers ?? []).map((customer) => customer.id));
+  const containsExactlyActiveCustomers =
+    activeCustomerIds.size === normalizedIds.length &&
+    normalizedIds.every((customerId) => activeCustomerIds.has(customerId));
+
+  if (lookupError || !containsExactlyActiveCustomers) {
+    return { error: "พบข้อมูลร้านค้าไม่ครบถ้วน กรุณารีเฟรชหน้าแล้วลองใหม่" };
+  }
+
+  // The generated database types may predate the customer sort_order migration.
+  // Keep this cast local until the next type generation run includes the column.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const customersTable = admin.from("customers") as any;
+  const updatedAt = new Date().toISOString();
+  const results = await Promise.all(
+    normalizedIds.map((customerId, index) =>
+      customersTable
+        .update({ sort_order: index, updated_at: updatedAt })
+        .eq("id", customerId)
+        .eq("organization_id", session.organizationId)
+        .eq("is_active", true),
+    ),
+  );
+
+  if (results.some((result: { error?: unknown }) => result.error)) {
+    return { error: "บันทึกลำดับร้านค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+  }
+
+  revalidateCustomerSettings(session.organizationId);
+  return { success: true };
+}
+
 function getCustomerCodeMode(value: FormDataEntryValue | null): CustomerCodeMode {
   return value === "manual" ? "manual" : "auto";
 }

@@ -28,6 +28,7 @@ import {
 import { useCreateOrder } from "./create-order-context";
 import { getEffectiveSaleUnitCost } from "@/lib/products/sale-unit-cost";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
   createManualOrderAction,
@@ -113,33 +114,6 @@ function CreateOrderPortal({ children }: { children: React.ReactNode }) {
   if (typeof document === "undefined") return null;
 
   return createPortal(children, document.body);
-}
-
-const codeCollator = new Intl.Collator("th", {
-  numeric: true,
-  sensitivity: "base",
-});
-
-function getCodeSequence(code: string) {
-  const match = code.trim().match(/(\d+)/);
-  return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
-}
-
-function compareCustomerCode(left: OrderCustomerOption, right: OrderCustomerOption) {
-  const leftSequence = getCodeSequence(left.code);
-  const rightSequence = getCodeSequence(right.code);
-
-  if (leftSequence !== rightSequence) {
-    return leftSequence - rightSequence;
-  }
-
-  const codeComparison = codeCollator.compare(left.code.trim(), right.code.trim());
-
-  if (codeComparison !== 0) {
-    return codeComparison;
-  }
-
-  return left.name.localeCompare(right.name, "th");
 }
 
 function ActionPopup({
@@ -977,7 +951,7 @@ export function CreateOrderModal({
   );
   const selectedCustomerOrderCount = customerId ? customerOrderCountsByDate[customerId] ?? 0 : 0;
   const orderedCustomers = useMemo(
-    () => customers.toSorted(compareCustomerCode),
+    () => customers.toSorted(compareCustomerOrder),
     [customers],
   );
 

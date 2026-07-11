@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 
 export type DeliveryLineStatus = "complete" | "partial" | "unlinked";
@@ -49,6 +50,7 @@ export type DeliveryListItem = {
   customerId: string;
   customerName: string;
   customerCode: string;
+  sortOrder?: number;
   deliveryDate: string;
   deliveryNotes: DeliveryNoteEntry[];
   orderedAmount: number;
@@ -79,6 +81,7 @@ type RawDeliveryNoteRow = {
     id: string;
     name: string;
     customer_code: string;
+    sort_order: number | string;
   };
   orders: {
     order_number: string;
@@ -131,6 +134,7 @@ type GroupAccumulator = {
   customerId: string;
   customerName: string;
   customerCode: string;
+  sortOrder: number;
   deliveryDate: string;
   deliveryNotes: DeliveryNoteEntry[];
   orderedAmount: number;
@@ -159,7 +163,7 @@ export async function getDeliveryList(
     .from("delivery_notes")
     .select(`
       id, delivery_number, delivery_date, total_amount, notes,
-      customers!inner(id, name, customer_code),
+      customers!inner(id, name, customer_code, sort_order),
       orders(order_number)
     `)
     .eq("organization_id", organizationId)
@@ -180,7 +184,7 @@ export async function getDeliveryList(
   if (notesError || !notesData) return [];
 
   const normalizedKeyword = normalizeSearch(keyword);
-  const allNotes = notesData as RawDeliveryNoteRow[];
+  const allNotes = notesData as unknown as RawDeliveryNoteRow[];
   const filteredNotes = normalizedKeyword
     ? allNotes.filter((row) => {
         const customerName = normalizeSearch(row.customers.name);
@@ -318,6 +322,7 @@ export async function getDeliveryList(
       customerId: note.customers.id,
       customerName: note.customers.name,
       customerCode: note.customers.customer_code,
+      sortOrder: Number(note.customers.sort_order),
       deliveryDate: note.delivery_date,
       deliveryNotes: [],
       orderedAmount: 0,
@@ -443,6 +448,7 @@ export async function getDeliveryList(
         customerId: group.customerId,
         customerName: group.customerName,
         customerCode: group.customerCode,
+        sortOrder: group.sortOrder,
         deliveryDate: group.deliveryDate,
         deliveryNotes: group.deliveryNotes,
         orderedAmount: group.orderedAmount,
@@ -459,7 +465,7 @@ export async function getDeliveryList(
     })
     .sort((a, b) => {
       if (a.deliveryDate === b.deliveryDate) {
-        return a.customerName.localeCompare(b.customerName, "th");
+        return compareCustomerOrder(a, b);
       }
       return a.deliveryDate.localeCompare(b.deliveryDate);
     });

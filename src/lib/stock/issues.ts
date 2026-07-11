@@ -17,6 +17,7 @@ type CustomerRow = {
   customer_code: string | null;
   id: string;
   name: string | null;
+  sort_order: number | string;
 };
 
 type ProductRow = {
@@ -116,8 +117,9 @@ export const getStockIssueHistoryData = cache(async (organizationId: string, lim
     customerIds.length > 0
       ? admin
           .from("customers")
-          .select("id, customer_code, name")
+          .select("id, customer_code, name, sort_order")
           .in("id", customerIds)
+          .order("sort_order", { ascending: true })
           .order("customer_code", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     orderIds.length > 0

@@ -1,6 +1,7 @@
 import { requireAppRole } from "@/lib/auth/authorization";
 import type { DeliveryNotePrintData } from "@/lib/delivery/print";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { DeliveryNoteLayout } from "@/components/print/delivery-note-layout";
 import { AutoPrint, PrintButton } from "./print-button";
 
@@ -32,6 +33,7 @@ type RawDeliveryPrintRow = {
     customer_code: string;
     address: string | null;
     default_vehicle_id: string | null;
+    sort_order: number | string;
     vehicles: { id: string; name: string } | { id: string; name: string }[] | null;
   };
   organizations: {
@@ -180,6 +182,7 @@ function buildPrintData(rows: RawDeliveryPrintRow[]): DeliveryNotePrintData[] {
         name: base.customers.name || "Unknown",
         code: base.customers.customer_code || "Unknown",
         address: base.customers.address || "Unknown",
+        sortOrder: Number(base.customers.sort_order),
         vehicleId,
         vehicleName,
       },
@@ -215,7 +218,7 @@ export default async function DeliveryBatchPrintPage({ searchParams }: Props) {
     .select(`
       id, delivery_number, delivery_date, total_amount, notes, customer_id, vehicle_id,
       vehicles(id, name),
-      customers!inner(id, name, customer_code, address, default_vehicle_id, vehicles(id, name)),
+      customers!inner(id, name, customer_code, address, sort_order, default_vehicle_id, vehicles(id, name)),
       organizations!inner(name, metadata),
       orders(order_number),
       delivery_note_items(
@@ -268,9 +271,9 @@ export default async function DeliveryBatchPrintPage({ searchParams }: Props) {
         b.customer.vehicleId === null ? 999 : (vehicleSortIndexMap.get(b.customer.vehicleId) ?? 998);
       if (indexA !== indexB) return indexA - indexB;
 
-      return (
-        a.customer.code.localeCompare(b.customer.code, "th") ||
-        a.customer.name.localeCompare(b.customer.name, "th")
+      return compareCustomerOrder(
+        { code: a.customer.code, name: a.customer.name, sortOrder: a.customer.sortOrder },
+        { code: b.customer.code, name: b.customer.name, sortOrder: b.customer.sortOrder },
       );
     });
   }

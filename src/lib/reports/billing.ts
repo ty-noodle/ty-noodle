@@ -1,12 +1,14 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 export type BillingReportRow = {
   id: string;
   billingDate: string;
   customerCode: string;
   customerName: string;
+  sortOrder?: number;
   totalAmount: number;
 };
 
@@ -29,12 +31,8 @@ type CustomerRecord = {
   id: string;
   customer_code: string | null;
   name: string | null;
+  sort_order: number | string;
 };
-
-const customerCodeCollator = new Intl.Collator("th", {
-  numeric: true,
-  sensitivity: "base",
-});
 
 export async function getBillingReport(fromDate: string, toDate: string): Promise<BillingReportData> {
   const supabase = getSupabaseAdmin();
@@ -60,7 +58,7 @@ export async function getBillingReport(fromDate: string, toDate: string): Promis
     customerIds.length > 0
       ? await supabase
           .from("customers")
-          .select("id, customer_code, name")
+          .select("id, customer_code, name, sort_order")
           .in("id", customerIds)
       : { data: [] as CustomerRecord[], error: null };
 
@@ -68,7 +66,7 @@ export async function getBillingReport(fromDate: string, toDate: string): Promis
     console.error("Error fetching customers for billing:", customerResult.error.message);
   }
 
-  const customers = (customerResult.data ?? []) as CustomerRecord[];
+  const customers = (customerResult.data ?? []) as unknown as CustomerRecord[];
   const customerMap = new Map(customers.map((c) => [c.id, c]));
 
   const rows: BillingReportRow[] = billingRecords.map((item) => {
@@ -78,10 +76,11 @@ export async function getBillingReport(fromDate: string, toDate: string): Promis
       billingDate: item.billing_date,
       customerCode: customer?.customer_code ?? "-",
       customerName: customer?.name ?? "ไม่ทราบชื่อ",
+      sortOrder: customer ? Number(customer.sort_order) : undefined,
       totalAmount: Number(item.total_amount ?? 0),
     };
   }).sort((left, right) => {
-    const customerOrder = customerCodeCollator.compare(left.customerCode, right.customerCode);
+    const customerOrder = compareCustomerOrder(left, right);
     if (customerOrder !== 0) return customerOrder;
 
     const dateOrder = left.billingDate.localeCompare(right.billingDate);

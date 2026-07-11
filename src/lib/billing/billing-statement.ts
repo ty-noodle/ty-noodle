@@ -2,6 +2,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { PRINT_ORGANIZATION_NAME } from "@/components/print/print-shared";
+import { compareCustomerOrder } from "@/lib/settings/customer-order";
 
 export type SnapshotRow = {
   lineNumber: number;
@@ -205,12 +206,8 @@ async function getDeliveryNoteActualTotals(
   return deliveryTotals;
 }
 
-function sortByCustomerCode<T extends { customerCode: string; customerName: string }>(rows: T[]) {
-  return rows.sort((a, b) => {
-    const codeCompare = a.customerCode.localeCompare(b.customerCode, "th");
-    if (codeCompare !== 0) return codeCompare;
-    return a.customerName.localeCompare(b.customerName, "th");
-  });
+function sortByCustomerCode<T extends { customerCode: string; customerName: string; sortOrder?: number }>(rows: T[]) {
+  return rows.toSorted(compareCustomerOrder);
 }
 
 async function resolveBillingSyncActorUserId(organizationId: string) {
@@ -334,15 +331,16 @@ export async function getBillingCandidates(
     delivery_date: string;
     total_amount: number;
     notes: string | null;
-    customers: {
-      id: string;
-      name: string;
-      customer_code: string;
-    };
+      customers: {
+        id: string;
+        name: string;
+        customer_code: string;
+        sort_order: number | string;
+      };
   }
   let notes: DeliveryNoteCandidate[] = [];
   try {
-    notes = await fetchAllPaged((from, to) =>
+    notes = (await fetchAllPaged((from, to) =>
       supabase
         .from("delivery_notes")
         .select(`
@@ -355,7 +353,8 @@ export async function getBillingCandidates(
           customers!inner (
             id,
             name,
-            customer_code
+            customer_code,
+            sort_order
           )
         `)
         .eq("organization_id", organizationId)
@@ -363,7 +362,7 @@ export async function getBillingCandidates(
         .gte("delivery_date", fromDate)
         .lte("delivery_date", toDate)
         .range(from, to)
-    );
+    )) as unknown as DeliveryNoteCandidate[];
   } catch (notesError) {
     console.error("[billing] failed to load delivery notes for candidates", notesError);
     return [];
@@ -376,18 +375,19 @@ export async function getBillingCandidates(
 
   const grouped = new Map<string, BillingCandidate>();
 
-  for (const note of (notes as {
+  for (const note of (notes as unknown as {
     id: string;
     customer_id: string;
     total_amount: number;
     delivery_number: string;
     delivery_date: string;
-    customers: { name: string; customer_code: string };
+    customers: { name: string; customer_code: string; sort_order: number | string };
   }[])) {
     const current = grouped.get(note.customer_id) ?? {
       customerId: note.customer_id,
       customerName: note.customers.name,
       customerCode: note.customers.customer_code,
+      sortOrder: Number(note.customers.sort_order),
       deliveryCount: 0,
       totalAmount: 0,
       latestDeliveryDate: note.delivery_date,
@@ -506,17 +506,20 @@ export async function getBilledDeliveryNumbersForRange(
   return billedDeliveryNumbers;
 }
 
-export async function getCustomersForBilling(organizationId: string) {
+export async function getCustomersForBilling(
+  organizationId: string,
+): Promise<Array<{ id: string; name: string; customer_code: string }>> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("customers")
-    .select("id, name, customer_code")
+    .select("id, name, customer_code, sort_order")
     .eq("organization_id", organizationId)
     .eq("is_active", true)
+    .order("sort_order", { ascending: true })
     .order("customer_code", { ascending: true });
   
   if (error || !data) return [];
-  return data;
+  return (data ?? []) as unknown as Array<{ id: string; name: string; customer_code: string }>;
 }
 
 export async function getBillingHistory(

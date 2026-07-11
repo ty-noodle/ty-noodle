@@ -111,12 +111,13 @@ export async function getCustomersForFilter(
   const supabase = getSupabaseAdmin();
     const { data } = await supabase
     .from("customers")
-    .select("id, name")
+    .select("id, name, sort_order")
     .eq("organization_id", organizationId)
     .eq("is_active", true)
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
-  return ((data ?? []) as { id: string; name: string }[]).map((c) => ({
+  return ((data ?? []) as unknown as { id: string; name: string }[]).map((c) => ({
     id: c.id,
     name: c.name,
   }));
