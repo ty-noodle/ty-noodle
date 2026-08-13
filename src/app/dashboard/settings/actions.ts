@@ -59,7 +59,7 @@ function parseSaleUnits(formData: FormData, fallbackBaseUnit: string) {
   );
   const minOrderQtys = formData.getAll("saleUnitMinOrderQty").map((value) => {
     const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
-    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
+    return Number.isFinite(parsed) && parsed >= 0.001 ? parsed : 1;
   });
   const stepOrderQtys = formData.getAll("saleUnitStepOrderQty").map((value) => {
     const normalized = String(value ?? "").replace(/,/g, "").trim();

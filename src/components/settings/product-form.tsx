@@ -533,7 +533,7 @@ function ProductFormBody({
     setSaleUnits((current) =>
       current.map((saleUnit) => {
         if (saleUnit.key !== key) return saleUnit;
-        if (preset === "free") return { ...saleUnit, orderPreset: "free", minOrderQty: "1", stepOrderQty: "" };
+        if (preset === "free") return { ...saleUnit, orderPreset: "free", minOrderQty: "0.001", stepOrderQty: "" };
         if (preset === "integer") {
           return {
             ...saleUnit,
@@ -1019,7 +1019,7 @@ function ProductFormBody({
                             ? saleUnit.minOrderQty || "1"
                             : saleUnit.orderPreset === "integer"
                               ? String(INTEGER_ORDER_PRESET_QTY)
-                              : "1"
+                              : "0.001"
                         }
                       />
                       <input

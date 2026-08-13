@@ -31,6 +31,12 @@ import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manag
 import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
+  getEffectiveOrderMinimum,
+  isValidOrderQuantity as isValidByRule,
+  normalizeOrderQuantity as normalizeToRule,
+  stepOrderQuantity as stepByRule,
+} from "@/lib/orders/quantity-rules";
+import {
   createManualOrderAction,
   fetchCustomerOrderCountsForDateAction,
   fetchCustomerLastOrderItemsAction,
@@ -38,6 +44,10 @@ import {
   upsertCustomerPricesBatchFromOrderModalAction,
 } from "@/app/orders/incoming/actions";
 import type { CustomerLastOrderSnapshot } from "@/app/orders/incoming/types";
+import {
+  INCOMING_ORDER_SAVED_EVENT,
+  type IncomingOrderSavedEventDetail,
+} from "./incoming-order-live-update";
 
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 
@@ -162,19 +172,22 @@ function formatThaiShortDate(isoDate: string) {
 
 function getUnits(product: OrderProductOption): ProductUnit[] {
   if (product.saleUnits.length > 0) {
-    return product.saleUnits.map((unit) => ({
-      baseUnitQuantity: unit.baseUnitQuantity,
-      costMode: unit.costMode ?? null,
-      fixedCostPrice: unit.fixedCostPrice ?? null,
-      id: unit.id,
-      isDefault: unit.isDefault,
-      label: product.unit,
-      minOrderQty: Number(unit.minOrderQty ?? 1),
-      stepOrderQty:
+    return product.saleUnits.map((unit) => {
+      const stepOrderQty =
         unit.stepOrderQty === null || unit.stepOrderQty === undefined
           ? null
-          : Number(unit.stepOrderQty),
-    }));
+          : Number(unit.stepOrderQty);
+      return {
+        baseUnitQuantity: unit.baseUnitQuantity,
+        costMode: unit.costMode ?? null,
+        fixedCostPrice: unit.fixedCostPrice ?? null,
+        id: unit.id,
+        isDefault: unit.isDefault,
+        label: product.unit,
+        minOrderQty: getEffectiveOrderMinimum(Number(unit.minOrderQty ?? 1), stepOrderQty),
+        stepOrderQty,
+      };
+    });
   }
   return [
     {
@@ -184,59 +197,10 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
       id: null,
       isDefault: true,
       label: product.unit,
-      minOrderQty: 1,
+      minOrderQty: getEffectiveOrderMinimum(1, null),
       stepOrderQty: null,
     },
   ];
-}
-
-const QTY_SCALE = 1000;
-function toScaled(value: number) {
-  return Math.round(value * QTY_SCALE);
-}
-function fromScaled(value: number) {
-  return value / QTY_SCALE;
-}
-function getEffectiveStep(stepOrderQty: number | null) {
-  return stepOrderQty && Number.isFinite(stepOrderQty) && stepOrderQty > 0 ? stepOrderQty : 1;
-}
-function normalizeToRule(value: number, minOrderQty: number, stepOrderQty: number | null) {
-  const safeMin = Number.isFinite(minOrderQty) && minOrderQty > 0 ? minOrderQty : 1;
-  const safeStep =
-    stepOrderQty && Number.isFinite(stepOrderQty) && stepOrderQty > 0 ? stepOrderQty : null;
-  if (!Number.isFinite(value)) return safeMin;
-
-  const clamped = Math.max(value, safeMin);
-  if (!safeStep) return clamped;
-
-  const minScaled = toScaled(safeMin);
-  const stepScaled = Math.max(1, toScaled(safeStep));
-  const valueScaled = toScaled(clamped);
-  const snapped = minScaled + Math.round((valueScaled - minScaled) / stepScaled) * stepScaled;
-  return fromScaled(Math.max(minScaled, snapped));
-}
-function isValidByRule(value: number, minOrderQty: number, stepOrderQty: number | null) {
-  const safeMin = Number.isFinite(minOrderQty) && minOrderQty > 0 ? minOrderQty : 1;
-  if (!Number.isFinite(value) || value < safeMin) return false;
-
-  const safeStep =
-    stepOrderQty && Number.isFinite(stepOrderQty) && stepOrderQty > 0 ? stepOrderQty : null;
-  if (!safeStep) return true;
-
-  const offset = toScaled(value) - toScaled(safeMin);
-  const stepScaled = Math.max(1, toScaled(safeStep));
-  return offset % stepScaled === 0;
-}
-function stepByRule(
-  current: number,
-  direction: -1 | 1,
-  minOrderQty: number,
-  stepOrderQty: number | null,
-) {
-  const normalizedCurrent = normalizeToRule(current, minOrderQty, stepOrderQty);
-  const step = getEffectiveStep(stepOrderQty);
-  const nextValue = normalizedCurrent + direction * step;
-  return normalizeToRule(nextValue, minOrderQty, stepOrderQty);
 }
 
 function getUnitPrice(productId: string, unitId: string | null, priceMap: Record<string, number>) {
@@ -394,6 +358,9 @@ const ProductRow = React.memo(({
                 </button>
                 <input
                   type="number"
+                  inputMode="decimal"
+                  min={unit?.minOrderQty ?? 0.001}
+                  step={unit?.stepOrderQty ?? 0.001}
                   value={selection.quantity}
                   onChange={(e) => onUpdateSelection(product.id, "quantity", e.target.value)}
                   className="h-10 w-full min-w-0 rounded-2xl border-2 border-transparent bg-white px-2 text-center text-xl font-black text-slate-950 shadow-md outline-none focus:border-[#003366]/30"
@@ -1318,6 +1285,17 @@ export function CreateOrderModal({
       } else {
         setSuccess(null);
       }
+      if (result.incomingOrder) {
+        window.dispatchEvent(
+          new CustomEvent<IncomingOrderSavedEventDetail>(INCOMING_ORDER_SAVED_EVENT, {
+            detail: {
+              deliveryNumber: resolvedDeliveryNumber || null,
+              order: result.incomingOrder,
+            },
+          }),
+        );
+      }
+      startTransition(() => router.refresh());
       setShowSuccessOverlay(true);
       
       // Clear overlay after 3 seconds and reset form

@@ -14,6 +14,11 @@ import { revalidateDashboardPages } from "@/lib/dashboard/revalidate-dashboard-p
 import { mergeItemsIntoOrder, type MergeableOrderItemInput } from "@/lib/orders/merge-order-items";
 import { notifyUpdatedCustomerReceiptForOrder } from "@/lib/orders/notify-customer-receipt";
 import { syncDeliveryNoteForOrder } from "@/lib/orders/sync-delivery-note";
+import {
+  calculateBaseQuantity,
+  calculateLineTotal,
+  isValidOrderQuantity,
+} from "@/lib/orders/quantity-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type { ActionResult, CustomerLastOrderSnapshot, CustomerLastOrderItem } from "./types";
@@ -1237,7 +1242,7 @@ function mapManualItemsToMergeableInputs(
     productId: item.productId,
     productSaleUnitId: item.saleUnitId,
     quantity: item.quantity,
-    quantityInBaseUnit: item.quantity * item.saleUnitBaseQty,
+    quantityInBaseUnit: calculateBaseQuantity(item.quantity, item.saleUnitBaseQty),
     saleUnitLabel: item.saleUnitLabel,
     saleUnitRatio: item.saleUnitBaseQty,
     unitPrice: item.unitPrice,
@@ -1264,16 +1269,87 @@ export async function createManualOrderAction(formData: FormData): Promise<Actio
   if (!customerId) return { error: "กรุณาเลือกลูกค้า" };
   if (items.length === 0) return { error: "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ" };
 
-  console.log(`[createManualOrderAction] Received Date: ${orderDate}, Customer: ${customerId}`);
-
-  const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const { data: existingOrderRows, error: existingOrderError } = await admin
+  const saleUnitIds = Array.from(
+    new Set(items.map((item) => item.saleUnitId).filter((id): id is string => Boolean(id))),
+  );
+  const saleUnitsQuery = saleUnitIds.length > 0
+    ? admin
+        .from("product_sale_units")
+        .select("id, product_id, unit_label, base_unit_quantity, min_order_qty, step_order_qty")
+        .eq("organization_id", session.organizationId)
+        .eq("is_active", true)
+        .in("id", saleUnitIds)
+    : Promise.resolve({ data: [], error: null });
+  const existingOrdersQuery = admin
     .from("orders")
     .select("id, order_number, notes, subtotal_amount, total_amount, created_at, status")
     .eq("organization_id", session.organizationId)
     .eq("customer_id", customerId)
     .eq("order_date", orderDate)
     .order("created_at", { ascending: true });
+  const customerQuery = admin
+    .from("customers")
+    .select("id, customer_code, name, default_vehicle_id, vehicles(id, name)")
+    .eq("id", customerId)
+    .eq("organization_id", session.organizationId)
+    .single();
+  const [saleUnitsResult, existingOrdersResult, customerResult] = await Promise.all([
+    saleUnitsQuery,
+    existingOrdersQuery,
+    customerQuery,
+  ]);
+  const { data: saleUnits, error: saleUnitsError } = saleUnitsResult;
+
+  if (saleUnitsError) return { error: "ไม่สามารถตรวจสอบหน่วยขายของสินค้าได้" };
+  if (customerResult.error || !customerResult.data) {
+    return { error: "ไม่พบข้อมูลร้านค้าที่เลือก" };
+  }
+  const saleUnitsById = new Map((saleUnits ?? []).map((unit) => [unit.id, unit] as const));
+  const validatedItems: ManualOrderItem[] = [];
+
+  for (const item of items) {
+    const quantity = Number(item.quantity);
+    const unitPrice = Number(item.unitPrice);
+    if (!item.productId || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return { error: "ข้อมูลสินค้าและราคาไม่ถูกต้อง" };
+    }
+
+    const saleUnit = item.saleUnitId ? saleUnitsById.get(item.saleUnitId) : null;
+    if (item.saleUnitId && (!saleUnit || saleUnit.product_id !== item.productId)) {
+      return { error: "หน่วยขายของสินค้าไม่ถูกต้องหรือไม่ได้เปิดใช้งาน" };
+    }
+
+    const stepOrderQty = saleUnit?.step_order_qty == null
+      ? null
+      : Number(saleUnit.step_order_qty);
+    const minOrderQty = Number(saleUnit?.min_order_qty ?? 1);
+    if (!isValidOrderQuantity(quantity, minOrderQty, stepOrderQty)) {
+      return { error: "จำนวนสินค้าต้องมากกว่า 0 มีทศนิยมได้ไม่เกิน 3 ตำแหน่ง และตรงตามเงื่อนไขการสั่ง" };
+    }
+
+    const baseUnitQuantity = Number(saleUnit?.base_unit_quantity ?? item.saleUnitBaseQty ?? 1);
+    if (!Number.isFinite(baseUnitQuantity) || baseUnitQuantity <= 0) {
+      return { error: "อัตราแปลงหน่วยของสินค้าไม่ถูกต้อง" };
+    }
+
+    validatedItems.push({
+      ...item,
+      quantity,
+      saleUnitBaseQty: baseUnitQuantity,
+      saleUnitLabel: saleUnit?.unit_label ?? item.saleUnitLabel,
+      unitPrice,
+    });
+  }
+
+  items = validatedItems;
+
+  console.log(`[createManualOrderAction] Received Date: ${orderDate}, Customer: ${customerId}`);
+
+  const totalAmount = items.reduce(
+    (sum, item) => sum + calculateLineTotal(item.quantity, item.unitPrice),
+    0,
+  );
+  const { data: existingOrderRows, error: existingOrderError } = existingOrdersResult;
 
   if (existingOrderError) {
     console.error("[createManualOrderAction] Existing Order Lookup Error:", existingOrderError);
@@ -1400,10 +1476,49 @@ export async function createManualOrderAction(formData: FormData): Promise<Actio
   revalidatePath("/orders/incoming");
   revalidatePath("/orders");
 
+  updateTag(`orders-${session.organizationId}`);
+  const [savedOrderResult, savedItemsResult] = await Promise.all([
+    admin
+      .from("orders")
+      .select("id, order_number, order_date, status, fulfillment_status, total_amount, created_at, notes")
+      .eq("id", orderId)
+      .eq("organization_id", session.organizationId)
+      .single(),
+    admin
+      .from("order_items")
+      .select("product_id")
+      .eq("order_id", orderId),
+  ]);
+
+  const savedOrder = savedOrderResult.data;
+  const customer = customerResult.data;
+  const customerVehicle = customer?.vehicles as { id: string; name: string } | null | undefined;
+  const incomingOrder: IncomingOrderListItem | undefined = savedOrder && customer
+    ? {
+        channelLabel: "สร้าง",
+        createdAt: savedOrder.created_at,
+        customerCode: customer.customer_code,
+        customerId,
+        customerName: customer.name,
+        sortOrder: Number.MAX_SAFE_INTEGER,
+        id: savedOrder.id,
+        notes: savedOrder.notes,
+        orderDate: savedOrder.order_date,
+        orderNumber: savedOrder.order_number,
+        productCount: new Set((savedItemsResult.data ?? []).map((item) => item.product_id)).size,
+        fulfillmentStatus: savedOrder.fulfillment_status,
+        status: savedOrder.status,
+        totalAmount: Number(savedOrder.total_amount),
+        vehicleId: customer.default_vehicle_id,
+        vehicleName: customerVehicle?.name ?? null,
+      }
+    : undefined;
+
   return {
     success: true,
     orderNumber: String(effectiveOrderNumber),
     deliveryNumber: syncedDeliveryNumber,
+    incomingOrder,
   };
 }
 export async function linkPendingLineOrderAction(formData: FormData): Promise<ActionResult> {

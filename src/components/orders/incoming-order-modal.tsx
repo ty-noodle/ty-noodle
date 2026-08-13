@@ -22,11 +22,20 @@ import {
 } from "lucide-react";
 import type { OrderDetailData, IncomingOrderListItem } from "@/lib/orders/detail";
 import type { OrderProductOption } from "@/lib/orders/manage";
+import {
+  getEffectiveOrderMinimum,
+  getEffectiveOrderStep,
+  normalizeOrderQuantity,
+} from "@/lib/orders/quantity-rules";
 import type { AddedOrderItemDraft } from "@/components/orders/order-add-product-picker";
 import {
   deleteOrderCascadeActionV3,
   updateOrderItemsBatchAction,
 } from "@/app/orders/incoming/actions";
+import {
+  INCOMING_ORDER_DELETED_EVENT,
+  type IncomingOrderDeletedEventDetail,
+} from "@/components/orders/incoming-order-live-update";
 
 const loadOrderAddProductPicker = () =>
   import("@/components/orders/order-add-product-picker").then((mod) => mod.OrderAddProductPicker);
@@ -180,22 +189,28 @@ const EditItemsPanel = memo(({
 
   function getItemRules(productId: string, saleUnitId: string | null) {
     const product = products.find((p) => p.id === productId);
-    if (!product) return { min: 1, step: 1 };
+    if (!product) return { min: 1, step: 1, configuredStep: 1 };
     const unit = product.saleUnits.find((u) => u.id === (saleUnitId || null)) ||
                  (saleUnitId === null ? product.saleUnits.find(u => u.baseUnitQuantity === 1) : null);
-    if (unit) return { min: Number(unit.minOrderQty ?? 1), step: unit.stepOrderQty && unit.stepOrderQty > 0 ? Number(unit.stepOrderQty) : 1 };
-    return { min: 1, step: 1 };
+    if (unit) {
+      const configuredStep = unit.stepOrderQty == null ? null : Number(unit.stepOrderQty);
+      return {
+        min: getEffectiveOrderMinimum(Number(unit.minOrderQty ?? 1), configuredStep),
+        step: getEffectiveOrderStep(configuredStep),
+        configuredStep,
+      };
+    }
+    return { min: 1, step: 1, configuredStep: 1 };
   }
 
   function handleQty(itemId: string, delta: number) {
     setError(null);
     const item = detail.items.find((i) => i.id === itemId);
     if (!item) return;
-    const { min, step } = getItemRules(item.productId, item.productSaleUnitId);
+    const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
     setQuantities((prev: Record<string, number>) => {
       const current = prev[itemId] ?? item.quantity;
-      const nextRaw = current + delta * step;
-      const next = Math.max(min, Math.round((nextRaw - min) / step) * step + min);
+      const next = normalizeOrderQuantity(current + delta * step, min, configuredStep);
       setQuantityInputs((prevInputs) => ({ ...prevInputs, [itemId]: String(Number(next.toFixed(3))) }));
       return { ...prev, [itemId]: Number(next.toFixed(3)) };
     });
@@ -207,9 +222,8 @@ const EditItemsPanel = memo(({
       const idx = prev.findIndex((i) => i.key === key);
       if (idx === -1) return prev;
       const item = prev[idx];
-      const { min, step } = getItemRules(item.productId, item.productSaleUnitId);
-      const nextRaw = item.quantity + delta * step;
-      const next = Math.max(min, Math.round((nextRaw - min) / step) * step + min);
+      const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
+      const next = normalizeOrderQuantity(item.quantity + delta * step, min, configuredStep);
       const nextItems = [...prev];
       nextItems[idx] = { ...item, quantity: Number(next.toFixed(3)) };
       setAddedQuantityInputs((prevInputs) => ({
@@ -571,7 +585,7 @@ const EditItemsPanel = memo(({
                             <input
                               type="number"
                               inputMode="decimal"
-                              min={1}
+                              min={0.001}
                               step="0.001"
                               value={addedQuantityInputs[item.key] ?? String(item.quantity)}
                               onChange={(e) => handleAddedQuantityInput(item.key, e.target.value)}
@@ -644,7 +658,7 @@ const EditItemsPanel = memo(({
                               <input
                                 type="number"
                                 inputMode="decimal"
-                                min={1}
+                                min={0.001}
                                 step="0.001"
                                 value={quantityInputs[item.id] ?? String(qty)}
                                 onChange={(e) => handleQuantityInput(item.id, e.target.value)}
@@ -759,7 +773,7 @@ const EditItemsPanel = memo(({
                         <input
                           type="number"
                           inputMode="decimal"
-                          min={1}
+                          min={0.001}
                           step="0.001"
                           value={addedQuantityInputs[item.key] ?? String(item.quantity)}
                           onChange={(e) => handleAddedQuantityInput(item.key, e.target.value)}
@@ -841,7 +855,7 @@ const EditItemsPanel = memo(({
                           <input
                             type="number"
                             inputMode="decimal"
-                            min={1}
+                            min={0.001}
                             step="0.001"
                             value={quantityInputs[item.id] ?? String(qty)}
                             onChange={(e) => handleQuantityInput(item.id, e.target.value)}
@@ -1043,6 +1057,11 @@ export function IncomingOrderModal({
       setDeleteError(result.error);
       return;
     }
+    window.dispatchEvent(
+      new CustomEvent<IncomingOrderDeletedEventDetail>(INCOMING_ORDER_DELETED_EVENT, {
+        detail: { orderId: detail.id },
+      }),
+    );
     close();
     window.setTimeout(() => {
       router.refresh();

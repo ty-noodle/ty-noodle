@@ -17,6 +17,11 @@ import { fetchCustomerPricesAction } from "@/app/orders/incoming/actions";
 import { getEffectiveSaleUnitCost } from "@/lib/products/sale-unit-cost";
 import type { OrderProductOption } from "@/lib/orders/manage";
 import { normalizeSearch } from "@/lib/utils/search";
+import {
+  getEffectiveOrderMinimum,
+  getEffectiveOrderStep as getEffectiveStep,
+  normalizeOrderQuantity as normalizeQuantity,
+} from "@/lib/orders/quantity-rules";
 
 export type AddedOrderItemDraft = {
   imageUrl: string | null;
@@ -60,19 +65,22 @@ function formatTHB(value: number) {
 
 function getUnits(product: OrderProductOption): ProductUnit[] {
   if (product.saleUnits.length > 0) {
-    return product.saleUnits.map((unit) => ({
-      baseUnitQuantity: unit.baseUnitQuantity,
-      costMode: unit.costMode ?? null,
-      fixedCostPrice: unit.fixedCostPrice ?? null,
-      id: unit.id,
-      isDefault: unit.isDefault,
-      label: product.unit,
-      minOrderQty: Number(unit.minOrderQty ?? 1),
-      stepOrderQty:
+    return product.saleUnits.map((unit) => {
+      const stepOrderQty =
         unit.stepOrderQty === null || unit.stepOrderQty === undefined
           ? null
-          : Number(unit.stepOrderQty),
-    }));
+          : Number(unit.stepOrderQty);
+      return {
+        baseUnitQuantity: unit.baseUnitQuantity,
+        costMode: unit.costMode ?? null,
+        fixedCostPrice: unit.fixedCostPrice ?? null,
+        id: unit.id,
+        isDefault: unit.isDefault,
+        label: product.unit,
+        minOrderQty: getEffectiveOrderMinimum(Number(unit.minOrderQty ?? 1), stepOrderQty),
+        stepOrderQty,
+      };
+    });
   }
 
   return [
@@ -83,21 +91,10 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
       id: null,
       isDefault: true,
       label: product.unit,
-      minOrderQty: 1,
+      minOrderQty: getEffectiveOrderMinimum(1, null),
       stepOrderQty: null,
     },
   ];
-}
-
-function getEffectiveStep(stepOrderQty: number | null) {
-  return stepOrderQty && Number.isFinite(stepOrderQty) && stepOrderQty > 0 ? stepOrderQty : 1;
-}
-
-function normalizeQuantity(value: number, minOrderQty: number, stepOrderQty: number | null) {
-  const safeMin = Number.isFinite(minOrderQty) && minOrderQty > 0 ? minOrderQty : 1;
-  const clamped = Math.max(value, safeMin);
-  const step = getEffectiveStep(stepOrderQty);
-  return Number((Math.round((clamped - safeMin) / step) * step + safeMin).toFixed(3));
 }
 
 function getDefaultUnit(product: OrderProductOption) {
@@ -498,7 +495,7 @@ export function OrderAddProductPicker({
                                 <input
                                   type="number"
                                   min={selectedUnit.minOrderQty}
-                                  step={getEffectiveStep(selectedUnit.stepOrderQty)}
+                                  step={selectedUnit.stepOrderQty ?? 0.001}
                                   value={draft.quantity}
                                   onChange={(e) => {
                                     const val = Number(e.target.value);

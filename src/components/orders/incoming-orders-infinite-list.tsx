@@ -7,6 +7,15 @@ import { IncomingOrdersDesktopTable } from "@/components/orders/incoming-orders-
 import { IncomingOrdersMobileList } from "@/components/orders/incoming-orders-mobile-list";
 import type { IncomingOrderListItem, OrderDetailData } from "@/lib/orders/detail";
 import type { OrderProductOption, OrderVehicleOption } from "@/lib/orders/manage";
+import {
+  INCOMING_ORDER_DELETED_EVENT,
+  INCOMING_ORDER_SAVED_EVENT,
+  removeIncomingOrder,
+  shouldShowIncomingOrder,
+  upsertIncomingOrder,
+  type IncomingOrderDeletedEventDetail,
+  type IncomingOrderSavedEventDetail,
+} from "@/components/orders/incoming-order-live-update";
 
 type IncomingOrdersInfiniteListProps = {
   billedByCustomerDate: Record<string, boolean>;
@@ -57,6 +66,52 @@ export function IncomingOrdersInfiniteList({
   const [canLoadMore, setCanLoadMore] = useState(hasMore);
   const [loadMorePending, startLoadMoreTransition] = useTransition();
   const sensorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleIncomingOrderSaved(event: Event) {
+      const saved = (event as CustomEvent<IncomingOrderSavedEventDetail>).detail;
+      if (!saved?.order?.id) return;
+
+      const matchesFilters = shouldShowIncomingOrder(saved.order, {
+        endDate,
+        orderDate,
+        searchTerm,
+        selectedCustomerIds,
+      });
+
+      setLoadedOrders((current) =>
+        matchesFilters
+          ? upsertIncomingOrder(current, saved.order)
+          : current.filter((order) => order.id !== saved.order.id),
+      );
+
+      if (saved.deliveryNumber) {
+        const customerDateKey = `${saved.order.customerId}_${saved.order.orderDate}`;
+        const deliveryNumber = saved.deliveryNumber;
+        setLoadedDeliveryByCustomerId((current) => ({
+          ...current,
+          [customerDateKey]: Array.from(
+            new Set([...(current[customerDateKey] ?? []), deliveryNumber]),
+          ),
+        }));
+      }
+    }
+
+    window.addEventListener(INCOMING_ORDER_SAVED_EVENT, handleIncomingOrderSaved);
+    return () => window.removeEventListener(INCOMING_ORDER_SAVED_EVENT, handleIncomingOrderSaved);
+  }, [endDate, orderDate, searchTerm, selectedCustomerIds]);
+
+  useEffect(() => {
+    function handleIncomingOrderDeleted(event: Event) {
+      const deleted = (event as CustomEvent<IncomingOrderDeletedEventDetail>).detail;
+      if (!deleted?.orderId) return;
+
+      setLoadedOrders((current) => removeIncomingOrder(current, deleted.orderId));
+    }
+
+    window.addEventListener(INCOMING_ORDER_DELETED_EVENT, handleIncomingOrderDeleted);
+    return () => window.removeEventListener(INCOMING_ORDER_DELETED_EVENT, handleIncomingOrderDeleted);
+  }, []);
 
   useEffect(() => {
     function handleIncomingOrderUpdated(event: Event) {

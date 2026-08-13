@@ -2,6 +2,11 @@
 
 import { memo, useCallback, useState, type MutableRefObject } from "react";
 import { Lock, Minus, Plus, ShoppingCart } from "lucide-react";
+import {
+  getEffectiveOrderMinimum,
+  getEffectiveOrderStep,
+  normalizeOrderQuantity,
+} from "@/lib/orders/quantity-rules";
 
 const ModalQuantityStepper = memo(function ModalQuantityStepper({
   quantity,
@@ -80,19 +85,21 @@ export const ModalAddToCartFooter = memo(function ModalAddToCartFooter({
   const [pendingQty, setPendingQty] = useState(0);
 
   const handleDecrease = useCallback(() => {
-    const minQty = minOrderQty ?? 1;
-    const stepQty = stepOrderQty ?? 1;
+    const minQty = getEffectiveOrderMinimum(minOrderQty ?? 1, stepOrderQty);
+    const stepQty = getEffectiveOrderStep(stepOrderQty);
     setPendingQty((prev) => {
       if (prev <= minQty) return 0;
-      return prev - stepQty;
+      return normalizeOrderQuantity(prev - stepQty, minQty, stepOrderQty);
     });
   }, [minOrderQty, stepOrderQty]);
 
   const handleIncrease = useCallback(() => {
     if (!isOrderOpen) return;
-    const minQty = minOrderQty ?? 1;
-    const stepQty = stepOrderQty ?? 1;
-    setPendingQty((prev) => (prev === 0 ? minQty : prev + stepQty));
+    const minQty = getEffectiveOrderMinimum(minOrderQty ?? 1, stepOrderQty);
+    const stepQty = getEffectiveOrderStep(stepOrderQty);
+    setPendingQty((prev) =>
+      prev === 0 ? minQty : normalizeOrderQuantity(prev + stepQty, minQty, stepOrderQty),
+    );
   }, [isOrderOpen, minOrderQty, stepOrderQty]);
 
   const handleAddToCart = useCallback(() => {

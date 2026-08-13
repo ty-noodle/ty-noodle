@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { calculateLineTotal } from "@/lib/orders/quantity-rules";
 
 type Admin = SupabaseClient<Database>;
 
@@ -45,7 +46,7 @@ export function aggregateMergeableOrderItems(items: MergeableOrderItemInput[]) {
   for (const item of items) {
     const key = getOrderItemKey(item.productId, item.productSaleUnitId);
     const existing = grouped.get(key);
-    const lineTotal = Number(item.quantity) * Number(item.unitPrice);
+    const lineTotal = calculateLineTotal(Number(item.quantity), Number(item.unitPrice));
 
     if (!existing) {
       grouped.set(key, {
@@ -162,7 +163,7 @@ export async function mergeItemsIntoOrder(
     const key = getOrderItemKey(item.productId, item.productSaleUnitId);
     const existingGroup = groupedExisting.get(key);
     const existing = existingGroup?.[0];
-    const incomingLineTotal = Number(item.quantity) * Number(item.unitPrice);
+    const incomingLineTotal = calculateLineTotal(Number(item.quantity), Number(item.unitPrice));
 
     if (existing) {
       const currentQuantity = Number(existing.quantity ?? 0);

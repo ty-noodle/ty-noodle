@@ -211,7 +211,7 @@ export async function recordBillingHistoryAction(params: {
   const db = billingTable(supabase);
   const results: { customerId: string; billingNumber: string }[] = [];
 
-  const { data: existingRecords } = await db
+  const { data: existingRecords, error: existingRecordsError } = await db
     .from("billing_records")
     .select("customer_id, billing_number")
     .eq("organization_id", params.organizationId)
@@ -227,6 +227,15 @@ export async function recordBillingHistoryAction(params: {
       "to_date",
       params.items.map((item) => item.toDate),
     );
+
+  if (existingRecordsError) {
+    console.error("[billing] failed to check existing billing records", existingRecordsError);
+    return {
+      success: false as const,
+      error: "ตรวจสอบประวัติใบวางบิลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+      results: [],
+    };
+  }
 
   const existingMap = new Map<string, string>();
   existingRecords?.forEach((record) => {
@@ -244,14 +253,21 @@ export async function recordBillingHistoryAction(params: {
       continue;
     }
 
-    const { data: billingNumber } = await supabase.rpc("next_billing_number", {
+    const { data: billingNumber, error: billingNumberError } = await supabase.rpc("next_billing_number", {
       p_organization_id: params.organizationId,
       p_billing_date: item.billingDate,
     });
 
-    if (!billingNumber) continue;
+    if (billingNumberError || !billingNumber) {
+      console.error("[billing] failed to generate billing number", billingNumberError);
+      return {
+        success: false as const,
+        error: "สร้างเลขใบวางบิลไม่สำเร็จ ระบบจะไม่สั่งพิมพ์ กรุณาลองใหม่อีกครั้ง",
+        results,
+      };
+    }
 
-    await db.from("billing_records").insert({
+    const { error: insertError } = await db.from("billing_records").insert({
       organization_id: params.organizationId,
       customer_id: item.customerId,
       billing_number: billingNumber,
@@ -261,6 +277,19 @@ export async function recordBillingHistoryAction(params: {
       total_amount: item.totalAmount,
       snapshot_rows: item.snapshotRows,
     });
+
+    if (insertError) {
+      console.error("[billing] failed to save billing record", {
+        customerId: item.customerId,
+        billingNumber,
+        error: insertError,
+      });
+      return {
+        success: false as const,
+        error: `บันทึกใบวางบิล ${billingNumber} ไม่สำเร็จ ระบบจะไม่สั่งพิมพ์ กรุณาลองใหม่อีกครั้ง`,
+        results,
+      };
+    }
 
     results.push({ customerId: item.customerId, billingNumber });
   }

@@ -31,6 +31,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
+## Customer Receipt Cleanup
+
+Vercel Cron runs `/api/cron/cleanup-customer-receipts` daily at 03:00 UTC. It removes only files older than 30 days from `customer-receipts/<organization-id>/line-receipts/`.
+
+Set a strong `CRON_SECRET` value in the Vercel Production Environment Variables. Vercel sends it to the cron route automatically as a bearer token. No other Storage buckets or order data are deleted.
+
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

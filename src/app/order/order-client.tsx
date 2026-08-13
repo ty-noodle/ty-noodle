@@ -69,6 +69,11 @@ import {
   isOrderOpenAtMinutes,
 } from "@/lib/order-window";
 import { maskLineUserId, reportOrderDebugClient, summarizeError } from "@/lib/order-debug";
+import {
+  getEffectiveOrderMinimum,
+  getEffectiveOrderStep,
+  normalizeOrderQuantity,
+} from "@/lib/orders/quantity-rules";
 
 const EditOrderProductSheet = dynamic(() =>
   import("@/app/order/customer/components/order-edit-view").then(
@@ -210,6 +215,10 @@ function calcIsOrderOpen({
 
 function getConstraintError(qty: number, min: number, step: number | null): string | null {
   if (qty <= 0) return null;
+  min = getEffectiveOrderMinimum(min, step);
+  if (Math.abs(qty * 1000 - Math.round(qty * 1000)) > 1e-9) {
+    return "ใส่จำนวนทศนิยมได้ไม่เกิน 3 ตำแหน่ง";
+  }
   if (qty < min) return `สั่งขั้นต่ำ ${min} ${step !== null ? `(เช่น ${min}, ${min + step}...)` : ""}`;
   if (step !== null && (qty - min) % step !== 0) {
     return `เพิ่ม/ลดทีละ ${step} (เช่น ${min}, ${min + step}, ${min + step * 2}...)`;
@@ -781,17 +790,23 @@ export default function OrderClient({
     setCart((prev) => {
       const currentQty = prev[productId] || 0;
       const product = productsById.get(productId);
-      const minQty = product?.min_order_qty ?? 1;
-      const stepQty = product?.step_order_qty ?? 1;
+      const configuredMinQty = product?.min_order_qty ?? 1;
+      const configuredStepQty = product?.step_order_qty ?? null;
+      const minQty = getEffectiveOrderMinimum(configuredMinQty, configuredStepQty);
+      const stepQty = getEffectiveOrderStep(configuredStepQty);
 
       let next = currentQty;
       if (direction === "remove") {
         next = 0;
       } else if (direction === "increase") {
-        next = currentQty === 0 ? minQty : currentQty + stepQty;
+        next = currentQty === 0
+          ? minQty
+          : normalizeOrderQuantity(currentQty + stepQty, minQty, configuredStepQty);
       } else {
         const reduced = currentQty - stepQty;
-        next = reduced < minQty ? 0 : reduced;
+        next = reduced < minQty
+          ? 0
+          : normalizeOrderQuantity(reduced, minQty, configuredStepQty);
       }
 
       const newCart = { ...prev };

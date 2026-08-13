@@ -380,7 +380,7 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
           <div
             ref={mainScrollRef}
             data-horizontal-scroll="true"
-            className="overflow-x-auto touch-pan-x pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="overflow-x-auto touch-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <table className="min-w-[1180px] border-collapse text-left">
             <thead className="bg-slate-50 text-slate-950">

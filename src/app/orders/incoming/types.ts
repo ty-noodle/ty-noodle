@@ -6,6 +6,7 @@ export type ActionResult =
       orderDate?: string;
       orderNumber?: string;
       deliveryNumber?: string;
+      incomingOrder?: import("@/lib/orders/detail").IncomingOrderListItem;
       updatedOrder?: {
         id: string;
         notes: string | null;

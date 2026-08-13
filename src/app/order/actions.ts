@@ -24,6 +24,12 @@ import {
   type PendingOrderCreateItem,
 } from "@/lib/orders/line-pending";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  calculateBaseQuantity,
+  calculateLineTotal,
+  getEffectiveOrderMinimum,
+  isValidOrderQuantity,
+} from "@/lib/orders/quantity-rules";
 import type { Database, Json } from "@/types/database";
 
 // ---------------------- Types ----------------------
@@ -267,10 +273,18 @@ async function buildOrderItemData(
   for (const item of items) {
     const saleUnit = saleUnitMap.get(item.productSaleUnitId);
     if (!saleUnit) continue;
-    const minQty = Number(saleUnit.min_order_qty ?? 1);
+    const configuredMinQty = Number(saleUnit.min_order_qty ?? 1);
     const stepQty: number | null = saleUnit.step_order_qty !== null && saleUnit.step_order_qty !== undefined
       ? Number(saleUnit.step_order_qty)
       : null;
+    const minQty = getEffectiveOrderMinimum(configuredMinQty, stepQty);
+
+    if (!isValidOrderQuantity(item.quantity, configuredMinQty, stepQty)) {
+      return {
+        success: false as const,
+        error: `จำนวนสินค้า "${saleUnit.unit_label}" ไม่ถูกต้อง (ขั้นต่ำ ${minQty} และทศนิยมไม่เกิน 3 ตำแหน่ง)`,
+      };
+    }
 
     if (item.quantity < minQty) {
       return {
@@ -305,11 +319,14 @@ async function buildOrderItemData(
       product_id: item.productId,
       product_sale_unit_id: item.productSaleUnitId,
       quantity: item.quantity,
-      quantity_in_base_unit: item.quantity * Number(saleUnit?.base_unit_quantity ?? 1),
+      quantity_in_base_unit: calculateBaseQuantity(
+        item.quantity,
+        Number(saleUnit?.base_unit_quantity ?? 1),
+      ),
       sale_unit_label: saleUnit?.unit_label ?? product?.unit ?? "-",
       sale_unit_ratio: Number(saleUnit?.base_unit_quantity ?? 1),
       unit_price: unitPrice,
-      line_total: item.quantity * unitPrice,
+      line_total: calculateLineTotal(item.quantity, unitPrice),
       cost_price: costPrice,
     };
   });
