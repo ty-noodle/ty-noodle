@@ -26,6 +26,7 @@ import {
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
   normalizeOrderQuantity,
+  stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 import type { AddedOrderItemDraft } from "@/components/orders/order-add-product-picker";
 import {
@@ -210,7 +211,7 @@ const EditItemsPanel = memo(({
     const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
     setQuantities((prev: Record<string, number>) => {
       const current = prev[itemId] ?? item.quantity;
-      const next = normalizeOrderQuantity(current + delta * step, min, configuredStep);
+      const next = stepOrderQuantity(current, delta < 0 ? -1 : 1, min, configuredStep);
       setQuantityInputs((prevInputs) => ({ ...prevInputs, [itemId]: String(Number(next.toFixed(3))) }));
       return { ...prev, [itemId]: Number(next.toFixed(3)) };
     });
@@ -223,7 +224,7 @@ const EditItemsPanel = memo(({
       if (idx === -1) return prev;
       const item = prev[idx];
       const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
-      const next = normalizeOrderQuantity(item.quantity + delta * step, min, configuredStep);
+      const next = stepOrderQuantity(item.quantity, delta < 0 ? -1 : 1, min, configuredStep);
       const nextItems = [...prev];
       nextItems[idx] = { ...item, quantity: Number(next.toFixed(3)) };
       setAddedQuantityInputs((prevInputs) => ({

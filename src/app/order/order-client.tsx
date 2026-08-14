@@ -72,7 +72,9 @@ import { maskLineUserId, reportOrderDebugClient, summarizeError } from "@/lib/or
 import {
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
+  getDefaultOrderQuantity,
   normalizeOrderQuantity,
+  stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 
 const EditOrderProductSheet = dynamic(() =>
@@ -794,19 +796,20 @@ export default function OrderClient({
       const configuredStepQty = product?.step_order_qty ?? null;
       const minQty = getEffectiveOrderMinimum(configuredMinQty, configuredStepQty);
       const stepQty = getEffectiveOrderStep(configuredStepQty);
+      const defaultQty = getDefaultOrderQuantity(configuredMinQty, configuredStepQty);
 
       let next = currentQty;
       if (direction === "remove") {
         next = 0;
       } else if (direction === "increase") {
         next = currentQty === 0
-          ? minQty
-          : normalizeOrderQuantity(currentQty + stepQty, minQty, configuredStepQty);
+          ? defaultQty
+          : stepOrderQuantity(currentQty, 1, configuredMinQty, configuredStepQty);
       } else {
         const reduced = currentQty - stepQty;
         next = reduced < minQty
           ? 0
-          : normalizeOrderQuantity(reduced, minQty, configuredStepQty);
+          : stepOrderQuantity(currentQty, -1, configuredMinQty, configuredStepQty);
       }
 
       const newCart = { ...prev };

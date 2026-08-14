@@ -8,7 +8,8 @@ import type { CustomerOrderRow } from "@/app/order/customer/order-client-types";
 import {
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
-  normalizeOrderQuantity,
+  getDefaultOrderQuantity,
+  stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 
 type OrderEditViewProps = {
@@ -134,11 +135,7 @@ export const OrderEditView = memo(function OrderEditView({
                           onUpdateEditQuantity(product.id, 0);
                           return;
                         }
-                        const nextQty = normalizeOrderQuantity(
-                          nextQtyRaw,
-                          minQty,
-                          configuredStepQty,
-                        );
+                        const nextQty = stepOrderQuantity(quantity, -1, product.min_order_qty ?? 1, configuredStepQty);
                         onUpdateEditQuantity(product.id, nextQty);
                       }}
                       className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition-all hover:bg-white active:scale-90"
@@ -150,8 +147,8 @@ export const OrderEditView = memo(function OrderEditView({
                       onClick={() => onUpdateEditQuantity(
                         product.id,
                         quantity === 0
-                          ? minQty
-                          : normalizeOrderQuantity(quantity + stepQty, minQty, configuredStepQty),
+                          ? getDefaultOrderQuantity(product.min_order_qty ?? 1, configuredStepQty)
+                          : stepOrderQuantity(quantity, 1, product.min_order_qty ?? 1, configuredStepQty),
                       )}
                       className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition-all hover:bg-white active:scale-90"
                     >
@@ -269,7 +266,7 @@ export const EditOrderProductSheet = memo(function EditOrderProductSheet({
                               product.id,
                               nextRaw < minQty
                                 ? 0
-                                : normalizeOrderQuantity(nextRaw, minQty, configuredStepQty),
+                                : stepOrderQuantity(qty, -1, product.min_order_qty ?? 1, configuredStepQty),
                             );
                           }}
                           className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition-all hover:bg-white active:scale-90"
@@ -282,7 +279,7 @@ export const EditOrderProductSheet = memo(function EditOrderProductSheet({
                         <button
                           onClick={() => onUpdateEditQuantity(
                             product.id,
-                            normalizeOrderQuantity(qty + stepQty, minQty, configuredStepQty),
+                            stepOrderQuantity(qty, 1, product.min_order_qty ?? 1, configuredStepQty),
                           )}
                           className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition-all hover:bg-white active:scale-90"
                         >
@@ -291,7 +288,7 @@ export const EditOrderProductSheet = memo(function EditOrderProductSheet({
                       </div>
                     ) : (
                       <button
-                        onClick={() => onUpdateEditQuantity(product.id, minQty)}
+                        onClick={() => onUpdateEditQuantity(product.id, getDefaultOrderQuantity(product.min_order_qty ?? 1, configuredStepQty))}
                         className="flex h-9 items-center gap-1 rounded-full bg-[#003366] px-4 text-xs font-bold text-white transition-all active:scale-95"
                       >
                         <Plus className="h-3.5 w-3.5" />

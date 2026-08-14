@@ -18,9 +18,9 @@ import { getEffectiveSaleUnitCost } from "@/lib/products/sale-unit-cost";
 import type { OrderProductOption } from "@/lib/orders/manage";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
-  getEffectiveOrderMinimum,
-  getEffectiveOrderStep as getEffectiveStep,
+  getDefaultOrderQuantity,
   normalizeOrderQuantity as normalizeQuantity,
+  stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 
 export type AddedOrderItemDraft = {
@@ -77,7 +77,7 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
         id: unit.id,
         isDefault: unit.isDefault,
         label: product.unit,
-        minOrderQty: getEffectiveOrderMinimum(Number(unit.minOrderQty ?? 1), stepOrderQty),
+        minOrderQty: getDefaultOrderQuantity(Number(unit.minOrderQty ?? 1), stepOrderQty),
         stepOrderQty,
       };
     });
@@ -91,7 +91,7 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
       id: null,
       isDefault: true,
       label: product.unit,
-      minOrderQty: getEffectiveOrderMinimum(1, null),
+      minOrderQty: getDefaultOrderQuantity(1, null),
       stepOrderQty: null,
     },
   ];
@@ -209,8 +209,9 @@ export function OrderAddProductPicker({
 
     updateSelection(product.id, (current) => ({
       ...current,
-      quantity: normalizeQuantity(
-        current.quantity + direction * getEffectiveStep(unit.stepOrderQty),
+      quantity: stepOrderQuantity(
+        current.quantity,
+        direction,
         unit.minOrderQty,
         unit.stepOrderQty,
       ),
@@ -494,8 +495,8 @@ export function OrderAddProductPicker({
                                 </button>
                                 <input
                                   type="number"
-                                  min={selectedUnit.minOrderQty}
-                                  step={selectedUnit.stepOrderQty ?? 0.001}
+                                  min={selectedUnit.stepOrderQty == null ? 0.5 : selectedUnit.minOrderQty}
+                                  step={selectedUnit.stepOrderQty ?? 0.5}
                                   value={draft.quantity}
                                   onChange={(e) => {
                                     const val = Number(e.target.value);

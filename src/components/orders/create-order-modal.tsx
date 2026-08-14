@@ -32,6 +32,7 @@ import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
   getEffectiveOrderMinimum,
+  getDefaultOrderQuantity,
   isValidOrderQuantity as isValidByRule,
   normalizeOrderQuantity as normalizeToRule,
   stepOrderQuantity as stepByRule,
@@ -184,7 +185,7 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
         id: unit.id,
         isDefault: unit.isDefault,
         label: product.unit,
-        minOrderQty: getEffectiveOrderMinimum(Number(unit.minOrderQty ?? 1), stepOrderQty),
+        minOrderQty: getDefaultOrderQuantity(Number(unit.minOrderQty ?? 1), stepOrderQty),
         stepOrderQty,
       };
     });
@@ -197,7 +198,7 @@ function getUnits(product: OrderProductOption): ProductUnit[] {
       id: null,
       isDefault: true,
       label: product.unit,
-      minOrderQty: getEffectiveOrderMinimum(1, null),
+      minOrderQty: getDefaultOrderQuantity(1, null),
       stepOrderQty: null,
     },
   ];
@@ -359,8 +360,8 @@ const ProductRow = React.memo(({
                 <input
                   type="number"
                   inputMode="decimal"
-                  min={unit?.minOrderQty ?? 0.001}
-                  step={unit?.stepOrderQty ?? 0.001}
+                  min={unit?.stepOrderQty == null ? 0.5 : (unit?.minOrderQty ?? 1)}
+                  step={unit?.stepOrderQty ?? 0.5}
                   value={selection.quantity}
                   onChange={(e) => onUpdateSelection(product.id, "quantity", e.target.value)}
                   className="h-10 w-full min-w-0 rounded-2xl border-2 border-transparent bg-white px-2 text-center text-xl font-black text-slate-950 shadow-md outline-none focus:border-[#003366]/30"

@@ -4,20 +4,26 @@ import test from "node:test";
 import {
   calculateBaseQuantity,
   calculateLineTotal,
+  getDefaultOrderQuantity,
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
   isValidOrderQuantity,
   normalizeOrderQuantity,
 } from "../../src/lib/orders/quantity-rules.ts";
 
-test("free ordering accepts any positive quantity with up to three decimals", () => {
-  assert.equal(getEffectiveOrderMinimum(1, null), 0.001);
-  assert.equal(getEffectiveOrderStep(null), 0.1);
-  assert.equal(isValidOrderQuantity(0.1, 1, null), true);
-  assert.equal(isValidOrderQuantity(0.2, 1, null), true);
-  assert.equal(isValidOrderQuantity(0.001, 1, null), true);
-  assert.equal(isValidOrderQuantity(0.0001, 1, null), false);
-  assert.equal(normalizeOrderQuantity(0.2, 1, null), 0.2);
+test("free ordering accepts only half a unit or positive whole numbers", () => {
+  assert.equal(getDefaultOrderQuantity(1, null), 1);
+  assert.equal(getEffectiveOrderMinimum(1, null), 0.5);
+  assert.equal(getEffectiveOrderStep(null), 1);
+  assert.equal(isValidOrderQuantity(0.5, 1, null), true);
+  assert.equal(isValidOrderQuantity(1, 1, null), true);
+  assert.equal(isValidOrderQuantity(5, 1, null), true);
+  assert.equal(isValidOrderQuantity(0.1, 1, null), false);
+  assert.equal(isValidOrderQuantity(0.2, 1, null), false);
+  assert.equal(isValidOrderQuantity(0.6, 1, null), false);
+  assert.equal(isValidOrderQuantity(1.5, 1, null), false);
+  assert.equal(normalizeOrderQuantity(0.2, 1, null), 0.5);
+  assert.equal(normalizeOrderQuantity(1.5, 1, null), 1);
 });
 
 test("fixed-step ordering keeps its configured minimum and increment", () => {
@@ -27,8 +33,8 @@ test("fixed-step ordering keeps its configured minimum and increment", () => {
 });
 
 test("fractional orders calculate stock and money at database precision", () => {
-  assert.equal(calculateBaseQuantity(0.1, 20), 2);
-  assert.equal(calculateBaseQuantity(0.2, 12.5), 2.5);
-  assert.equal(calculateLineTotal(0.1, 99.99), 10);
-  assert.equal(calculateLineTotal(0.2, 125), 25);
+  assert.equal(calculateBaseQuantity(0.5, 20), 10);
+  assert.equal(calculateBaseQuantity(0.5, 12.5), 6.25);
+  assert.equal(calculateLineTotal(0.5, 99.99), 50);
+  assert.equal(calculateLineTotal(0.5, 125), 62.5);
 });
