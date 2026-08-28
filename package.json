@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "benchmark:dashboard": "node scripts/benchmark-dashboard.mjs",
     "gen:types": "node scripts/gen-supabase-types.mjs",
     "push:vapid": "node scripts/generate-web-push-vapid.mjs"
   },

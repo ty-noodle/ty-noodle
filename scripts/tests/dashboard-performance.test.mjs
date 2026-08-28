@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
+import { summarizeDurations } from "../benchmark-dashboard.mjs";
 
 const migrationsDirectory = "supabase/migrations";
 const overviewSource = readFileSync("src/lib/dashboard/overview.ts", "utf8");
@@ -53,4 +54,13 @@ test("orders and settings use recognized loading filenames", () => {
   assert.equal(existsSync("src/app/settings/loading.tsx"), true);
   assert.equal(existsSync("src/app/orders/_loading.tsx"), false);
   assert.equal(existsSync("src/app/settings/_loading.tsx"), false);
+});
+
+test("dashboard benchmark summarizes latency percentiles", () => {
+  assert.deepEqual(summarizeDurations([100, 200, 300, 400]), {
+    medianMs: 250,
+    p75Ms: 325,
+    p95Ms: 385,
+    maxMs: 400,
+  });
 });
