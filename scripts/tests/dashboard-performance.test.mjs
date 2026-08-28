@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const migrationsDirectory = "supabase/migrations";
+const overviewSource = readFileSync("src/lib/dashboard/overview.ts", "utf8");
 
 function findDashboardMigration() {
   const matches = readdirSync(migrationsDirectory).filter((file) =>
@@ -28,4 +29,16 @@ test("dashboard migration aggregates pending deliveries without a row limit", ()
 test("dashboard migration fixes the function search path", () => {
   const sql = readFileSync(findDashboardMigration(), "utf8");
   assert.match(sql, /set\s+search_path\s*=\s*''/i);
+});
+
+test("dashboard uses the aggregate snapshot with a legacy compatibility path", () => {
+  assert.match(overviewSource, /getDashboardAggregateSnapshot/);
+  assert.match(overviewSource, /getDashboardOverviewLegacy/);
+});
+
+test("the optimized overview skips unbounded pending-delivery row loading", () => {
+  assert.match(
+    overviewSource,
+    /aggregateSnapshot\s*\?[\s\S]*Promise\.resolve\(\{ data: \[\][\s\S]*pending delivery/is,
+  );
 });

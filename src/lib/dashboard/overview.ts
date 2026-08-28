@@ -2,8 +2,10 @@ import "server-only";
 
 import { getTodayInBangkok } from "@/lib/orders/date";
 import { getRecentDailyPerformance } from "@/lib/reports/sales-overview";
+import { getDashboardAggregateSnapshot } from "@/lib/dashboard/snapshot";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStockDashboardData, type StockProductOption, type StockSupplierOption } from "@/lib/stock/admin";
+import type { DashboardAggregateSnapshot } from "@/lib/dashboard/snapshot-core.mjs";
 import type { Json } from "@/types/database";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -190,7 +192,10 @@ async function loadTodayNetProfit(
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 
-export async function getDashboardOverview(organizationId: string): Promise<DashboardOverview> {
+async function getDashboardOverviewData(
+  organizationId: string,
+  aggregateSnapshot: DashboardAggregateSnapshot | null,
+): Promise<DashboardOverview> {
   const supabase = getSupabaseAdmin();
   const today = getTodayInBangkok();
   const monthStart = firstOfMonth(today);
@@ -210,33 +215,41 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
     lineSourceOrdersRes,
   ] = await Promise.all([
     // 1. Today's submitted/confirmed orders
-    supabase.from("orders")
-      .select("id, total_amount")
-      .eq("organization_id", organizationId)
-      .eq("order_date", today)
-      .in("status", ["submitted", "confirmed"]),
+    aggregateSnapshot
+      ? Promise.resolve({ data: [] as unknown[] })
+      : supabase.from("orders")
+          .select("id, total_amount")
+          .eq("organization_id", organizationId)
+          .eq("order_date", today)
+          .in("status", ["submitted", "confirmed"]),
 
     // 3. Pending delivery notes
-    supabase.from("delivery_notes")
-      .select("id, total_amount")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .eq("dispatch_status", "pending"),
+    aggregateSnapshot
+      ? Promise.resolve({ data: [] as unknown[] })
+      : supabase.from("delivery_notes")
+          .select("id, total_amount")
+          .eq("organization_id", organizationId)
+          .eq("status", "confirmed")
+          .eq("dispatch_status", "pending"),
 
     // 3. This month's delivered amount
-    supabase.from("delivery_notes")
-      .select("total_amount")
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .eq("dispatch_status", "delivered")
-      .gte("delivery_date", monthStart)
-      .lte("delivery_date", today),
+    aggregateSnapshot
+      ? Promise.resolve({ data: [] as unknown[] })
+      : supabase.from("delivery_notes")
+          .select("total_amount")
+          .eq("organization_id", organizationId)
+          .eq("status", "confirmed")
+          .eq("dispatch_status", "delivered")
+          .gte("delivery_date", monthStart)
+          .lte("delivery_date", today),
 
     // 4. Active customers
-    supabase.from("customers")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("is_active", true),
+    aggregateSnapshot
+      ? Promise.resolve({ count: 0 })
+      : supabase.from("customers")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("is_active", true),
 
     // 5. Recent 5 orders
     supabase.from("orders")
@@ -259,7 +272,13 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
     getRecentDailyPerformance(organizationId, 7, today),
 
     // 10. Today's profit snapshot
-    loadTodayNetProfit(organizationId, today),
+    aggregateSnapshot
+      ? Promise.resolve({
+          netProfit: aggregateSnapshot.todayNetProfit,
+          totalCost: aggregateSnapshot.todayCost,
+          totalRevenue: aggregateSnapshot.todayOrderAmount,
+        })
+      : loadTodayNetProfit(organizationId, today),
 
     // 11. Today's LINE orders that still need a store link
     supabase.from("line_pending_orders")
@@ -319,18 +338,20 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
       return source === "line" || source === "line_pending" || hasLinkedLineCustomer;
     });
 
-  const kpi: DashboardKpi = {
-    todayOrderCount: todayOrders.length,
-    todayOrderAmount: todayDeliveryRevenue,
-    todayNetProfit,
-    todayCost,
-    submittedOrderCount: lineOrderRows.length + lineSourceOrderRows.length,
-    pendingDeliveryCount: pendingDeliveries.length,
-    pendingDeliveryAmount: pendingDeliveries.reduce((s, r) => s + toNum(r.total_amount), 0),
-    monthDeliveredAmount: monthDelivered.reduce((s, r) => s + toNum(r.total_amount), 0),
-    activeCustomerCount: toNum(activeCustomerRes.count),
-    lowStockCount: stockDashboardRes.lowStockCount,
-  };
+  const kpi: DashboardKpi = aggregateSnapshot
+    ? { ...aggregateSnapshot }
+    : {
+        todayOrderCount: todayOrders.length,
+        todayOrderAmount: todayDeliveryRevenue,
+        todayNetProfit,
+        todayCost,
+        submittedOrderCount: lineOrderRows.length + lineSourceOrderRows.length,
+        pendingDeliveryCount: pendingDeliveries.length,
+        pendingDeliveryAmount: pendingDeliveries.reduce((s, r) => s + toNum(r.total_amount), 0),
+        monthDeliveredAmount: monthDelivered.reduce((s, r) => s + toNum(r.total_amount), 0),
+        activeCustomerCount: toNum(activeCustomerRes.count),
+        lowStockCount: stockDashboardRes.lowStockCount,
+      };
 
   const recentOrders: RecentOrder[] = recentRaw.map((r) => ({
     id: r.id,
@@ -553,4 +574,26 @@ export async function getDashboardOverview(organizationId: string): Promise<Dash
     stockSuppliers: stockDashboardRes.suppliers,
     lineOrders,
   };
+}
+
+export async function getDashboardOverviewLegacy(
+  organizationId: string,
+): Promise<DashboardOverview> {
+  return getDashboardOverviewData(organizationId, null);
+}
+
+export async function getDashboardOverview(
+  organizationId: string,
+): Promise<DashboardOverview> {
+  const today = getTodayInBangkok();
+
+  try {
+    const aggregateSnapshot = await getDashboardAggregateSnapshot(organizationId, today);
+    return await getDashboardOverviewData(organizationId, aggregateSnapshot);
+  } catch (error) {
+    console.error("dashboard_snapshot_fallback", {
+      reason: error instanceof Error ? error.name : "UnknownError",
+    });
+    return getDashboardOverviewLegacy(organizationId);
+  }
 }
