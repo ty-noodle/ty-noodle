@@ -4,6 +4,7 @@ import test from "node:test";
 
 const migrationsDirectory = "supabase/migrations";
 const overviewSource = readFileSync("src/lib/dashboard/overview.ts", "utf8");
+const sidebarSource = readFileSync("src/components/app-sidebar.tsx", "utf8");
 
 function findDashboardMigration() {
   const matches = readdirSync(migrationsDirectory).filter((file) =>
@@ -41,4 +42,15 @@ test("the optimized overview skips unbounded pending-delivery row loading", () =
     overviewSource,
     /aggregateSnapshot\s*\?[\s\S]*Promise\.resolve\(\{ data: \[\][\s\S]*pending delivery/is,
   );
+});
+
+test("primary navigation does not disable App Router prefetch", () => {
+  assert.doesNotMatch(sidebarSource, /prefetch=\{false\}/);
+});
+
+test("orders and settings use recognized loading filenames", () => {
+  assert.equal(existsSync("src/app/orders/loading.tsx"), true);
+  assert.equal(existsSync("src/app/settings/loading.tsx"), true);
+  assert.equal(existsSync("src/app/orders/_loading.tsx"), false);
+  assert.equal(existsSync("src/app/settings/_loading.tsx"), false);
 });
