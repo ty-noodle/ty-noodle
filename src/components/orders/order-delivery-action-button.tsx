@@ -45,7 +45,7 @@ export function OrderDeliveryActionButton({
   label = "ดูใบยืนยัน",
   orderId,
 }: OrderDeliveryActionButtonProps) {
-  const [isTouchLayout, setIsTouchLayout] = useState(false);
+  const [isMobilePhone, setIsMobilePhone] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -58,11 +58,14 @@ export function OrderDeliveryActionButton({
     setMounted(true);
     if (typeof window === "undefined") return;
 
-    const mediaQuery = window.matchMedia("(pointer: coarse)");
-    const update = () => setIsTouchLayout(mediaQuery.matches);
-    update();
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const updateMobile = () => setIsMobilePhone(mobileQuery.matches);
+    updateMobile();
+    mobileQuery.addEventListener("change", updateMobile);
+
+    return () => {
+      mobileQuery.removeEventListener("change", updateMobile);
+    };
   }, []);
 
   const receiptItems = useMemo(
@@ -173,48 +176,40 @@ export function OrderDeliveryActionButton({
     }
   }
 
-  if (!isTouchLayout) {
-    return (
-      <PrintStoreDeliveryButton
-        date={date}
-        customerId={customerId}
-        label="พิมพ์ใบส่งของ"
-        iconOnly={iconOnly}
-      />
-    );
-  }
-
-  if (!orderId || !customerName) {
-    return (
-      <PrintStoreDeliveryButton
-        date={date}
-        customerId={customerId}
-        label="พิมพ์ใบส่งของ"
-        iconOnly={iconOnly}
-      />
-    );
-  }
+  const showDocumentButton = Boolean(orderId && customerName);
+  const showPrintButton = !isMobilePhone;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openReceipt}
-        disabled={isLoading}
-        aria-label={label}
-        title={label}
-        className={[
-          "inline-flex items-center justify-center border border-[#003366] bg-[#003366] text-white transition hover:bg-[#002952] active:scale-95 disabled:opacity-50",
-          iconOnly ? "size-10 shrink-0 rounded-full p-0 leading-none" : "min-h-9 w-full gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold",
-        ].join(" ")}
-      >
-        {isLoading ? (
-          <Loader2 className="h-4.5 w-4.5 animate-spin" strokeWidth={2.2} />
-        ) : (
-          <ReceiptText className="h-4.5 w-4.5" strokeWidth={2.2} />
-        )}
-        {iconOnly ? null : isLoading ? "กำลังโหลด..." : label}
-      </button>
+      {showDocumentButton && (
+        <button
+          type="button"
+          onClick={openReceipt}
+          disabled={isLoading}
+          aria-label={label}
+          title={label}
+          className={[
+            "inline-flex items-center justify-center border border-[#003366] bg-[#003366] text-white transition hover:bg-[#002952] active:scale-95 disabled:opacity-50",
+            iconOnly ? "size-10 shrink-0 rounded-full p-0 leading-none" : "min-h-9 w-full gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold",
+          ].join(" ")}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4.5 w-4.5 animate-spin" strokeWidth={2.2} />
+          ) : (
+            <ReceiptText className="h-4.5 w-4.5" strokeWidth={2.2} />
+          )}
+          {iconOnly ? null : isLoading ? "กำลังโหลด..." : label}
+        </button>
+      )}
+
+      {showPrintButton && (
+        <PrintStoreDeliveryButton
+          date={date}
+          customerId={customerId}
+          label="พิมพ์ใบส่งของ"
+          iconOnly={iconOnly}
+        />
+      )}
 
       {mounted && isOpen && detail
         ? createPortal(

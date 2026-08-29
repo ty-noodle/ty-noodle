@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchIncomingOrderModalDataAction } from "@/app/orders/incoming/actions";
+import { fetchStockModalDataAction } from "@/app/settings/stock/actions";
 import { LineAppIcon } from "@/components/icons/line-app-icon";
 import { useCreateOrder } from "@/components/orders/create-order-context";
 import { IncomingOrderModal } from "@/components/orders/incoming-order-modal";
@@ -197,8 +198,6 @@ function formatThaiDateTime(value: string) {
 export function DashboardClient({
   overview,
   storeStatusSummary,
-  stockProducts,
-  stockSuppliers,
   today,
   orderDate,
   expandedDetail,
@@ -211,6 +210,28 @@ export function DashboardClient({
   const [isNavigating, startTransition] = useTransition();
   const { open: openCreateOrder } = useCreateOrder();
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [lazyStockProducts, setLazyStockProducts] = useState<StockProductOption[] | null>(null);
+  const [lazyStockSuppliers, setLazyStockSuppliers] = useState<StockSupplierOption[] | null>(null);
+  const [isStockLoading, setIsStockLoading] = useState(false);
+
+  const handleOpenStockModal = () => {
+    setIsStockModalOpen(true);
+    if (!lazyStockProducts || !lazyStockSuppliers) {
+      setIsStockLoading(true);
+      fetchStockModalDataAction()
+        .then((res) => {
+          setLazyStockProducts(res.products);
+          setLazyStockSuppliers(res.suppliers);
+          setIsStockLoading(false);
+        })
+        .catch((err) => {
+          console.error("Failed to load stock receipt form data:", err);
+          setIsStockLoading(false);
+          setIsStockModalOpen(false);
+          alert("โหลดข้อมูลคลังสินค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        });
+    }
+  };
   const [isLineOrdersDrawerOpen, setIsLineOrdersDrawerOpen] = useState(false);
   const [isLineOrdersDrawerClosing, setIsLineOrdersDrawerClosing] = useState(false);
   const [lineOrderModal, setLineOrderModal] = useState<LineOrderModalState | null>(null);
@@ -462,7 +483,7 @@ export function DashboardClient({
             </button>
 
             <button
-              onClick={() => setIsStockModalOpen(true)}
+              onClick={handleOpenStockModal}
               className="flex min-h-[4.25rem] flex-row items-center justify-center gap-3 rounded-[1rem] border border-[#d8f2df] bg-[#eefcf0] px-4 py-4 text-[#14a44d] shadow-[0_10px_24px_rgba(20,164,77,0.08)] transition-transform active:scale-95"
             >
               <Truck className="h-5 w-5 shrink-0" strokeWidth={2.2} />
@@ -963,13 +984,23 @@ export function DashboardClient({
         />
       ) : null}
 
-      {isStockModalOpen ? (
+      {isStockModalOpen && lazyStockProducts && lazyStockSuppliers ? (
         <StockReceiveForm
-          products={stockProducts}
-          suppliers={stockSuppliers}
+          products={lazyStockProducts}
+          suppliers={lazyStockSuppliers}
           returnHref="/dashboard"
           onClose={() => setIsStockModalOpen(false)}
         />
+      ) : null}
+
+      {isStockModalOpen && isStockLoading ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
+            <p className="text-base font-bold text-slate-950">กำลังเตรียมข้อมูลรับสินค้า</p>
+            <p className="mt-1 text-sm font-medium text-slate-600">กรุณารอสักครู่...</p>
+          </div>
+        </div>
       ) : null}
 
       {expandedOrderId && !lineOrderModal ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, useTransition } from "react";
+import { createContext, useCallback, useContext, useState, useTransition } from "react";
 import { fetchOrderModalDataAction } from "@/app/orders/incoming/actions";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
 
@@ -30,26 +30,27 @@ export function CreateOrderProvider({ children }: { children: React.ReactNode })
   const open = useCallback((customerId?: string) => {
     setInitialCustomerId(customerId);
     setIsOpen(true);
-  }, []);
+    
+    // Fetch data on-demand if it hasn't been loaded yet
+    setData((currentData) => {
+      if (!currentData && !isPending) {
+        startTransition(async () => {
+          try {
+            const result = await fetchOrderModalDataAction();
+            setData(result);
+          } catch (error) {
+            console.error("Failed to fetch order modal data:", error);
+          }
+        });
+      }
+      return currentData;
+    });
+  }, [isPending]);
 
   const close = useCallback(() => {
     setIsOpen(false);
     setInitialCustomerId(undefined);
   }, []);
-
-  // Pre-fetch data on mount for instant access
-  useEffect(() => {
-    if (!data && !isPending) {
-      startTransition(async () => {
-        try {
-          const result = await fetchOrderModalDataAction();
-          setData(result);
-        } catch (error) {
-          console.error("Failed to pre-fetch order modal data:", error);
-        }
-      });
-    }
-  }, [data, isPending]);
 
   return (
     <Ctx.Provider

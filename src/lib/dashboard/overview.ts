@@ -265,8 +265,18 @@ async function getDashboardOverviewData(
     // 7. This month's orders — for Top 5 rankings (Bypassed to optimize speed)
     Promise.resolve({ data: [] as unknown[] }),
 
-    // 8. Stock dashboard data (for low stock count)
-    getStockDashboardData(organizationId, 0, 0),
+    // 8. Stock dashboard data (Bypassed if we have snapshot)
+    aggregateSnapshot
+      ? Promise.resolve({
+          products: [] as StockProductOption[],
+          suppliers: [] as StockSupplierOption[],
+          lowStockCount: 0,
+          movementRows: [],
+          reservedTotal: 0,
+          setupHint: null,
+          totalOnHandValue: 0,
+        })
+      : getStockDashboardData(organizationId, 0, 0),
 
     // 9. Recent daily performance for dashboard report section
     getRecentDailyPerformance(organizationId, 7, today),

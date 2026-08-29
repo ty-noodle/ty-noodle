@@ -25,7 +25,6 @@ import type { OrderProductOption } from "@/lib/orders/manage";
 import {
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
-  normalizeOrderQuantity,
   stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 import type { AddedOrderItemDraft } from "@/components/orders/order-add-product-picker";
@@ -208,7 +207,7 @@ const EditItemsPanel = memo(({
     setError(null);
     const item = detail.items.find((i) => i.id === itemId);
     if (!item) return;
-    const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
+    const { min, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
     setQuantities((prev: Record<string, number>) => {
       const current = prev[itemId] ?? item.quantity;
       const next = stepOrderQuantity(current, delta < 0 ? -1 : 1, min, configuredStep);
@@ -223,7 +222,7 @@ const EditItemsPanel = memo(({
       const idx = prev.findIndex((i) => i.key === key);
       if (idx === -1) return prev;
       const item = prev[idx];
-      const { min, step, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
+      const { min, configuredStep } = getItemRules(item.productId, item.productSaleUnitId);
       const next = stepOrderQuantity(item.quantity, delta < 0 ? -1 : 1, min, configuredStep);
       const nextItems = [...prev];
       nextItems[idx] = { ...item, quantity: Number(next.toFixed(3)) };

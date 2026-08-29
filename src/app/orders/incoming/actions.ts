@@ -1471,12 +1471,10 @@ export async function createManualOrderAction(formData: FormData): Promise<Actio
     });
 
     revalidateDashboardPages();
+    revalidatePath("/orders/incoming");
+    revalidatePath("/orders");
+    updateTag(`orders-${session.organizationId}`);
   });
-
-  revalidatePath("/orders/incoming");
-  revalidatePath("/orders");
-
-  updateTag(`orders-${session.organizationId}`);
   const [savedOrderResult, savedItemsResult] = await Promise.all([
     admin
       .from("orders")

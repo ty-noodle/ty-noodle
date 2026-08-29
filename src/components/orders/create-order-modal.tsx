@@ -31,7 +31,6 @@ import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manag
 import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
-  getEffectiveOrderMinimum,
   getDefaultOrderQuantity,
   isValidOrderQuantity as isValidByRule,
   normalizeOrderQuantity as normalizeToRule,
@@ -1299,11 +1298,11 @@ export function CreateOrderModal({
       startTransition(() => router.refresh());
       setShowSuccessOverlay(true);
       
-      // Clear overlay after 3 seconds and reset form
+      // Clear overlay after 1.5 seconds and reset form
       setTimeout(() => {
         setShowSuccessOverlay(false);
         resetForm();
-      }, 2500);
+      }, 1500);
     });
   }
 

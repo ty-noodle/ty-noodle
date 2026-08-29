@@ -3,8 +3,20 @@
 import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getStockReceiptDetail, type StockReceiptDetail } from "@/lib/stock/admin";
+import { getStockReceiptDetail, getStockDashboardData, type StockReceiptDetail, type StockProductOption, type StockSupplierOption } from "@/lib/stock/admin";
 import { createActionClient } from "@/lib/supabase/action";
+
+export async function fetchStockModalDataAction(): Promise<{
+  products: StockProductOption[];
+  suppliers: StockSupplierOption[];
+}> {
+  const session = await requireAppRole("admin");
+  const data = await getStockDashboardData(session.organizationId, 0, 0);
+  return {
+    products: data.products,
+    suppliers: data.suppliers,
+  };
+}
 import type { Json } from "@/types/database";
 
 const STOCK_RECEIPT_IMAGES_BUCKET = "stock-receipts";

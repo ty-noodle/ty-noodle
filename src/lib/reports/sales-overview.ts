@@ -267,39 +267,36 @@ export async function getRecentDailyPerformance(
   }
 
   const startDate = subtractDays(endDate, safeLimit - 1);
-
-  const { data: notes } = await supabase
-    .from("delivery_notes")
-    .select("id, delivery_date, total_amount")
-    .eq("organization_id", organizationId)
-    .eq("status", "confirmed")
-    .gte("delivery_date", startDate)
-    .lte("delivery_date", endDate)
-    .order("delivery_date", { ascending: true });
-
-  const typedNotes = (notes ?? []) as DeliveryNoteRow[];
-  if (typedNotes.length === 0) {
-    return {
-      rows: [],
-      rangeStartDate: startDate,
-      rangeEndDate: endDate,
-    };
-  }
-
   const selectedDates = Array.from({ length: safeLimit }, (_, index) =>
     subtractDays(endDate, safeLimit - 1 - index),
   );
-  const selectedDateSet = new Set(selectedDates);
-  const selectedNotes = typedNotes.filter((note) => selectedDateSet.has(note.delivery_date));
-  const noteCostById = await loadNoteCosts(selectedNotes.map((note) => note.id));
-  const noteBuckets = new Map<string, { revenue: number; cost: number; orderCount: number }>();
 
-  for (const note of selectedNotes) {
-    const bucket = noteBuckets.get(note.delivery_date) ?? { revenue: 0, cost: 0, orderCount: 0 };
-    bucket.revenue += toNumber(note.total_amount);
-    bucket.cost += noteCostById.get(note.id) ?? 0;
-    bucket.orderCount += 1;
-    noteBuckets.set(note.delivery_date, bucket);
+  const { data, error } = await supabase.rpc("get_profit_sales_report" as never, {
+    p_organization_id: organizationId,
+    p_from_date: startDate,
+    p_to_date: endDate,
+    p_customer_ids: null,
+  } as never);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rpcRows = (data ?? []) as Array<{
+    iso_date: string;
+    order_count: number;
+    sales: number;
+    cost: number;
+    net_profit: number;
+  }>;
+
+  const noteBuckets = new Map<string, { revenue: number; cost: number; orderCount: number }>();
+  for (const row of rpcRows) {
+    noteBuckets.set(row.iso_date, {
+      revenue: Number(row.sales),
+      cost: Number(row.cost),
+      orderCount: Number(row.order_count),
+    });
   }
 
   const { rows } = buildRowsFromDates(selectedDates, noteBuckets);

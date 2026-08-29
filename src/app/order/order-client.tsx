@@ -73,7 +73,6 @@ import {
   getEffectiveOrderMinimum,
   getEffectiveOrderStep,
   getDefaultOrderQuantity,
-  normalizeOrderQuantity,
   stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 
