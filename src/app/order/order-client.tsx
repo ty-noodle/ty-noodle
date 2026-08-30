@@ -76,23 +76,55 @@ import {
   stepOrderQuantity,
 } from "@/lib/orders/quantity-rules";
 
+const loadOrderEditView = () => import("@/app/order/customer/components/order-edit-view");
+const loadOrderHistoryView = () => import("@/app/order/customer/components/order-history-view");
+const loadOrderProfileView = () => import("@/app/order/customer/components/order-profile-view");
+const loadProductDetailModal = () =>
+  import("@/app/order/customer/components/product-detail-modal");
+
+function OrderInteractionLoading() {
+  return (
+    <div
+      aria-label="กำลังเปิด"
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-white/70 backdrop-blur-sm"
+      role="status"
+    >
+      <Loader2 className="h-8 w-8 animate-spin text-[#003366]" />
+      <span className="sr-only">กำลังเปิด...</span>
+    </div>
+  );
+}
+
+function preloadOrderInteractionChunks() {
+  void Promise.allSettled([
+    loadProductDetailModal(),
+    loadOrderHistoryView(),
+    loadOrderProfileView(),
+    loadOrderEditView(),
+  ]);
+}
+
 const EditOrderProductSheet = dynamic(() =>
-  import("@/app/order/customer/components/order-edit-view").then(
+  loadOrderEditView().then(
     (mod) => mod.EditOrderProductSheet,
   ),
+  { loading: OrderInteractionLoading },
 );
 const OrderEditView = dynamic(() =>
-  import("@/app/order/customer/components/order-edit-view").then((mod) => mod.OrderEditView),
+  loadOrderEditView().then((mod) => mod.OrderEditView),
+  { loading: OrderInteractionLoading },
 );
 const OrderHistoryView = dynamic(() =>
-  import("@/app/order/customer/components/order-history-view").then(
+  loadOrderHistoryView().then(
     (mod) => mod.OrderHistoryView,
   ),
+  { loading: OrderInteractionLoading },
 );
 const OrderProfileView = dynamic(() =>
-  import("@/app/order/customer/components/order-profile-view").then(
+  loadOrderProfileView().then(
     (mod) => mod.OrderProfileView,
   ),
+  { loading: OrderInteractionLoading },
 );
 const OrderReceiptModals = dynamic(() =>
   import("@/app/order/customer/components/order-receipt-modals").then(
@@ -105,9 +137,10 @@ const OrderSuccessView = dynamic(() =>
   ),
 );
 const ProductDetailModal = dynamic(() =>
-  import("@/app/order/customer/components/product-detail-modal").then(
+  loadProductDetailModal().then(
     (mod) => mod.ProductDetailModal,
   ),
+  { loading: OrderInteractionLoading },
 );
 
 function extractCustomerLinePictureUrl(value: unknown) {
@@ -313,6 +346,25 @@ export default function OrderClient({
     refreshProfile,
   } = useLiff();
   const cartButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const browserWindow = window as Window & {
+      cancelIdleCallback?: (handle: number) => void;
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+    };
+    const idleHandle = browserWindow.requestIdleCallback?.(
+      preloadOrderInteractionChunks,
+      { timeout: 1_500 },
+    );
+    const timerHandle = idleHandle === undefined
+      ? window.setTimeout(preloadOrderInteractionChunks, 250)
+      : undefined;
+
+    return () => {
+      if (idleHandle !== undefined) browserWindow.cancelIdleCallback?.(idleHandle);
+      if (timerHandle !== undefined) window.clearTimeout(timerHandle);
+    };
+  }, []);
 
   // Order window state — updates every minute
   const [isOrderOpen, setIsOrderOpen] = useState(() =>

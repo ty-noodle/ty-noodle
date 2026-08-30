@@ -6,6 +6,7 @@ import { summarizeDurations } from "../benchmark-dashboard.mjs";
 const migrationsDirectory = "supabase/migrations";
 const overviewSource = readFileSync("src/lib/dashboard/overview.ts", "utf8");
 const sidebarSource = readFileSync("src/components/app-sidebar.tsx", "utf8");
+const orderClientSource = readFileSync("src/app/order/order-client.tsx", "utf8");
 
 function findDashboardMigration() {
   const matches = readdirSync(migrationsDirectory).filter((file) =>
@@ -63,4 +64,10 @@ test("dashboard benchmark summarizes latency percentiles", () => {
     p95Ms: 385,
     maxMs: 400,
   });
+});
+
+test("mobile order interactions preload lazy views and show immediate feedback", () => {
+  assert.match(orderClientSource, /preloadOrderInteractionChunks/);
+  assert.match(orderClientSource, /requestIdleCallback/);
+  assert.match(orderClientSource, /loading:\s*OrderInteractionLoading/);
 });

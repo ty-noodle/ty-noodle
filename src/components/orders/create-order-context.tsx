@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, useTransition } from "react";
+import { createContext, useCallback, useContext, useRef, useState, useTransition } from "react";
 import { fetchOrderModalDataAction } from "@/app/orders/incoming/actions";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
 
@@ -26,26 +26,28 @@ export function CreateOrderProvider({ children }: { children: React.ReactNode })
   const [initialCustomerId, setInitialCustomerId] = useState<string | undefined>();
   const [data, setData] = useState<CreateOrderData | null>(null);
   const [isPending, startTransition] = useTransition();
+  const loadInFlightRef = useRef(false);
 
   const open = useCallback((customerId?: string) => {
     setInitialCustomerId(customerId);
     setIsOpen(true);
     
-    // Fetch data on-demand if it hasn't been loaded yet
-    setData((currentData) => {
-      if (!currentData && !isPending) {
-        startTransition(async () => {
-          try {
-            const result = await fetchOrderModalDataAction();
-            setData(result);
-          } catch (error) {
-            console.error("Failed to fetch order modal data:", error);
-          }
-        });
+    // Side effects must not run inside a state updater: React may execute an
+    // updater while rendering, which previously caused a transition loop.
+    if (data || loadInFlightRef.current) return;
+
+    loadInFlightRef.current = true;
+    startTransition(async () => {
+      try {
+        const result = await fetchOrderModalDataAction();
+        setData(result);
+      } catch (error) {
+        console.error("Failed to fetch order modal data:", error);
+      } finally {
+        loadInFlightRef.current = false;
       }
-      return currentData;
     });
-  }, [isPending]);
+  }, [data]);
 
   const close = useCallback(() => {
     setIsOpen(false);
