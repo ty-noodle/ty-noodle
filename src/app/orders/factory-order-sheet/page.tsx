@@ -45,6 +45,8 @@ async function FactoryOrderSheetPage({ searchParams }: Props) {
     "TYN012",
     "TYN006",
     "TYN013",
+    "TYN056",
+    "TYN057",
   ]);
 
   // Filter products and their matching quantity rows
