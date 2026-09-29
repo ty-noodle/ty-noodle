@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { AppSidebarLayout } from "@/components/app-sidebar";
-import { PageLoader } from "@/components/page-loader";
+import { BillingDashboardSkeleton } from "@/components/billing/billing-dashboard-skeleton";
 import { requireAppRole } from "@/lib/auth/authorization";
 import {
   getBillingCandidates,
@@ -44,21 +44,21 @@ async function BillingPageContent({ searchParams }: BillingPageProps) {
   ]);
 
   return (
-    <AppSidebarLayout>
-      <BillingDashboardClient
-        candidates={candidates}
-        allCustomers={allCustomers}
-        initialFrom={from}
-        initialTo={to}
-      />
-    </AppSidebarLayout>
+    <BillingDashboardClient
+      candidates={candidates}
+      allCustomers={allCustomers}
+      initialFrom={from}
+      initialTo={to}
+    />
   );
 }
 
 export default function BillingPage(props: BillingPageProps) {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <BillingPageContent {...props} />
-    </Suspense>
+    <AppSidebarLayout>
+      <Suspense fallback={<BillingDashboardSkeleton />}>
+        <BillingPageContent {...props} />
+      </Suspense>
+    </AppSidebarLayout>
   );
 }

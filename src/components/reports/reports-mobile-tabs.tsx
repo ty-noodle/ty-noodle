@@ -25,6 +25,7 @@ export function ReportsMobileTabs() {
             <Link
               key={href}
               href={href}
+              prefetch={true}
               className={`flex flex-1 flex-col items-center justify-center gap-0.5 border-b-2 py-2 transition-colors ${
                 active
                   ? "border-[#003366] text-[#003366]"

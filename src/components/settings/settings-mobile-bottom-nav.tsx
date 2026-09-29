@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowRight,
   BarChart2,
@@ -51,12 +51,30 @@ export function SettingsMobileBottomNav() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { open: openCreateOrder, isOpen: isCreateModalOpen } = useCreateOrder();
 
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setPendingHref(null);
+  }
+
+  // Safety timer: ensure progress indicator never hangs indefinitely
+  useEffect(() => {
+    if (!pendingHref) return;
+    const timer = setTimeout(() => {
+      setPendingHref(null);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [pendingHref]);
+
   const moreActive = moreItems.some((item) => pathname.startsWith(item.href));
   const createOrderActive = pathname.startsWith("/orders/incoming");
-  const visiblePendingHref = pendingHref && pathname !== pendingHref ? pendingHref : null;
+  const visiblePendingHref =
+    pendingHref && pathname !== pendingHref && !pathname.startsWith(pendingHref)
+      ? pendingHref
+      : null;
 
   function markNavigationPending(href: string) {
-    if (pathname !== href) {
+    if (pathname !== href && !pathname.startsWith(href)) {
       setPendingHref(href);
     }
   }

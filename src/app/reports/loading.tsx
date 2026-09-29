@@ -1,5 +1,10 @@
-import { PageLoader } from "@/components/page-loader";
+import { AppSidebarLayout } from "@/components/app-sidebar";
+import { ReportTableSkeleton } from "@/components/reports/report-table-skeleton";
 
 export default function ReportsLoading() {
-  return <PageLoader />;
+  return (
+    <AppSidebarLayout>
+      <ReportTableSkeleton />
+    </AppSidebarLayout>
+  );
 }

@@ -3,7 +3,8 @@ import { ChevronLeft, ChevronRight, FileText, Filter } from "lucide-react";
 import Link from "next/link";
 import { AppSidebarLayout } from "@/components/app-sidebar";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
-import { PageLoader } from "@/components/page-loader";
+import { ReportTableSkeleton } from "@/components/reports/report-table-skeleton";
+import { ReportGetForm } from "@/components/report-get-form";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { requireAppSession } from "@/lib/auth/authorization";
 import { getTodayInBangkok } from "@/lib/orders/date";
@@ -66,16 +67,18 @@ function formatPrintedAt(date: Date) {
   return { datePart, timePart };
 }
 
-export default async function Page({ searchParams }: PageProps) {
+export default function Page({ searchParams }: PageProps) {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <BillingContent searchParams={searchParams} />
-    </Suspense>
+    <AppSidebarLayout>
+      <Suspense fallback={<ReportTableSkeleton />}>
+        <BillingContent searchParams={searchParams} />
+      </Suspense>
+    </AppSidebarLayout>
   );
 }
 
 async function BillingContent({ searchParams }: PageProps) {
-  await requireAppSession();
+  const session = await requireAppSession();
   const sp = await searchParams;
 
   const today = getTodayInBangkok();
@@ -84,7 +87,7 @@ async function BillingContent({ searchParams }: PageProps) {
   const pageParam = Number(sp.page) || 1;
   const safeCurrentPage = pageParam < 1 ? 1 : pageParam;
 
-  const report = await getBillingReport(fromDate, toDate);
+  const report = await getBillingReport(fromDate, toDate, session.organizationId);
   const printedAt = formatPrintedAt(new Date());
 
   const itemsPerPage = BILLING_REPORT_ROWS_PER_PAGE;
@@ -96,8 +99,7 @@ async function BillingContent({ searchParams }: PageProps) {
   const pages = splitPages(report.rows, BILLING_REPORT_ROWS_PER_PAGE);
 
   return (
-    <AppSidebarLayout>
-      <div className="flex h-full flex-col bg-slate-50/50">
+    <div className="flex h-full flex-col bg-slate-50/50">
         <div className="flex-1 space-y-4 p-4 print:hidden sm:p-6 md:space-y-6 md:p-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -121,7 +123,7 @@ async function BillingContent({ searchParams }: PageProps) {
           </div>
 
           <MobileSearchDrawer title="ค้นหารายงานใบวางบิล">
-            <form method="GET" action="/reports/billing" className="flex flex-col gap-4 pb-32">
+            <ReportGetForm action="/reports/billing" className="flex flex-col gap-4 pb-32">
               <div>
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">ช่วงวันที่</label>
                 <div className="flex items-center gap-2">
@@ -138,11 +140,11 @@ async function BillingContent({ searchParams }: PageProps) {
                 <Filter className="h-4 w-4" strokeWidth={2} />
                 ค้นหา
               </button>
-            </form>
+            </ReportGetForm>
           </MobileSearchDrawer>
 
           <div className="hidden border border-slate-100 bg-white p-5 shadow-2xl sm:rounded-sm md:block">
-            <form action="/reports/billing" method="get">
+            <ReportGetForm action="/reports/billing">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-[180px]">
                   <label className="mb-1 block text-xs font-bold text-slate-500">เริ่มวันที่</label>
@@ -160,7 +162,7 @@ async function BillingContent({ searchParams }: PageProps) {
                   ค้นหา
                 </button>
               </div>
-            </form>
+            </ReportGetForm>
           </div>
 
           <div className="flex-1">
@@ -346,6 +348,5 @@ async function BillingContent({ searchParams }: PageProps) {
           ))}
         </div>
       </div>
-    </AppSidebarLayout>
   );
 }

@@ -1,7 +1,7 @@
 -----------------------------------------------
 Gmail
 username : punchfolk@gmail.com
-password : punchfolk2625
+password : tommY@1155
 -----------------------------------------------
 Supabase : ใช้ GitHub login
 project name : ty-noodle

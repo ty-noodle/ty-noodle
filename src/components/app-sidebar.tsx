@@ -235,6 +235,7 @@ function SidebarLink({
   return (
     <Link
       href={item.href}
+      prefetch={true}
       title={collapsed ? item.label : undefined}
       className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-black transition-colors ${active ? "bg-[#003366]/10 text-[#003366]" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
         } ${collapsed ? "justify-center" : ""} ${indent && !collapsed ? "pl-9" : ""}`}
@@ -378,6 +379,7 @@ export function AppSidebarLayout({
               {collapsed ? (
                 <Link
                   href="/reports/profit-sales"
+                  prefetch={true}
                   title="Reports"
                   className={`flex items-center justify-center rounded-xl px-2.5 py-2.5 text-sm font-black transition-colors ${anyReportsActive
                       ? "bg-[#003366]/10 text-[#003366]"
@@ -437,6 +439,7 @@ export function AppSidebarLayout({
               {collapsed ? (
                 <Link
                   href="/settings/products"
+                  prefetch={true}
                   title="Settings"
                   className={`flex items-center justify-center rounded-xl px-2.5 py-2.5 text-sm font-black transition-colors ${anySettingsActive
                       ? "bg-[#003366]/10 text-[#003366]"

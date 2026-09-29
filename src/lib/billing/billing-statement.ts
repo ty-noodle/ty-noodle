@@ -255,6 +255,8 @@ async function ensureConfirmedDeliveryNotesForRange(
           .eq("status", "confirmed")
           .gte("delivery_date", fromDate)
           .lte("delivery_date", toDate)
+          .order("delivery_date", { ascending: true })
+          .order("id", { ascending: true })
           .range(from, to)
       ),
     ]);
@@ -361,6 +363,8 @@ export async function getBillingCandidates(
         .eq("status", "confirmed")
         .gte("delivery_date", fromDate)
         .lte("delivery_date", toDate)
+        .order("delivery_date", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to)
     )) as unknown as DeliveryNoteCandidate[];
   } catch (notesError) {
@@ -368,10 +372,15 @@ export async function getBillingCandidates(
     return [];
   }
 
-  const deliveryTotals = await getDeliveryNoteActualTotals(
-    supabase,
-    (notes as { id: string }[]).map((note) => note.id),
+  const notesNeedingActualTotals = (notes as unknown as { id: string; total_amount: number | null }[]).filter(
+    (note) => !note.total_amount || Number(note.total_amount) === 0
   );
+  const deliveryTotals = notesNeedingActualTotals.length > 0
+    ? await getDeliveryNoteActualTotals(
+        supabase,
+        notesNeedingActualTotals.map((note) => note.id),
+      )
+    : new Map<string, number>();
 
   const grouped = new Map<string, BillingCandidate>();
 
@@ -416,10 +425,6 @@ export async function getBillingCandidates(
   const candidates = Array.from(grouped.values());
   if (candidates.length === 0) return [];
 
-  const lookbackDate = new Date(fromDate);
-  lookbackDate.setMonth(lookbackDate.getMonth() - 3);
-  const lookbackISO = lookbackDate.toISOString().split("T")[0];
-
   interface BillingRecordLookup {
     customer_id: string;
     billing_number: string;
@@ -434,8 +439,10 @@ export async function getBillingCandidates(
         .from("billing_records")
         .select("customer_id, billing_number, snapshot_rows, from_date, to_date")
         .eq("organization_id", organizationId)
-        .gte("from_date", lookbackISO)
-        .in("customer_id", candidates.map((candidate) => candidate.customerId))
+        .lte("from_date", toDate)
+        .gte("to_date", fromDate)
+        .order("from_date", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to)
     )) as unknown as BillingRecordLookup[];
   } catch (error) {
@@ -450,7 +457,7 @@ export async function getBillingCandidates(
       from_date: string;
       to_date: string;
     }[])) {
-      const candidate = candidates.find(c => c.customerId === record.customer_id);
+      const candidate = grouped.get(record.customer_id);
       if (!candidate) continue;
 
       const snapshot = record.snapshot_rows || [];
