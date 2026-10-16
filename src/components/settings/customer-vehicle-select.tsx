@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Truck } from "lucide-react";
-import { updateCustomerDefaultVehicleAction } from "@/app/settings/customers/actions";
+import { updateCustomerDefaultVehicleAction } from "@/app/(workspace)/settings/customers/actions";
 import type { SettingsVehicle } from "@/lib/settings/admin";
 
 type CustomerVehicleSelectProps = {

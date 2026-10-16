@@ -5,7 +5,7 @@ import { Loader2, Power, RotateCcw, Trash2, X } from "lucide-react";
 import {
   deleteCustomerDataAction,
   toggleCustomerAvailabilityAction,
-} from "@/app/settings/customer-data/actions";
+} from "@/app/(workspace)/settings/customer-data/actions";
 
 type CustomerDataActionsProps = {
   customerCode: string;

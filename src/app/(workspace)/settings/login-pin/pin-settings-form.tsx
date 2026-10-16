@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { CheckCircle2, KeyRound, Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { signOut } from "@/app/login/actions";
-import { changeLoginPinAction } from "@/app/settings/login-pin/actions";
+import { changeLoginPinAction } from "@/app/(workspace)/settings/login-pin/actions";
 
 const initialChangeLoginPinState = {
   status: "idle" as const,

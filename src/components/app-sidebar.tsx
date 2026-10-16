@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   BarChart2,
   CircleDollarSign,
@@ -248,17 +248,26 @@ function SidebarLink({
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-export function AppSidebarLayout({
-  children,
-  hideMobileTopBar = false,
-  hideOrdersTabs = false,
-  hideReportsTabs = false,
-}: {
+const SidebarMountedContext = createContext(false);
+
+type AppSidebarLayoutProps = {
   children: React.ReactNode;
   hideMobileTopBar?: boolean;
   hideOrdersTabs?: boolean;
   hideReportsTabs?: boolean;
-}) {
+};
+
+export function AppSidebarLayout(props: AppSidebarLayoutProps) {
+  const mounted = useContext(SidebarMountedContext);
+  return mounted ? props.children : <AppSidebarFrame {...props} />;
+}
+
+export function AppSidebarFrame({
+  children,
+  hideMobileTopBar = false,
+  hideOrdersTabs = false,
+  hideReportsTabs = false,
+}: AppSidebarLayoutProps) {
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -273,6 +282,15 @@ export function AppSidebarLayout({
 
   const [reportsOpenInternal, setReportsOpenInternal] = useState(isReportsPage);
   const [settingsOpenInternal, setSettingsOpenInternal] = useState(isSettingsPage);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
+    setReportsUserToggled(false);
+    setSettingsUserToggled(false);
+    setReportsOpenInternal(isReportsPage);
+    setSettingsOpenInternal(isSettingsPage);
+  }
 
   // Derived states
   const reportsOpen = reportsOpenInternal || (isReportsPage && !reportsUserToggled);
@@ -527,7 +545,7 @@ export function AppSidebarLayout({
         <div
           className={`${collapsed ? "lg:pl-16" : "lg:pl-60"} ${mobileContentTopPaddingClass} pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0 print:pl-0 print:pt-0 print:pb-0 transition-[padding-left] duration-200 ease-in-out [will-change:padding-left] motion-reduce:transition-none`}
         >
-          {children}
+          <SidebarMountedContext.Provider value={true}>{children}</SidebarMountedContext.Provider>
         </div>
 
         <div className="no-print">

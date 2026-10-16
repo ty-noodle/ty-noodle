@@ -23,8 +23,8 @@ import {
   X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { fetchIncomingOrderModalDataAction } from "@/app/orders/incoming/actions";
-import { fetchStockModalDataAction } from "@/app/settings/stock/actions";
+import { fetchIncomingOrderModalDataAction } from "@/app/(workspace)/orders/incoming/actions";
+import { fetchStockModalDataAction } from "@/app/(workspace)/settings/stock/actions";
 import { LineAppIcon } from "@/components/icons/line-app-icon";
 import { useCreateOrder } from "@/components/orders/create-order-context";
 import { IncomingOrderModal } from "@/components/orders/incoming-order-modal";

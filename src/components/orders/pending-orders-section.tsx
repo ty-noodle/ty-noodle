@@ -8,8 +8,8 @@ import {
   createDeliveryNoteAction,
   getDeliveryFormDataAction,
   getStoreDeliveryDataAction,
-} from "@/app/orders/delivery-actions";
-import type { CreateDeliveryState } from "@/app/orders/delivery-actions";
+} from "@/app/(workspace)/orders/delivery-actions";
+import type { CreateDeliveryState } from "@/app/(workspace)/orders/delivery-actions";
 import type { DeliveryFormData, DeliveryItemData, PendingOrder } from "@/lib/delivery/admin";
 
 // Helpers

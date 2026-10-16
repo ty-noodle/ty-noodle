@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { deleteProduct } from "@/app/dashboard/settings/actions";
+import { deleteProduct } from "@/app/(workspace)/dashboard/settings/actions";
 import { AlertTriangle, Trash2, X, AlertCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 

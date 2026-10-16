@@ -31,7 +31,7 @@ import type { AddedOrderItemDraft } from "@/components/orders/order-add-product-
 import {
   deleteOrderCascadeActionV3,
   updateOrderItemsBatchAction,
-} from "@/app/orders/incoming/actions";
+} from "@/app/(workspace)/orders/incoming/actions";
 import {
   INCOMING_ORDER_DELETED_EVENT,
   type IncomingOrderDeletedEventDetail,

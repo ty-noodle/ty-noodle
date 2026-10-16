@@ -56,27 +56,30 @@ export async function syncDeliveryNoteForOrder(
     };
   }
 
-  const { data: customer } = await admin
-    .from("customers")
-    .select("default_vehicle_id")
-    .eq("id", order.customer_id)
-    .single();
+  const [customerResult, sameDayOrdersResult] = await Promise.all([
+    admin
+      .from("customers")
+      .select("default_vehicle_id")
+      .eq("id", order.customer_id)
+      .single(),
+    admin
+      .from("orders")
+      .select("id, notes")
+      .eq("organization_id", input.organizationId)
+      .eq("customer_id", order.customer_id)
+      .eq("order_date", order.order_date)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: true }),
+  ]);
 
-  const vehicleId = customer?.default_vehicle_id || null;
-  const lossInBaseUnitByItemId = input.lossInBaseUnitByItemId ?? new Map<string, number>();
-
-  const { data: sameDayOrders, error: sameDayOrdersError } = await admin
-    .from("orders")
-    .select("id, notes")
-    .eq("organization_id", input.organizationId)
-    .eq("customer_id", order.customer_id)
-    .eq("order_date", order.order_date)
-    .neq("status", "cancelled")
-    .order("created_at", { ascending: true });
-
-  if (sameDayOrdersError) {
+  if (sameDayOrdersResult.error) {
     return { error: "โหลดรายการออเดอร์ของร้านนี้ในวันเดียวกันไม่สำเร็จ" };
   }
+
+  const customer = customerResult.data;
+  const vehicleId = customer?.default_vehicle_id || null;
+  const lossInBaseUnitByItemId = input.lossInBaseUnitByItemId ?? new Map<string, number>();
+  const sameDayOrders = sameDayOrdersResult.data;
 
   const targetOrders = sameDayOrders ?? [];
   const targetOrderIds = targetOrders.map((item) => item.id);

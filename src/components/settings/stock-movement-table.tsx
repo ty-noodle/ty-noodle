@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { StockMovementRow } from "@/lib/stock/admin";
 import { fmtDateTH } from "@/lib/utils/date";
-import { loadMoreStockMovementsAction } from "@/app/stock/pagination-actions";
+import { loadMoreStockMovementsAction } from "@/app/(workspace)/stock/pagination-actions";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
 import { useMobileSearch } from "@/components/mobile-search/mobile-search-context";
 

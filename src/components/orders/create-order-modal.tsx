@@ -28,7 +28,7 @@ import {
 import { useCreateOrder } from "./create-order-context";
 import { getEffectiveSaleUnitCost } from "@/lib/products/sale-unit-cost";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
-import { compareCustomerOrder } from "@/lib/settings/customer-order";
+import { sortCustomersByOrder } from "@/lib/settings/customer-order";
 import { normalizeSearch } from "@/lib/utils/search";
 import {
   getDefaultOrderQuantity,
@@ -42,8 +42,8 @@ import {
   fetchCustomerLastOrderItemsAction,
   fetchCustomerPricesAction,
   upsertCustomerPricesBatchFromOrderModalAction,
-} from "@/app/orders/incoming/actions";
-import type { CustomerLastOrderSnapshot } from "@/app/orders/incoming/types";
+} from "@/app/(workspace)/orders/incoming/actions";
+import type { CustomerLastOrderSnapshot } from "@/app/(workspace)/orders/incoming/types";
 import {
   INCOMING_ORDER_SAVED_EVENT,
   type IncomingOrderSavedEventDetail,
@@ -918,7 +918,7 @@ export function CreateOrderModal({
   );
   const selectedCustomerOrderCount = customerId ? customerOrderCountsByDate[customerId] ?? 0 : 0;
   const orderedCustomers = useMemo(
-    () => customers.toSorted(compareCustomerOrder),
+    () => sortCustomersByOrder(customers),
     [customers],
   );
 

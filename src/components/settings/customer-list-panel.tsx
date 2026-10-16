@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, ListTree, PencilLine, Store } from "lucide-react";
-import { updateCustomerOrderAction } from "@/app/settings/customers/actions";
+import { updateCustomerOrderAction } from "@/app/(workspace)/settings/customers/actions";
 import { CustomerDeleteButton } from "@/components/settings/customer-delete-button";
 import { CustomerVehicleSelect } from "@/components/settings/customer-vehicle-select";
 import {

@@ -16,7 +16,7 @@ import {
 import {
   deleteProductCategory,
   upsertProductCategory,
-} from "@/app/dashboard/settings/actions";
+} from "@/app/(workspace)/dashboard/settings/actions";
 import {
   SettingsEmptyState,
   SettingsPanel,

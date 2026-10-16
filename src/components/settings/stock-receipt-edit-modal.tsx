@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { X, Calendar, Building2, Package, Save, Loader2, ChevronRight, Factory, Check } from "lucide-react";
-import { updateStockReceiptAction, type UpdateStockReceiptActionState } from "@/app/settings/stock/actions";
+import { updateStockReceiptAction, type UpdateStockReceiptActionState } from "@/app/(workspace)/settings/stock/actions";
 import type { StockReceiptDetail, StockSupplierOption } from "@/lib/stock/admin";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 

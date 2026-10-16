@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { AlertTriangle } from "lucide-react";
-import { upsertStoreProductPrice } from "@/app/dashboard/settings/actions";
+import { upsertStoreProductPrice } from "@/app/(workspace)/dashboard/settings/actions";
 import { confirmBelowCostSave } from "@/components/pricing/price-guard";
 import { SubmitButton } from "@/components/settings/submit-button";
 import { settingsInputClass } from "@/components/settings/settings-ui";

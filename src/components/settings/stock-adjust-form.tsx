@@ -21,8 +21,8 @@ import {
   useState,
   startTransition,
 } from "react";
-import { adjustStockAction } from "@/app/settings/stock/actions";
-import type { AdjustStockActionState } from "@/app/settings/stock/actions";
+import { adjustStockAction } from "@/app/(workspace)/settings/stock/actions";
+import type { AdjustStockActionState } from "@/app/(workspace)/settings/stock/actions";
 import type { StockProductOption } from "@/lib/stock/admin";
 
 type StockAdjustFormProps = {

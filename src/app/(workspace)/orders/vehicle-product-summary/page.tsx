@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import { AutoPrint, PackingListPrintButton } from "@/app/orders/packing-list/preview/print-button";
+import { AutoPrint, PackingListPrintButton } from "@/app/(workspace)/orders/packing-list/preview/print-button";
 import { PageLoader } from "@/components/page-loader";
-import { FactoryOrderSheetLayout } from "@/components/print/factory-order-sheet-layout";
 import { MobilePinchZoom } from "@/components/print/mobile-pinch-zoom";
+import { VehicleProductSummaryLayout } from "@/components/print/vehicle-product-summary-layout";
 import { requireAnyRole } from "@/lib/auth/authorization";
-import { getVehicleProductSummaryData, VehicleSummaryProduct } from "@/lib/orders/vehicle-product-summary";
+import { getVehicleProductSummaryData } from "@/lib/orders/vehicle-product-summary";
 
-export const metadata = { title: "พิมพ์ใบสั่งของ (โรงงานอนามัย)" };
+export const metadata = { title: "สรุปสินค้าตามรถ" };
 
 type Props = {
   searchParams: Promise<{
@@ -16,57 +16,23 @@ type Props = {
   }>;
 };
 
-export default async function FactoryOrderSheetWrapper({ searchParams }: Props) {
+export default async function VehicleProductSummaryWrapper({ searchParams }: Props) {
   return (
     <Suspense fallback={<PageLoader />}>
-      <FactoryOrderSheetPage searchParams={searchParams} />
+      <VehicleProductSummaryPage searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function FactoryOrderSheetPage({ searchParams }: Props) {
+async function VehicleProductSummaryPage({ searchParams }: Props) {
   const session = await requireAnyRole(["admin", "warehouse"]);
   const params = await searchParams;
   const date = params.date ?? new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Bangkok" });
   const endDate = params.endDate ?? date;
   const autoprint = params.autoprint === "1";
 
-  // Fetch full vehicle summary data
   const summaryData = await getVehicleProductSummaryData(session.organizationId, date, endDate);
-
-  // Target product SKUs for the factory order sheet
-  const TARGET_SKUS = new Set([
-    "TYN036",
-    "TYN037",
-    "TYN014",
-    "TYN015",
-    "TYN010",
-    "TYN011",
-    "TYN012",
-    "TYN006",
-    "TYN013",
-    "TYN056",
-    "TYN057",
-  ]);
-
-  // Filter products and their matching quantity rows
-  const filteredProducts: VehicleSummaryProduct[] = [];
-  const filteredQty: number[][] = [];
-
-  summaryData.products.forEach((product, index) => {
-    if (product.sku && TARGET_SKUS.has(product.sku.trim().toUpperCase())) {
-      filteredProducts.push(product);
-      filteredQty.push(summaryData.qty[index]);
-    }
-  });
-
-  const filteredSummaryData = {
-    ...summaryData,
-    products: filteredProducts,
-    qty: filteredQty,
-  };
-
-  const hasData = filteredSummaryData.products.length > 0;
+  const hasData = summaryData.products.length > 0;
 
   return (
     <>
@@ -123,17 +89,17 @@ async function FactoryOrderSheetPage({ searchParams }: Props) {
           border: "1px solid rgba(15,23,42,0.06)",
         }}
       >
-        <span style={{ fontSize: "15px", fontWeight: 800, color: "#003366" }}>ใบสั่งของ (โรงงานอนามัย)</span>
+        <span style={{ fontSize: "15px", fontWeight: 800, color: "#003366" }}>สรุปสินค้าตามรถ</span>
         <span className="vehicle-summary-toolbar__meta" style={{ fontSize: "13px", color: "#64748b", fontWeight: 700 }}>
-          {filteredSummaryData.dateLabel} · {filteredSummaryData.vehicles.length} รถ
+          {summaryData.dateLabel} · {summaryData.vehicles.length} รถ
         </span>
         <div className="vehicle-summary-toolbar__actions" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap" }}>
           <PackingListPrintButton
             unassignedStores={[]}
-            dateLabel={filteredSummaryData.dateLabel}
+            dateLabel={summaryData.dateLabel}
             hidePrintOnMobile={false}
-            documentTitle="ใบสั่งของ"
-            printButtonText="พิมพ์ใบสั่งของ"
+            documentTitle="สรุปสินค้าตามรถ"
+            printButtonText="พิมพ์ฟอร์มสรุปตามรถ"
           />
         </div>
         <a
@@ -173,7 +139,7 @@ async function FactoryOrderSheetPage({ searchParams }: Props) {
       ) : (
         <div className="vehicle-summary-page">
           <MobilePinchZoom className="packing-print-container">
-            <FactoryOrderSheetLayout data={filteredSummaryData} />
+            <VehicleProductSummaryLayout data={summaryData} />
           </MobilePinchZoom>
         </div>
       )}

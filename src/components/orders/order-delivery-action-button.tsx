@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Loader2, ReceiptText, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { fetchIncomingOrderDetailAction } from "@/app/orders/incoming/actions";
+import { fetchIncomingOrderDetailAction } from "@/app/(workspace)/orders/incoming/actions";
 import { formatDisplayUnit } from "@/app/order/customer/unit-label";
 import { PrintStoreDeliveryButton } from "@/components/orders/print-store-delivery-button";
 import type { OrderDetailData } from "@/lib/orders/detail";

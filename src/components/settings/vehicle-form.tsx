@@ -3,8 +3,8 @@
 import { startTransition, useActionState, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, PencilLine, Save, Truck, UserRound, X } from "lucide-react";
-import { createVehicleAction, updateVehicleAction } from "@/app/settings/vehicles/actions";
-import type { CreateVehicleActionState } from "@/app/settings/vehicles/actions";
+import { createVehicleAction, updateVehicleAction } from "@/app/(workspace)/settings/vehicles/actions";
+import type { CreateVehicleActionState } from "@/app/(workspace)/settings/vehicles/actions";
 import {
   SettingsPanel,
   SettingsPanelBody,

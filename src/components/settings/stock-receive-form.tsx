@@ -31,8 +31,8 @@ import {
   startTransition,
   useRef,
 } from "react";
-import { receiveStockAction } from "@/app/settings/stock/actions";
-import type { ReceiveStockActionState } from "@/app/settings/stock/actions";
+import { receiveStockAction } from "@/app/(workspace)/settings/stock/actions";
+import type { ReceiveStockActionState } from "@/app/(workspace)/settings/stock/actions";
 import type { StockProductOption, StockSupplierOption } from "@/lib/stock/admin";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 

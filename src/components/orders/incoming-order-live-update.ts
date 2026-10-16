@@ -48,7 +48,7 @@ export function upsertIncomingOrder(
   savedOrder: IncomingOrderListItem,
 ) {
   const withoutSavedOrder = orders.filter((order) => order.id !== savedOrder.id);
-  return [savedOrder, ...withoutSavedOrder].toSorted((left, right) => {
+  return [savedOrder, ...withoutSavedOrder].sort((left, right) => {
     const dateDifference = right.orderDate.localeCompare(left.orderDate);
     if (dateDifference !== 0) return dateDifference;
     return right.createdAt.localeCompare(left.createdAt);

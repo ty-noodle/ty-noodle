@@ -1452,7 +1452,17 @@ export async function createManualOrderAction(formData: FormData): Promise<Actio
 
   const syncedDeliveryNumber = String(syncResult.deliveryNumber);
   effectiveOrderNumber = syncedDeliveryNumber;
-  await admin.from("orders").update({ order_number: syncedDeliveryNumber }).eq("id", orderId);
+
+  const { data: updatedOrder, error: updateOrderError } = await admin
+    .from("orders")
+    .update({ order_number: syncedDeliveryNumber })
+    .eq("id", orderId)
+    .select("id, order_number, order_date, status, fulfillment_status, total_amount, created_at, notes")
+    .single();
+
+  if (updateOrderError) {
+    console.error("[createManualOrderAction] Update Order Number Error:", updateOrderError);
+  }
 
   after(() => {
     syncBillingSnapshotsForDeliveryNumbers({
@@ -1475,38 +1485,30 @@ export async function createManualOrderAction(formData: FormData): Promise<Actio
     revalidatePath("/orders");
     updateTag(`orders-${session.organizationId}`);
   });
-  const [savedOrderResult, savedItemsResult] = await Promise.all([
-    admin
-      .from("orders")
-      .select("id, order_number, order_date, status, fulfillment_status, total_amount, created_at, notes")
-      .eq("id", orderId)
-      .eq("organization_id", session.organizationId)
-      .single(),
-    admin
-      .from("order_items")
-      .select("product_id")
-      .eq("order_id", orderId),
-  ]);
 
-  const savedOrder = savedOrderResult.data;
   const customer = customerResult.data;
   const customerVehicle = customer?.vehicles as { id: string; name: string } | null | undefined;
-  const incomingOrder: IncomingOrderListItem | undefined = savedOrder && customer
+  const productCount =
+    ("distinctProductCount" in mergeResult && typeof mergeResult.distinctProductCount === "number")
+      ? mergeResult.distinctProductCount
+      : new Set(items.map((item) => item.productId)).size;
+
+  const incomingOrder: IncomingOrderListItem | undefined = updatedOrder && customer
     ? {
         channelLabel: "สร้าง",
-        createdAt: savedOrder.created_at,
+        createdAt: updatedOrder.created_at,
         customerCode: customer.customer_code,
         customerId,
         customerName: customer.name,
         sortOrder: Number.MAX_SAFE_INTEGER,
-        id: savedOrder.id,
-        notes: savedOrder.notes,
-        orderDate: savedOrder.order_date,
-        orderNumber: savedOrder.order_number,
-        productCount: new Set((savedItemsResult.data ?? []).map((item) => item.product_id)).size,
-        fulfillmentStatus: savedOrder.fulfillment_status,
-        status: savedOrder.status,
-        totalAmount: Number(savedOrder.total_amount),
+        id: updatedOrder.id,
+        notes: updatedOrder.notes,
+        orderDate: updatedOrder.order_date,
+        orderNumber: updatedOrder.order_number,
+        productCount,
+        fulfillmentStatus: updatedOrder.fulfillment_status,
+        status: updatedOrder.status,
+        totalAmount: Number(updatedOrder.total_amount),
         vehicleId: customer.default_vehicle_id,
         vehicleName: customerVehicle?.name ?? null,
       }

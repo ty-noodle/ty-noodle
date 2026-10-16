@@ -55,6 +55,8 @@ export function SettingsMobileBottomNav() {
   if (prevPathname !== pathname) {
     setPrevPathname(pathname);
     setPendingHref(null);
+    setMoreOpen(false);
+    setSettingsOpen(false);
   }
 
   // Safety timer: ensure progress indicator never hangs indefinitely

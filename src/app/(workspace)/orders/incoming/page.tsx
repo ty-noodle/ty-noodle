@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import { NavigationLoading } from "@/components/navigation-loading";
+import { getOrderSummaryItems, IncomingOrderPrintActions } from "./incoming-order-print-actions";
 import { ClipboardList, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SettingsShell } from "@/components/settings/settings-shell";
@@ -11,37 +14,15 @@ import { getCustomerOrderCountsByDate, getIncomingOrders, getOrderDetailById } f
 import { getBilledDeliveryNumbersForRange } from "@/lib/billing/billing-statement";
 import { getPendingLineOrders } from "@/lib/orders/line-pending";
 import { getCustomersForOrder, getProductsForOrder, getVehiclesForOrder } from "@/lib/orders/manage";
-import { compareCustomerOrder } from "@/lib/settings/customer-order";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { IncomingOrdersDeliveryActions } from "@/components/orders/incoming-orders-delivery-actions";
-import type {
-  PackingListSummaryProduct,
-  PackingListSummaryStore,
-} from "@/components/orders/packing-list-summary-button";
-
 const CreateOrderModal = dynamic(() =>
   import("@/components/orders/create-order-modal").then((mod) => mod.CreateOrderModal),
 );
 const IncomingOrderModal = dynamic(() =>
   import("@/components/orders/incoming-order-modal").then((mod) => mod.IncomingOrderModal),
 );
-const PackingListSummaryButton = dynamic(() =>
-  import("@/components/orders/packing-list-summary-button").then((mod) => mod.PackingListSummaryButton),
-);
 const PendingLineOrdersSection = dynamic(() =>
   import("@/components/orders/pending-line-orders-section").then((mod) => mod.PendingLineOrdersSection),
-);
-const PrintPackingListCombinedButton = dynamic(() =>
-  import("@/components/orders/print-packing-list-combined-button").then((mod) => mod.PrintPackingListCombinedButton),
-);
-const PrintVehicleProductSummaryButton = dynamic(() =>
-  import("@/components/orders/print-vehicle-product-summary-button").then((mod) => mod.PrintVehicleProductSummaryButton),
-);
-const PrintFactoryOrderSheetButton = dynamic(() =>
-  import("@/components/orders/print-factory-order-sheet-button").then((mod) => mod.PrintFactoryOrderSheetButton),
-);
-const MobilePrintActions = dynamic(() =>
-  import("@/components/orders/mobile-print-actions").then((mod) => mod.MobilePrintActions),
 );
 
 export const metadata = { title: "รายการออเดอร์" };
@@ -57,17 +38,6 @@ type IncomingOrdersPageProps = {
   }>;
 };
 
-type IncomingOrderSummaryItemRow = {
-  order_id: string;
-  product_id: string;
-  quantity: number | string;
-  sale_unit_label: string;
-  products: {
-    name: string;
-    sku: string;
-  } | null;
-};
-
 type IncomingDeliveryNoteRow = {
   id: string;
   order_id: string | null;
@@ -76,55 +46,7 @@ type IncomingDeliveryNoteRow = {
   delivery_number: string;
 };
 
-const ORDER_SUMMARY_ITEM_CHUNK_SIZE = 50;
 const INCOMING_ORDERS_PAGE_SIZE = 30;
-
-async function getOrderSummaryItems(
-  admin: ReturnType<typeof getSupabaseAdmin>,
-  orderIds: string[],
-) {
-  if (orderIds.length === 0) {
-    return { data: [] as IncomingOrderSummaryItemRow[], error: null };
-  }
-
-  const chunks: string[][] = [];
-  for (let index = 0; index < orderIds.length; index += ORDER_SUMMARY_ITEM_CHUNK_SIZE) {
-    chunks.push(orderIds.slice(index, index + ORDER_SUMMARY_ITEM_CHUNK_SIZE));
-  }
-
-  const results = await Promise.all(
-    chunks.map((chunk) =>
-      admin
-        .from("order_items")
-        .select(
-          `
-            order_id,
-            product_id,
-            quantity,
-            sale_unit_label,
-            products!inner(name, sku)
-          `,
-        )
-        .in("order_id", chunk),
-    ),
-  );
-
-  const error = results.find((result) => result.error)?.error ?? null;
-  if (error) {
-    return { data: [] as IncomingOrderSummaryItemRow[], error };
-  }
-
-  return {
-    data: results.flatMap((result) => (result.data ?? []) as IncomingOrderSummaryItemRow[]),
-    error: null,
-  };
-}
-
-function formatDisplayDate(value: string) {
-  const [y, m, d] = value.split("-");
-  if (!y || !m || !d) return value;
-  return `${d}/${m}/${parseInt(y, 10) + 543}`;
-}
 
 async function getIncomingDeliveryNoteRows(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -242,7 +164,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     code: customer.code,
     name: customer.name,
   }));
-  const productImageById = new Map(products.map((product) => [product.id, product.imageUrl ?? null]));
 
   const hasMoreOrders = initialPageOrders.length > INCOMING_ORDERS_PAGE_SIZE;
   const initialOrders = initialPageOrders.slice(0, INCOMING_ORDERS_PAGE_SIZE);
@@ -253,6 +174,9 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     selectedCustomerIds.length > 0
       ? selectedCustomerIds
       : Array.from(new Set(printActiveOrders.map((order) => order.customerId)));
+  const summaryItems = getOrderSummaryItems(admin, printActiveOrderIds);
+  // The print boundary handles errors; observe early rejection while delivery data loads.
+  void summaryItems.catch(() => {});
   const [rangeDeliveryData, directDeliveryData] = await Promise.all([
     getIncomingDeliveryNoteRows(
       admin,
@@ -282,102 +206,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
     (selectedCustomerIds.length === 0 || selectedCustomerIds.includes(expandedDetail.customer.id))
       ? expandedDetail
       : null;
-
-  const orderSummaryItemsResult = await getOrderSummaryItems(admin, printActiveOrderIds);
-
-  if (orderSummaryItemsResult.error) {
-    throw new Error(orderSummaryItemsResult.error.message ?? "Failed to load order summary items.");
-  }
-
-  const itemsByOrderId = new Map<string, IncomingOrderSummaryItemRow[]>();
-  for (const row of (orderSummaryItemsResult.data ?? []) as IncomingOrderSummaryItemRow[]) {
-    const current = itemsByOrderId.get(row.order_id) ?? [];
-    current.push(row);
-    itemsByOrderId.set(row.order_id, current);
-  }
-
-  const summaryProductMap = new Map<string, PackingListSummaryProduct>();
-  const summaryStoreMap = new Map<string, PackingListSummaryStore>();
-
-  for (const order of filteredPrintOrders) {
-    const orderItems = itemsByOrderId.get(order.id) ?? [];
-    const storeKey = `${order.customerId}_${order.orderDate}_${order.vehicleId ?? "unassigned"}`;
-    const existingStore = summaryStoreMap.get(storeKey) ?? {
-      id: storeKey,
-      customerCode: order.customerCode,
-      customerName: order.customerName,
-      date: order.orderDate,
-      dateLabel: formatDisplayDate(order.orderDate),
-      itemCount: 0,
-      totalQuantity: 0,
-      vehicleId: order.vehicleId,
-      vehicleName: order.vehicleName,
-      items: [],
-    };
-    const storeItemMap = new Map(existingStore.items.map((item) => [item.key, item]));
-
-    for (const item of orderItems) {
-      if (!item.products) continue;
-      const unit = item.sale_unit_label?.trim() || "-";
-      const quantity = Number(item.quantity ?? 0);
-      const key = `${String(item.products.sku).trim().toLowerCase()}||${unit.toLowerCase()}`;
-      const vehicleProductKey = `${order.vehicleId ?? "unassigned"}||${key}`;
-
-      const existingProduct = summaryProductMap.get(vehicleProductKey);
-      if (existingProduct) {
-        existingProduct.quantity += quantity;
-      } else {
-        summaryProductMap.set(vehicleProductKey, {
-          key: vehicleProductKey,
-          sku: item.products.sku,
-          name: item.products.name,
-          unit,
-          quantity,
-          imageUrl: productImageById.get(item.product_id) ?? null,
-          vehicleId: order.vehicleId,
-          vehicleName: order.vehicleName,
-        });
-      }
-
-      const existingStoreItem = storeItemMap.get(key);
-      if (existingStoreItem) {
-        existingStoreItem.quantity += quantity;
-      } else {
-        storeItemMap.set(key, {
-          key,
-          sku: item.products.sku,
-          name: item.products.name,
-          unit,
-          quantity,
-        });
-      }
-    }
-
-    const storeItems = Array.from(storeItemMap.values()).sort((a, b) => {
-      const skuCompare = a.sku.localeCompare(b.sku, "th");
-      if (skuCompare !== 0) return skuCompare;
-      return a.name.localeCompare(b.name, "th");
-    });
-
-    existingStore.items = storeItems;
-    existingStore.itemCount = storeItems.length;
-    existingStore.totalQuantity = storeItems.reduce((sum, item) => sum + item.quantity, 0);
-    summaryStoreMap.set(storeKey, existingStore);
-  }
-
-  const summaryProducts = Array.from(summaryProductMap.values()).sort((a, b) => {
-    const skuCompare = a.sku.localeCompare(b.sku, "th");
-    if (skuCompare !== 0) return skuCompare;
-    return a.name.localeCompare(b.name, "th");
-  });
-
-  const summaryStores = Array.from(summaryStoreMap.values()).sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date);
-    if (dateCompare !== 0) return dateCompare;
-    const vehicleCompare = (a.vehicleName ?? "").localeCompare(b.vehicleName ?? "", "th");
-    if (vehicleCompare !== 0) return vehicleCompare;
-    return compareCustomerOrder(a, b);
-  });
 
   const deliveryMap = new Map<string, string[]>();
   const deliveryIdMap = new Map<string, string[]>();
@@ -424,55 +252,6 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
       deliveryIdMap.set(key, existingIds);
     }
   }
-
-  type GroupedOrderStore = {
-    customerId: string;
-    customerName: string;
-    customerCode: string;
-    hasDelivery: boolean;
-    orderDate: string;
-    orderIds: string[];
-    orderNumbers: string[];
-    deliveryNoteIds: string[];
-    orderRounds: number;
-    totalAmount: number;
-    vehicleId?: string | null;
-    vehicleName?: string | null;
-  };
-
-  const visibleOrderStores = Array.from(
-    filteredPrintOrders
-      .filter((order) => order.status === "submitted" || order.status === "confirmed")
-      .reduce((storeMap, order) => {
-        const groupKey = `${order.customerId}_${order.orderDate}`;
-        const current = storeMap.get(groupKey) ?? {
-          customerId: order.customerId,
-          customerName: order.customerName,
-          customerCode: order.customerCode,
-          hasDelivery: false,
-          orderDate: order.orderDate,
-          orderIds: [] as string[],
-          orderNumbers: [] as string[],
-          deliveryNoteIds: [] as string[],
-          orderRounds: 0,
-          totalAmount: 0,
-          vehicleId: order.vehicleId,
-          vehicleName: order.vehicleName,
-        };
-
-        current.orderIds.push(order.id);
-        current.orderNumbers.push(order.orderNumber);
-        current.orderRounds += 1;
-        current.totalAmount += order.totalAmount;
-        storeMap.set(groupKey, current);
-        return storeMap;
-      }, new Map<string, GroupedOrderStore>())
-      .values(),
-  ).map((store) => ({
-    ...store,
-    hasDelivery: Boolean(deliveryMap.get(`${store.customerId}_${store.orderDate}`)?.length),
-    deliveryNoteIds: deliveryIdMap.get(`${store.customerId}_${store.orderDate}`) ?? [],
-  }));
 
   const deliveryByCustomerId = Object.fromEntries(deliveryMap.entries());
   const billedDeliveryByCustomerDate = Object.fromEntries(
@@ -621,32 +400,17 @@ export default async function IncomingOrdersPage({ searchParams }: IncomingOrder
               <h2 className="text-base font-bold text-slate-950 sm:text-xl">รายการออเดอร์เข้า</h2>
             </div>
 
-            {/* Mobile View: Premium Actions Bottom Sheet */}
-            <div className="block sm:hidden w-full">
-              <MobilePrintActions
-                date={orderDate}
+            <Suspense fallback={<NavigationLoading compact />}>
+              <IncomingOrderPrintActions
+                summaryItems={summaryItems}
+                filteredPrintOrders={filteredPrintOrders}
+                products={products}
+                deliveryMap={deliveryMap}
+                deliveryIdMap={deliveryIdMap}
+                orderDate={orderDate}
                 endDate={endDate}
-                dateLabel={orderDate === endDate ? formatDisplayDate(orderDate) : `${formatDisplayDate(orderDate)} - ${formatDisplayDate(endDate)}`}
-                summaryProducts={summaryProducts}
-                summaryStores={summaryStores}
-                visibleOrderStores={visibleOrderStores}
               />
-            </div>
-
-            {/* Desktop & Tablet View: 5 Equal Width Action Cards Grid */}
-            <div className="hidden sm:block w-full">
-              <div className="grid grid-cols-5 gap-3 w-full [&_button]:w-full [&_button]:h-full [&_button]:justify-center [&_button]:py-3.5 [&_button]:px-5 [&_button]:rounded-2xl">
-                <PackingListSummaryButton
-                  dateLabel={orderDate === endDate ? formatDisplayDate(orderDate) : `${formatDisplayDate(orderDate)} - ${formatDisplayDate(endDate)}`}
-                  products={summaryProducts}
-                  stores={summaryStores}
-                />
-                <PrintPackingListCombinedButton date={orderDate} endDate={endDate} />
-                <PrintVehicleProductSummaryButton date={orderDate} endDate={endDate} />
-                <PrintFactoryOrderSheetButton date={orderDate} endDate={endDate} />
-                <IncomingOrdersDeliveryActions date={orderDate} endDate={endDate} stores={visibleOrderStores} />
-              </div>
-            </div>
+            </Suspense>
           </div>
 
           {filteredOrders.length > 0 ? (

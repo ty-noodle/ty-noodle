@@ -1,5 +1,5 @@
 import { Clock3, MonitorSmartphone, ShieldCheck } from "lucide-react";
-import { PinSettingsForm } from "@/app/settings/login-pin/pin-settings-form";
+import { PinSettingsForm } from "@/app/(workspace)/settings/login-pin/pin-settings-form";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { requireAppRole } from "@/lib/auth/authorization";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";

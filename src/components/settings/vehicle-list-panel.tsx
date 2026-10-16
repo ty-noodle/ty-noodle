@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { IdCard, PencilLine, Store, Trash2, Truck, UserRound, UsersRound, X } from "lucide-react";
-import { deleteVehicleAction } from "@/app/settings/vehicles/actions";
+import { deleteVehicleAction } from "@/app/(workspace)/settings/vehicles/actions";
 import type { SettingsVehicle } from "@/lib/settings/admin";
 import {
   SettingsEmptyState,

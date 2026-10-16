@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
-import { loadMoreIncomingOrdersAction } from "@/app/orders/incoming/load-more-actions";
+import { loadMoreIncomingOrdersAction } from "@/app/(workspace)/orders/incoming/load-more-actions";
 import { IncomingOrdersDesktopTable } from "@/components/orders/incoming-orders-desktop-table";
 import { IncomingOrdersMobileList } from "@/components/orders/incoming-orders-mobile-list";
 import type { IncomingOrderListItem, OrderDetailData } from "@/lib/orders/detail";

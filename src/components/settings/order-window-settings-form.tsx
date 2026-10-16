@@ -14,7 +14,7 @@ import {
 import {
   updateOrderWindowSettingsAction,
   type OrderWindowSettingsActionState,
-} from "@/app/settings/order-window/actions";
+} from "@/app/(workspace)/settings/order-window/actions";
 
 type PushPanelStatus =
   | "loading"

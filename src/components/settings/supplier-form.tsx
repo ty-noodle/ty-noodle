@@ -3,8 +3,8 @@
 import { startTransition, useActionState, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, PencilLine, Save, X } from "lucide-react";
-import { createSupplierAction, updateSupplierAction } from "@/app/settings/suppliers/actions";
-import type { SupplierActionState } from "@/app/settings/suppliers/actions";
+import { createSupplierAction, updateSupplierAction } from "@/app/(workspace)/settings/suppliers/actions";
+import type { SupplierActionState } from "@/app/(workspace)/settings/suppliers/actions";
 import { CustomerAddressFields } from "@/components/settings/customer-address-fields";
 import {
   SettingsPanel,

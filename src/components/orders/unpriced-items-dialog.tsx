@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Tag, X } from "lucide-react";
-import { getStoreItemCostSnapshots, setStoreItemPrices } from "@/app/orders/actions";
+import { getStoreItemCostSnapshots, setStoreItemPrices } from "@/app/(workspace)/orders/actions";
 import { confirmBelowCostSave, isBelowCostPrice } from "@/components/pricing/price-guard";
 
 export type UnpricedItem = {

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Trash2, X, AlertTriangle } from "lucide-react";
-import { deleteCustomerAction } from "@/app/settings/customers/actions";
+import { deleteCustomerAction } from "@/app/(workspace)/settings/customers/actions";
 
 type Props = {
   customerId: string;

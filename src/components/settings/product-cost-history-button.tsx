@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { History, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { fetchProductCostHistory, type ProductCostHistoryRow } from "@/app/dashboard/settings/actions";
+import { fetchProductCostHistory, type ProductCostHistoryRow } from "@/app/(workspace)/dashboard/settings/actions";
 
 function fmtCost(n: number | null) {
   if (n === null) return "—";

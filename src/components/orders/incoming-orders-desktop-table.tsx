@@ -2,7 +2,7 @@
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Building2, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
-import { fetchIncomingOrderDetailAction } from "@/app/orders/incoming/actions";
+import { fetchIncomingOrderDetailAction } from "@/app/(workspace)/orders/incoming/actions";
 import { DesktopOrderDetail } from "@/components/orders/desktop-order-detail";
 import { IncomingOrderModal } from "@/components/orders/incoming-order-modal";
 import { IncomingOrderDateButton } from "@/components/orders/incoming-order-date-button";

@@ -36,5 +36,5 @@ export function compareCustomerOrder<T extends CustomerOrderFields>(left: T, rig
 }
 
 export function sortCustomersByOrder<T extends CustomerOrderFields>(customers: T[]) {
-  return customers.toSorted(compareCustomerOrder);
+  return [...customers].sort(compareCustomerOrder);
 }

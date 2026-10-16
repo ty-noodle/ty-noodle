@@ -13,7 +13,7 @@ import {
   X,
   Boxes,
 } from "lucide-react";
-import { fetchCustomerPricesAction } from "@/app/orders/incoming/actions";
+import { fetchCustomerPricesAction } from "@/app/(workspace)/orders/incoming/actions";
 import { getEffectiveSaleUnitCost } from "@/lib/products/sale-unit-cost";
 import type { OrderProductOption } from "@/lib/orders/manage";
 import { normalizeSearch } from "@/lib/utils/search";

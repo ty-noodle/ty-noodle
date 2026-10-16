@@ -17,8 +17,8 @@ import { fmtDateTH } from "@/lib/utils/date";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { StockReceiptDetailModal } from "@/components/settings/stock-receipt-detail-modal";
 import { StockReceiptEditModal } from "@/components/settings/stock-receipt-edit-modal";
-import { getStockReceiptDetailAction } from "@/app/settings/stock/actions";
-import { loadMoreStockHistoryAction } from "@/app/stock/pagination-actions";
+import { getStockReceiptDetailAction } from "@/app/(workspace)/settings/stock/actions";
+import { loadMoreStockHistoryAction } from "@/app/(workspace)/stock/pagination-actions";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
 import { useMobileSearch } from "@/components/mobile-search/mobile-search-context";
 

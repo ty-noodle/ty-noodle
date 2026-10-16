@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { GripVertical, Package2, Pencil, Plus, Power } from "lucide-react";
-import { setProductActive, updateProductOrder } from "@/app/dashboard/settings/actions";
+import { setProductActive, updateProductOrder } from "@/app/(workspace)/dashboard/settings/actions";
 import { DeleteProductButton } from "@/components/settings/delete-product-button";
 import { ProductCostHistoryButton } from "@/components/settings/product-cost-history-button";
 import { ProductImagePreview } from "@/components/settings/product-image-preview";

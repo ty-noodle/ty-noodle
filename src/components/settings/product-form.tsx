@@ -25,7 +25,7 @@ import {
   createProductFormAction,
   updateProductFormAction,
   type ProductSubmitActionState,
-} from "@/app/dashboard/settings/actions";
+} from "@/app/(workspace)/dashboard/settings/actions";
 import {
   settingsFieldLabelClass,
   settingsInputClass,

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState, useTransition } from "react";
 import { BadgeCheck, Link2, Loader2, Package2, Search, Store, X } from "lucide-react";
-import { linkPendingLineOrderAction } from "@/app/orders/incoming/actions";
+import { linkPendingLineOrderAction } from "@/app/(workspace)/orders/incoming/actions";
 import type { OrderCustomerOption } from "@/lib/orders/manage";
 import type { PendingLineOrderListItem } from "@/lib/orders/line-pending";
 

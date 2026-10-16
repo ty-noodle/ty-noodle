@@ -4,8 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { AlertTriangle, CheckCircle2, Loader2, Minus, Package2, Plus, X, PackagePlus } from "lucide-react";
 import type { OrderStoreDetail } from "@/lib/orders/admin";
-import { getShortagesForDate } from "@/app/orders/actions";
-import { bulkReceiveStockAction, type BulkReceiveItem } from "@/app/settings/stock/actions";
+import { getShortagesForDate } from "@/app/(workspace)/orders/actions";
+import { bulkReceiveStockAction, type BulkReceiveItem } from "@/app/(workspace)/settings/stock/actions";
 
 type ShortageReceiveModalProps = {
   orderDate: string;

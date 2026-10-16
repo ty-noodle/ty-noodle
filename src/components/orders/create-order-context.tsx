@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, useTransition } from "react";
-import { fetchOrderModalDataAction } from "@/app/orders/incoming/actions";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
+import { fetchOrderModalDataAction } from "@/app/(workspace)/orders/incoming/actions";
 import type { OrderCustomerOption, OrderProductOption } from "@/lib/orders/manage";
 
 type CreateOrderData = {
@@ -22,32 +23,55 @@ type CreateOrderCtx = {
 const Ctx = createContext<CreateOrderCtx | null>(null);
 
 export function CreateOrderProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [modalPathname, setModalPathname] = useState(pathname);
+  const [dataPathname, setDataPathname] = useState(pathname);
   const [isOpen, setIsOpen] = useState(false);
   const [initialCustomerId, setInitialCustomerId] = useState<string | undefined>();
-  const [data, setData] = useState<CreateOrderData | null>(null);
+  const [loadedData, setData] = useState<CreateOrderData | null>(null);
+  const data = dataPathname === pathname ? loadedData : null;
   const [isPending, startTransition] = useTransition();
-  const loadInFlightRef = useRef(false);
+  const loadInFlightRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    loadInFlightRef.current = null;
+  }, [pathname]);
+
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
+    setIsOpen(false);
+    setInitialCustomerId(undefined);
+    setData(null);
+  }
 
   const open = useCallback((customerId?: string) => {
+    setModalPathname(pathname);
     setInitialCustomerId(customerId);
     setIsOpen(true);
     
     // Side effects must not run inside a state updater: React may execute an
     // updater while rendering, which previously caused a transition loop.
-    if (data || loadInFlightRef.current) return;
+    if (data || loadInFlightRef.current === pathname) return;
 
-    loadInFlightRef.current = true;
+    loadInFlightRef.current = pathname;
+    const requestId = ++requestIdRef.current;
     startTransition(async () => {
       try {
         const result = await fetchOrderModalDataAction();
-        setData(result);
+        if (requestId === requestIdRef.current) {
+          setData(result);
+          setDataPathname(pathname);
+        }
       } catch (error) {
         console.error("Failed to fetch order modal data:", error);
       } finally {
-        loadInFlightRef.current = false;
+        if (requestId === requestIdRef.current) loadInFlightRef.current = null;
       }
     });
-  }, [data]);
+  }, [data, pathname]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -57,12 +81,12 @@ export function CreateOrderProvider({ children }: { children: React.ReactNode })
   return (
     <Ctx.Provider
       value={{
-        isOpen,
+        isOpen: isOpen && modalPathname === pathname,
         open,
         close,
         data,
         isLoading: isPending,
-        initialCustomerId,
+        initialCustomerId: modalPathname === pathname ? initialCustomerId : undefined,
       }}
     >
       {children}

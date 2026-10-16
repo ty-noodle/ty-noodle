@@ -485,15 +485,28 @@ export async function getIncomingOrders(
 
   const orderCustomerIds = Array.from(new Set(orders.map((order: OrderRow) => order.customer_id)));
 
-  const customersResult =
+  const orderIds = orders.map((order: OrderRow) => order.id);
+
+  const itemsQuery =
+    orderIds.length > 0
+      ? admin
+          .from("order_items")
+          .select("order_id, product_id")
+          .in("order_id", orderIds)
+          .order("order_id", { ascending: true })
+      : ({ data: [], error: null } as const);
+
+  const customersQuery =
     orderCustomerIds.length > 0
-      ? await admin
+      ? admin
           .from("customers")
           .select("id, customer_code, name, address, default_vehicle_id, sort_order")
           .in("id", orderCustomerIds)
           .order("sort_order", { ascending: true })
           .order("customer_code", { ascending: true })
       : { data: [], error: null };
+
+  const [customersResult, itemsResult] = await Promise.all([customersQuery, itemsQuery]);
 
   if (customersResult.error) {
     throw new Error(customersResult.error.message ?? "Failed to load customers.");
@@ -525,17 +538,6 @@ export async function getIncomingOrders(
   const vehicleNameMap = new Map(
     (vehiclesResult.data ?? []).map((vehicle) => [vehicle.id, vehicle.name]),
   );
-
-  const orderIds = orders.map((order: OrderRow) => order.id);
-
-  const itemsResult =
-    orderIds.length > 0
-      ? await admin
-          .from("order_items")
-          .select("order_id, product_id")
-          .in("order_id", orderIds)
-          .order("order_id", { ascending: true })
-      : ({ data: [], error: null } as const);
 
   const orderProductSets = new Map<string, Set<string>>();
   for (const item of itemsResult.data ?? []) {

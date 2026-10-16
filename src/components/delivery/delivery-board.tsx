@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useMemo, useState, useTransition } from "react";
 import { AlertTriangle, Building2, ExternalLink, FileText, Loader2, Package2, Pencil, Save, Search, Truck, X, } from "lucide-react";
-import { adjustDeliveryGroupQtyAction, adjustDeliveryLineQtyAction, type DeliveryAdjustmentMode, } from "@/app/delivery/actions";
+import { adjustDeliveryGroupQtyAction, adjustDeliveryLineQtyAction, type DeliveryAdjustmentMode, } from "@/app/(workspace)/delivery/actions";
 import type { BillingRecordInfo, DeliveryDaySummary, DeliveryEditableItem, DeliveryListItem, } from "@/lib/delivery/delivery-list";
 import { PrintDailyDeliveryButton } from "@/components/orders/print-daily-delivery-button";
 import { PrintPackingListButton } from "@/components/orders/print-packing-list-button";

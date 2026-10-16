@@ -19,7 +19,7 @@ import {
 import {
   deleteCustomerPrice,
   upsertStoreProductPrice,
-} from "@/app/dashboard/settings/actions";
+} from "@/app/(workspace)/dashboard/settings/actions";
 import { confirmBelowCostSave, isBelowCostPrice } from "@/components/pricing/price-guard";
 import type { SettingsPriceRow, SettingsSaleUnitOption } from "@/lib/settings/admin";
 import { normalizeSearch } from "@/lib/utils/search";

@@ -92,7 +92,7 @@ export async function mergeItemsIntoOrder(
 ) {
   const aggregatedIncomingItems = aggregateMergeableOrderItems(input.items);
   if (aggregatedIncomingItems.length === 0) {
-    return { success: true as const };
+    return { success: true as const, distinctProductCount: 0 };
   }
 
   const { data: existingRows, error: existingRowsError } = await admin
@@ -234,5 +234,17 @@ export async function mergeItemsIntoOrder(
     }
   }
 
-  return { success: true as const };
+  const distinctProductIds = new Set<string>();
+  for (const row of (existingRows ?? []) as ExistingOrderItemRow[]) {
+    if (row.product_id) {
+      distinctProductIds.add(row.product_id);
+    }
+  }
+  for (const item of aggregatedIncomingItems) {
+    if (item.productId) {
+      distinctProductIds.add(item.productId);
+    }
+  }
+
+  return { success: true as const, distinctProductCount: distinctProductIds.size };
 }

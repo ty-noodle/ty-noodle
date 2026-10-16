@@ -14,7 +14,7 @@ import Image from "next/image";
 import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { fmtDateTH } from "@/lib/utils/date";
 import type { StockIssueRow } from "@/lib/stock/issues";
-import { loadMoreStockIssuesAction } from "@/app/stock/pagination-actions";
+import { loadMoreStockIssuesAction } from "@/app/(workspace)/stock/pagination-actions";
 import { MobileSearchDrawer } from "@/components/mobile-search/mobile-search-drawer";
 import { useMobileSearch } from "@/components/mobile-search/mobile-search-context";
 

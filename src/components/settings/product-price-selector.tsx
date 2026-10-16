@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import { Check, Package2, Search, X } from "lucide-react";
-import { upsertStoreProductPrice } from "@/app/dashboard/settings/actions";
+import { upsertStoreProductPrice } from "@/app/(workspace)/dashboard/settings/actions";
 import { confirmBelowCostSave, isBelowCostPrice } from "@/components/pricing/price-guard";
 import type { SettingsSaleUnitOption } from "@/lib/settings/admin";
 import { normalizeSearch } from "@/lib/utils/search";

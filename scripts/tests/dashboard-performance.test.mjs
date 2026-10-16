@@ -51,10 +51,10 @@ test("primary navigation does not disable App Router prefetch", () => {
 });
 
 test("orders and settings use recognized loading filenames", () => {
-  assert.equal(existsSync("src/app/orders/loading.tsx"), true);
-  assert.equal(existsSync("src/app/settings/loading.tsx"), true);
-  assert.equal(existsSync("src/app/orders/_loading.tsx"), false);
-  assert.equal(existsSync("src/app/settings/_loading.tsx"), false);
+  assert.equal(existsSync("src/app/(workspace)/orders/loading.tsx"), true);
+  assert.equal(existsSync("src/app/(workspace)/settings/loading.tsx"), true);
+  assert.equal(existsSync("src/app/(workspace)/orders/_loading.tsx"), false);
+  assert.equal(existsSync("src/app/(workspace)/settings/_loading.tsx"), false);
 });
 
 test("dashboard benchmark summarizes latency percentiles", () => {
