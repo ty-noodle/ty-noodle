@@ -61,3 +61,14 @@ export function removeIncomingOrder(
 ) {
   return orders.filter((order) => order.id !== orderId);
 }
+
+export function reconcileIncomingOrderPage(
+  loadedOrders: IncomingOrderListItem[],
+  refreshedPage: IncomingOrderListItem[],
+  hasMore: boolean,
+) {
+  if (!hasMore) return refreshedPage;
+  // A partial page cannot prove that an absent row was deleted.
+  const replacedIds = new Set(refreshedPage.map((order) => order.id));
+  return [...refreshedPage, ...loadedOrders.filter((order) => !replacedIds.has(order.id))];
+}

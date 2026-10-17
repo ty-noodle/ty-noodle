@@ -5,6 +5,7 @@ import {
   removeIncomingOrder,
   shouldShowIncomingOrder,
   upsertIncomingOrder,
+  reconcileIncomingOrderPage,
 } from "../../src/components/orders/incoming-order-live-update.ts";
 
 const baseOrder = {
@@ -25,6 +26,27 @@ const baseOrder = {
   vehicleId: null,
   vehicleName: null,
 };
+
+test("fresh server rows replace stale first-page state without dropping loaded later pages", () => {
+  const later = { ...baseOrder, id: "order-2", totalAmount: 75 };
+  const saved = { ...baseOrder, totalAmount: 250, notes: "updated", productCount: 3 };
+  const result = reconcileIncomingOrderPage([baseOrder, later], [saved], true);
+  assert.deepEqual(result, [saved, later]);
+  assert.equal(baseOrder.totalAmount, 100);
+});
+
+test("partial refresh preserves displaced rows and deduplicates rows shifted from later pages", () => {
+  const later = { ...baseOrder, id: "order-2" };
+  assert.deepEqual(reconcileIncomingOrderPage([baseOrder, later], [later], true), [later, baseOrder]);
+  const newest = { ...baseOrder, id: "newest" };
+  assert.deepEqual(reconcileIncomingOrderPage([baseOrder, later], [newest], true), [newest, baseOrder, later]);
+  assert.deepEqual(reconcileIncomingOrderPage([baseOrder], [], false), []);
+});
+
+test("a complete server page removes rows that no longer exist", () => {
+  const removed = { ...baseOrder, id: "removed" };
+  assert.deepEqual(reconcileIncomingOrderPage([baseOrder, removed], [baseOrder], false), [baseOrder]);
+});
 
 test("upsert adds a newly created order at the top without duplicating it", () => {
   const result = upsertIncomingOrder([], baseOrder);

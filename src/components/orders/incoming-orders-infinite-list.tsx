@@ -11,6 +11,7 @@ import {
   INCOMING_ORDER_DELETED_EVENT,
   INCOMING_ORDER_SAVED_EVENT,
   removeIncomingOrder,
+  reconcileIncomingOrderPage,
   shouldShowIncomingOrder,
   upsertIncomingOrder,
   type IncomingOrderDeletedEventDetail,
@@ -66,6 +67,30 @@ export function IncomingOrdersInfiniteList({
   const [canLoadMore, setCanLoadMore] = useState(hasMore);
   const [loadMorePending, startLoadMoreTransition] = useTransition();
   const sensorRef = useRef<HTMLDivElement | null>(null);
+  const [previousServerData, setPreviousServerData] = useState({
+    orders, deliveryByCustomerId, billedByCustomerDate, hasMore,
+  });
+
+  if (
+    previousServerData.orders !== orders ||
+    previousServerData.deliveryByCustomerId !== deliveryByCustomerId ||
+    previousServerData.billedByCustomerDate !== billedByCustomerDate ||
+    previousServerData.hasMore !== hasMore
+  ) {
+    setPreviousServerData({ orders, deliveryByCustomerId, billedByCustomerDate, hasMore });
+    if (previousServerData.orders !== orders) {
+      setLoadedOrders((current) => reconcileIncomingOrderPage(current, orders, hasMore));
+    }
+    if (previousServerData.deliveryByCustomerId !== deliveryByCustomerId) {
+      setLoadedDeliveryByCustomerId(deliveryByCustomerId);
+    }
+    if (previousServerData.billedByCustomerDate !== billedByCustomerDate) {
+      setLoadedBilledByCustomerDate(billedByCustomerDate);
+    }
+    if (previousServerData.orders !== orders || previousServerData.hasMore !== hasMore) {
+      setCanLoadMore(hasMore);
+    }
+  }
 
   useEffect(() => {
     function handleIncomingOrderSaved(event: Event) {

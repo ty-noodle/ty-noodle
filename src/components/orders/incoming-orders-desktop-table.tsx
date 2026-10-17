@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, memo, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Building2, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { fetchIncomingOrderDetailAction } from "@/app/(workspace)/orders/incoming/actions";
 import { DesktopOrderDetail } from "@/components/orders/desktop-order-detail";
@@ -254,6 +254,33 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
   const stickyScrollRef = useRef<HTMLDivElement | null>(null);
   const stickyScrollInnerRef = useRef<HTMLDivElement | null>(null);
 
+  const previousOrdersRef = useRef(orders);
+  const previousInitialDetailRef = useRef(initialExpandedDetail);
+  const detailRequestVersions = useRef<Record<string, number>>({});
+  const loadOrderDetail = useCallback((orderId: string) => {
+    const version = (detailRequestVersions.current[orderId] ?? 0) + 1;
+    detailRequestVersions.current[orderId] = version;
+    setLoadingOrderId(orderId);
+    startTransition(async () => {
+      try {
+        const result = await fetchIncomingOrderDetailAction(orderId);
+        if (detailRequestVersions.current[orderId] !== version) return;
+        if (result.error || !result.detail) {
+          setDetailError(result.error ?? "โหลดรายละเอียดออเดอร์ไม่สำเร็จ");
+          return;
+        }
+        const nextDetail = result.detail;
+        setDetailByOrderId((current) => ({ ...current, [orderId]: nextDetail }));
+      } catch {
+        if (detailRequestVersions.current[orderId] === version) {
+          setDetailError("โหลดรายละเอียดออเดอร์ไม่สำเร็จ");
+        }
+      } finally {
+        if (detailRequestVersions.current[orderId] === version) setLoadingOrderId(null);
+      }
+    });
+  }, []);
+
   const visibleOrderIds = useMemo(() => new Set(orders.map((order) => order.id)), [orders]);
 
   useEffect(() => {
@@ -261,18 +288,34 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
   }, [initialExpandedOrderId]);
 
   useEffect(() => {
+    const previousOrders = new Map(previousOrdersRef.current.map((order) => [order.id, order]));
+    const changedIds = new Set(orders.filter((order) => {
+      const previous = previousOrders.get(order.id);
+      return previous && previous !== order;
+    }).map((order) => order.id));
+    const freshInitialDetail = previousInitialDetailRef.current !== initialExpandedDetail;
+    previousOrdersRef.current = orders;
+    previousInitialDetailRef.current = initialExpandedDetail;
+    if (freshInitialDetail && initialExpandedOrderId) changedIds.add(initialExpandedOrderId);
+
+    for (const orderId of changedIds) {
+      detailRequestVersions.current[orderId] = (detailRequestVersions.current[orderId] ?? 0) + 1;
+    }
+    setLoadingOrderId((current) => current && changedIds.has(current) ? null : current);
     setDetailByOrderId((current) => {
       const next = Object.fromEntries(
-        Object.entries(current).filter(([orderId]) => visibleOrderIds.has(orderId)),
+        Object.entries(current).filter(([orderId]) => visibleOrderIds.has(orderId) && !changedIds.has(orderId)),
       );
-
-      if (initialExpandedOrderId && initialExpandedDetail) {
+      if (initialExpandedOrderId && initialExpandedDetail && freshInitialDetail) {
         next[initialExpandedOrderId] = initialExpandedDetail;
       }
-
       return next;
     });
-  }, [initialExpandedDetail, initialExpandedOrderId, visibleOrderIds]);
+    if (changedIds.has(expandedOrderId) && !(freshInitialDetail && initialExpandedOrderId === expandedOrderId && initialExpandedDetail)) {
+      setDetailError(null);
+      loadOrderDetail(expandedOrderId);
+    }
+  }, [expandedOrderId, initialExpandedDetail, initialExpandedOrderId, loadOrderDetail, orders, visibleOrderIds]);
 
   useEffect(() => {
     const main = mainScrollRef.current;
@@ -332,22 +375,7 @@ export const IncomingOrdersDesktopTable = memo(function IncomingOrdersDesktopTab
     setExpandedOrderId(orderId);
     if (detailByOrderId[orderId]) return;
 
-    setLoadingOrderId(orderId);
-    startTransition(async () => {
-      try {
-        const result = await fetchIncomingOrderDetailAction(orderId);
-        if (result.error || !result.detail) {
-          setDetailError(result.error ?? "โหลดรายละเอียดออเดอร์ไม่สำเร็จ");
-          return;
-        }
-        const nextDetail = result.detail;
-        setDetailByOrderId((current) => ({ ...current, [orderId]: nextDetail }));
-      } catch {
-        setDetailError("โหลดรายละเอียดออเดอร์ไม่สำเร็จ");
-      } finally {
-        setLoadingOrderId(null);
-      }
-    });
+    loadOrderDetail(orderId);
   }
 
   return (
