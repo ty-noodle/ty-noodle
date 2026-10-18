@@ -20,7 +20,8 @@ export default function OfflinePage() {
         </p>
         <Link
           href="/"
-          className="mt-8 inline-flex rounded-full bg-accent-600 px-5 py-3 text-sm font-semibold text-white"
+          prefetch={false}
+          className="mt-8 inline-flex rounded-full bg-accent-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-700"
         >
           กลับหน้าแรก
         </Link>

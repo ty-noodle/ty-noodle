@@ -44,6 +44,9 @@ export function PwaProvider() {
           scope: "/",
           updateViaCache: "none",
         })
+        .then((registration) => {
+          void registration.update();
+        })
         .catch(() => {
           // Ignore registration failures; the app remains usable online.
         });

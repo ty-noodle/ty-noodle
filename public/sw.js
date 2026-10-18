@@ -1,4 +1,4 @@
-const CACHE_NAME = "T&Y Noodle-v9";
+const CACHE_NAME = "T&Y Noodle-v10";
 const APP_SHELL = [
   "/offline",
   "/manifest.webmanifest",
@@ -19,11 +19,15 @@ function cleanResponse(response) {
     return response;
   }
 
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
+  try {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  } catch {
+    return response;
+  }
 }
 
 function getDefaultPushPayload() {
@@ -68,7 +72,7 @@ function isBypassedRequest(request, url) {
   if (
     url.pathname === "/order" ||
     url.pathname.startsWith("/order/") ||
-    url.pathname.startsWith("/api/order/") ||
+    url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/_next/")
   ) {
     return true;
@@ -121,17 +125,22 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    const fetchPromise = (async () => {
-      const preloaded = await event.preloadResponse;
-      return cleanResponse(preloaded || (await fetch(request)));
-    })();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Navigation timeout")), 6000)
-    );
-
     event.respondWith(
-      Promise.race([fetchPromise, timeoutPromise])
-        .catch(async () => {
+      (async () => {
+        try {
+          let response = null;
+          try {
+            response = await event.preloadResponse;
+          } catch {
+            response = null;
+          }
+
+          if (!response) {
+            response = await fetch(request);
+          }
+
+          return cleanResponse(response);
+        } catch {
           const offlinePage = await caches.match("/offline");
           if (offlinePage) {
             return cleanResponse(offlinePage);
@@ -141,7 +150,8 @@ self.addEventListener("fetch", (event) => {
             status: 503,
             headers: { "Content-Type": "text/plain; charset=utf-8" },
           });
-        }),
+        }
+      })(),
     );
     return;
   }
@@ -155,8 +165,10 @@ self.addEventListener("fetch", (event) => {
       fetch(request).catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cleanResponse(cached);
-        const offlinePage = await caches.match("/offline");
-        return cleanResponse(offlinePage);
+        return new Response("Network unavailable", {
+          status: 503,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
       }),
     );
     return;
