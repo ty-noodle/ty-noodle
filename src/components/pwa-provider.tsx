@@ -45,10 +45,10 @@ export function PwaProvider() {
           updateViaCache: "none",
         })
         .then((registration) => {
-          void registration.update();
+          return registration.update();
         })
-        .catch(() => {
-          // Ignore registration failures; the app remains usable online.
+        .catch((error) => {
+          console.error("[pwa] Service worker registration or update failed", error);
         });
     };
 
