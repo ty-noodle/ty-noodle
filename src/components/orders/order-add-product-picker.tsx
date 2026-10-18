@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -123,6 +124,16 @@ export function OrderAddProductPicker({
   const [selections, setSelections] = useState<Record<string, SelectionDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -305,8 +316,8 @@ export function OrderAddProductPicker({
         </button>
       </div>
 
-      {open ? (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center overflow-x-hidden bg-slate-950/55 sm:items-center sm:p-2 xl:p-4">
+      {open ? createPortal(
+        <div role="dialog" aria-modal="true" aria-label="เพิ่มสินค้าใหม่" className="fixed inset-0 z-[300] flex items-end justify-center overflow-x-hidden bg-slate-950/55 sm:items-center sm:p-2 xl:p-4">
           <button
             type="button"
             className="absolute inset-0"
@@ -357,7 +368,7 @@ export function OrderAddProductPicker({
               </label>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-5">
+            <div className="min-h-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-5">
               {error ? (
                 <div className="mb-3 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} />
@@ -625,7 +636,8 @@ export function OrderAddProductPicker({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

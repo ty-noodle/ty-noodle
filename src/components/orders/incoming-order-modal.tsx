@@ -1094,7 +1094,7 @@ export function IncomingOrderModal({
     : false;
 
   return (
-    <div className={`fixed inset-0 z-[250] flex flex-col items-center justify-end overflow-x-hidden overflow-y-hidden lg:justify-center`}>
+    <div role="dialog" aria-modal="true" aria-label="รายละเอียดออเดอร์" className={`fixed inset-0 z-[250] flex flex-col items-center justify-end overflow-x-hidden overflow-y-hidden lg:justify-center`}>
       <style>{`
         @keyframes slideInL { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideInR { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

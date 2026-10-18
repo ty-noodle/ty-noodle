@@ -31,6 +31,9 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
     if (isPrintPage) return;
 
     const handleTouchStart = (e: TouchEvent) => {
+      isPulling.current = false;
+      if (e.target instanceof Element && e.target.closest('[role="dialog"], [aria-modal="true"]')) return;
+
       // Only start pull if main page is at absolute top
       if (window.scrollY > 0) return;
 
