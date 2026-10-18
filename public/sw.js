@@ -1,4 +1,4 @@
-const CACHE_NAME = "T&Y Noodle-v8";
+const CACHE_NAME = "T&Y Noodle-v9";
 const APP_SHELL = [
   "/offline",
   "/manifest.webmanifest",
@@ -126,7 +126,7 @@ self.addEventListener("fetch", (event) => {
       return cleanResponse(preloaded || (await fetch(request)));
     })();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Navigation timeout")), 1800)
+      setTimeout(() => reject(new Error("Navigation timeout")), 6000)
     );
 
     event.respondWith(
