@@ -1,0 +1,1 @@
+export const RECEIPT_EXPORT_WIDTH = 360;

@@ -1,0 +1,90 @@
+  const itemsByOrderId = new Map<string, IncomingOrderSummaryItemRow[]>();
+  for (const row of (orderSummaryItemsResult.data ?? []) as IncomingOrderSummaryItemRow[]) {
+    const current = itemsByOrderId.get(row.order_id) ?? [];
+    current.push(row);
+    itemsByOrderId.set(row.order_id, current);
+  }
+
+  const summaryProductMap = new Map<string, PackingListSummaryProduct>();
+  const summaryStoreMap = new Map<string, PackingListSummaryStore>();
+
+  for (const order of filteredPrintOrders) {
+    const orderItems = itemsByOrderId.get(order.id) ?? [];
+    const storeKey = `${order.customerId}_${order.orderDate}_${order.vehicleId ?? "unassigned"}`;
+    const existingStore = summaryStoreMap.get(storeKey) ?? {
+      id: storeKey,
+      customerCode: order.customerCode,
+      customerName: order.customerName,
+      date: order.orderDate,
+      dateLabel: formatDisplayDate(order.orderDate),
+      itemCount: 0,
+      totalQuantity: 0,
+      vehicleId: order.vehicleId,
+      vehicleName: order.vehicleName,
+      items: [],
+    };
+    const storeItemMap = new Map(existingStore.items.map((item) => [item.key, item]));
+
+    for (const item of orderItems) {
+      if (!item.products) continue;
+      const unit = item.sale_unit_label?.trim() || "-";
+      const quantity = Number(item.quantity ?? 0);
+      const key = `${String(item.products.sku).trim().toLowerCase()}||${unit.toLowerCase()}`;
+      const vehicleProductKey = `${order.vehicleId ?? "unassigned"}||${key}`;
+
+      const existingProduct = summaryProductMap.get(vehicleProductKey);
+      if (existingProduct) {
+        existingProduct.quantity += quantity;
+      } else {
+        summaryProductMap.set(vehicleProductKey, {
+          key: vehicleProductKey,
+          sku: item.products.sku,
+          name: item.products.name,
+          unit,
+          quantity,
+          imageUrl: productImageById.get(item.product_id) ?? null,
+          vehicleId: order.vehicleId,
+          vehicleName: order.vehicleName,
+        });
+      }
+
+      const existingStoreItem = storeItemMap.get(key);
+      if (existingStoreItem) {
+        existingStoreItem.quantity += quantity;
+      } else {
+        storeItemMap.set(key, {
+          key,
+          sku: item.products.sku,
+          name: item.products.name,
+          unit,
+          quantity,
+        });
+      }
+    }
+
+    const storeItems = Array.from(storeItemMap.values()).sort((a, b) => {
+      const skuCompare = a.sku.localeCompare(b.sku, "th");
+      if (skuCompare !== 0) return skuCompare;
+      return a.name.localeCompare(b.name, "th");
+    });
+
+    existingStore.items = storeItems;
+    existingStore.itemCount = storeItems.length;
+    existingStore.totalQuantity = storeItems.reduce((sum, item) => sum + item.quantity, 0);
+    summaryStoreMap.set(storeKey, existingStore);
+  }
+
+  const summaryProducts = Array.from(summaryProductMap.values()).sort((a, b) => {
+    const skuCompare = a.sku.localeCompare(b.sku, "th");
+    if (skuCompare !== 0) return skuCompare;
+    return a.name.localeCompare(b.name, "th");
+  });
+
+  const summaryStores = Array.from(summaryStoreMap.values()).sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    const vehicleCompare = (a.vehicleName ?? "").localeCompare(b.vehicleName ?? "", "th");
+    if (vehicleCompare !== 0) return vehicleCompare;
+    return compareCustomerOrder(a, b);
+  });
+

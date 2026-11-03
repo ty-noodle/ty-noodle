@@ -1,0 +1,30 @@
+- table [ref=f10e5]:
+  - rowgroup [ref=f10e6]:
+    - row [ref=f10e7]:
+      - columnheader "เลขที่ใบวางบิล" [ref=f10e8]
+      - columnheader "ร้านค้า" [ref=f10e9]
+      - columnheader "วันที่วางบิล" [ref=f10e10]
+      - columnheader "ยอดรวม" [ref=f10e11]
+      - columnheader "จัดการ" [ref=f10e12]
+  - rowgroup [ref=f10e13]:
+    - row [ref=f10e14] [cursor=pointer]:
+      - cell "BL202610001" [ref=f10e15]
+      - cell "ร้านตัวอย่าง TYS076" [ref=f10e22]:
+        - generic [ref=f10e23]:
+          - generic [ref=f10e24]: ร้านตัวอย่าง
+          - generic [ref=f10e25]: TYS076
+      - 'cell "08/10/2569 ช่วงวันที่: 01/10/2569 - 06/10/2569" [ref=f10e26]':
+        - generic [ref=f10e27]: 08/10/2569
+        - generic [ref=f10e30]: "ช่วงวันที่: 01/10/2569 - 06/10/2569"
+      - cell [ref=f10e31]:
+        - generic [ref=f10e32]:
+          - paragraph [ref=f10e33]: "720.00"
+          - paragraph [ref=f10e34]: บาท
+      - cell [ref=f10e35]:
+        - generic [ref=f10e36]:
+          - button "พิมพ์ใบวางบิลนี้อีกครั้ง" [ref=f10e38]
+          - link "พิมพ์ใบแนบส่งของ A4 แนวนอน (เปิดแท็บใหม่)" [ref=f10e44]:
+            - /url: /billing/attachments?record=bill-fixture-123&autoprint=1
+            - generic [ref=f10e48]:
+              - generic [ref=f10e49]: พิมพ์ใบแนบส่งของ
+              - generic [ref=f10e50]: เครื่อง A4 · แนวนอน

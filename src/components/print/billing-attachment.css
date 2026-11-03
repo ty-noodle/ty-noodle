@@ -1,0 +1,51 @@
+@font-face { font-family: "Attachment Thai"; src: url("/fonts/NotoSansThai-Regular.ttf") format("truetype"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Attachment Thai"; src: url("/fonts/NotoSansThai-Bold.ttf") format("truetype"); font-weight: 700; font-display: block; }
+
+.billing-attachments { color: #000; font-family: "Attachment Thai", Tahoma, sans-serif; font-weight: 400; font-size: 9.5pt; line-height: 1.2; }
+.attachment-sheet { box-sizing: border-box; width: 297mm; height: 210mm; padding: 8mm; display: flex; flex-direction: column; background: #fff; }
+.attachment-header { flex: none; padding-bottom: 2mm; border-bottom: 1px solid #000; margin-bottom: 2mm; }
+.attachment-heading, .attachment-customer { display: flex; justify-content: space-between; gap: 4mm; }
+.attachment-heading { align-items: baseline; font-size: 13pt; font-weight: 700; }
+.attachment-heading h1 { font-size: 13pt; margin: 0; font-weight: 700; }
+.attachment-customer { margin-top: 1.5mm; font-size: 10pt; }
+.attachment-customer > div:first-child { max-width: 60%; overflow-wrap: anywhere; }
+.attachment-customer p { margin: 0; }
+.attachment-customer strong { font-size: 11pt; }
+.attachment-period { text-align: right; flex-shrink: 0; }
+.attachment-page-body { flex: 1; min-height: 0; }
+.attachment-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6mm; align-items: start; }
+.attachment-note { padding-bottom: 2mm; }
+.attachment-note-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 2mm; padding: 0.8mm 1mm; background: #e9e9e9; }
+.attachment-note-heading strong { font-size: 11pt; }
+.attachment-note-heading span { font-size: 9pt; font-weight: 700; overflow-wrap: anywhere; }
+.attachment-note table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.attachment-note th, .attachment-note td { padding: 0.2mm 0.7mm; vertical-align: top; overflow-wrap: anywhere; }
+.attachment-note th { font-size: 8.5pt; border-bottom: 0.6px solid #000; font-weight: 700; text-align: left; }
+.attachment-note th:nth-child(n+3), .attachment-note td:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+.attachment-note td:first-child { font-size: 8.8pt; }
+.attachment-note-total { display: flex; justify-content: flex-end; align-items: baseline; gap: 5mm; border-top: 0.6px solid #000; padding: 0.8mm 0.7mm 0; font-size: 10pt; line-height: 1.3; min-height: 5mm; font-weight: 700; }
+.attachment-note-total strong { font-size: 11pt; font-variant-numeric: tabular-nums; }
+.attachment-footer { display: flex; align-items: baseline; justify-content: space-between; gap: 4mm; flex: none; border-top: 1px solid #000; margin-top: 1mm; padding-top: 1.5mm; font-size: 10pt; font-weight: 700; }
+.attachment-footer strong { font-size: 13pt; margin: 0 2mm; font-variant-numeric: tabular-nums; }
+.attachment-footer > span:last-child { font-size: 9pt; white-space: nowrap; }
+.attachment-measure { position: absolute; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+.attachment-measure-note { width: calc((281mm - 6mm) / 2); }
+.attachment-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 297mm; margin: 0 auto 20px; font-size: 14px; }
+.attachment-toolbar a { color: #003366; text-decoration: underline; }
+.attachment-toolbar button { padding: 10px 16px; color: white; background: #003366; border-radius: 6px; font-weight: 700; cursor: pointer; }
+.attachment-toolbar button:disabled { opacity: 0.5; cursor: wait; }
+
+@media screen {
+  body:has(.billing-attachments) { background: #e5e7eb; background-image: none; overflow-x: auto; }
+  .billing-attachments { width: max-content; min-width: 100%; padding: 24px; }
+  .attachment-sheet { margin: 0 auto 24px; box-shadow: 0 2px 16px #0002; }
+}
+@page { size: A4 landscape; margin: 8mm; }
+@media print {
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; background-image: none !important; width: auto !important; height: auto !important; overflow: visible !important; }
+  .billing-attachments { padding: 0; width: 281mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .billing-attachments .no-print, .attachment-measure { display: none !important; }
+  .attachment-sheet { width: 281mm; height: 193.5mm; padding: 0; margin: 0; box-shadow: none; break-after: page; }
+  .attachment-sheet:last-child { break-after: auto; }
+  .attachment-pair { break-inside: avoid; }
+}

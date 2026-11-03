@@ -1,0 +1,37 @@
+- generic [ref=f11e2]:
+  - button "กรองข้อมูล" [ref=f11e3]
+  - generic [ref=f11e5]:
+    - generic [ref=f11e6]:
+      - generic [ref=f11e7]:
+        - generic [ref=f11e8]: จากวันที่
+        - button "01/10/2569" [ref=f11e11]
+      - generic [ref=f11e15]:
+        - generic [ref=f11e16]: ถึงวันที่
+        - button "06/10/2569" [ref=f11e19]
+      - generic [ref=f11e23]:
+        - generic [ref=f11e24]: สถานะการวางบิล
+        - generic [ref=f11e25]:
+          - button "ทั้งหมด" [ref=f11e26]
+          - button "ยังไม่วางบิล" [ref=f11e27]
+          - button "วางบิลแล้ว" [ref=f11e28]
+      - generic [ref=f11e29]:
+        - generic [ref=f11e30]: เลือกร้านค้า / ลูกค้า
+        - button "เลือกทั้งหมด หรือบางร้าน..." [active] [ref=f11e32]
+    - generic [ref=f11e50]:
+      - generic [ref=f11e51]:
+        - generic [ref=f11e52]:
+          - heading "เลือกร้านค้า" [level=3] [ref=f11e53]
+          - paragraph [ref=f11e54]: เลือกแล้ว 0 ร้าน
+        - button [ref=f11e55]
+      - textbox "ค้นหาชื่อร้านหรือรหัส..." [ref=f11e64]
+      - generic [ref=f11e65]:
+        - button "เลือกที่พบทั้งหมด" [ref=f11e66]
+        - button "ล้างทั้งหมด" [ref=f11e67]
+      - button "ร้านตัวอย่าง TYS076" [ref=f11e69]:
+        - generic [ref=f11e71]:
+          - generic [ref=f11e72]: ร้านตัวอย่าง
+          - generic [ref=f11e73]: TYS076
+      - button "เสร็จสิ้น" [ref=f11e75]
+    - generic [ref=f11e41]:
+      - heading "กรุณาเลือกร้านค้าที่ต้องการ" [level=3] [ref=f11e46]
+      - paragraph [ref=f11e47]: ใช้ช่อง Dropdown ด้านบนเพื่อเลือกร้านค้าที่ต้องการออกใบวางบิลในช่วงวันที่ 01/10/2569 ถึง 06/10/2569
