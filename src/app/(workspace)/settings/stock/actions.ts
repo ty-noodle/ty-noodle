@@ -104,6 +104,12 @@ export async function receiveStockAction(
     }
   }
 
+  const receivedAtInput = getText(formData, "receivedAt");
+  const receivedAt = receivedAtInput ? new Date(receivedAtInput) : new Date();
+  if (Number.isNaN(receivedAt.getTime())) {
+    return { fieldErrors: {}, message: "วันที่รับสินค้าไม่ถูกต้อง", status: "error" };
+  }
+
   const receiptNumberInput = getText(formData, "receiptNumber");
   let receiptNumber = receiptNumberInput;
 
@@ -112,18 +118,19 @@ export async function receiveStockAction(
   if (!receiptNumber) {
     const { data: generatedNumber, error: generateError } = await admin.rpc("generate_receipt_number", {
       p_organization_id: session.organizationId,
+      p_date: new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(receivedAt),
     });
 
-    if (!generateError && generatedNumber) {
-      receiptNumber = generatedNumber;
-    } else {
-      receiptNumber = `RCV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    if (generateError || !generatedNumber) {
+      return { fieldErrors: {}, message: "สร้างเลขใบรับเข้าไม่สำเร็จ กรุณาลองใหม่", status: "error" };
     }
+    receiptNumber = generatedNumber;
   }
 
   const supplierId = getText(formData, "supplierId") || null;
   const supplierName = getText(formData, "supplierName") || "ผู้ขาย";
-  const receivedAt = getText(formData, "receivedAt");
   const notes = getText(formData, "notes");
   const imageFile = formData.get("receiptImage") as File | null;
 
@@ -141,14 +148,14 @@ export async function receiveStockAction(
     try {
       const supabase = await createActionClient();
       const fileExt = imageFile.name.split(".").pop() || "jpg";
-      const fileName = `${session.organizationId}/${receiptNumber}.${fileExt}`;
+      const fileName = `${session.organizationId}/${crypto.randomUUID()}.${fileExt}`;
       const buffer = Buffer.from(await imageFile.arrayBuffer());
 
       const { error: uploadError } = await supabase.storage
         .from(STOCK_RECEIPT_IMAGES_BUCKET)
         .upload(fileName, buffer, {
           contentType: imageFile.type,
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadError) {
@@ -181,7 +188,7 @@ export async function receiveStockAction(
     p_notes: notes,
     p_organization_id: session.organizationId,
     p_receipt_number: receiptNumber,
-    p_received_at: receivedAt ? new Date(receivedAt).toISOString() : new Date().toISOString(),
+    p_received_at: receivedAt.toISOString(),
     p_supplier_name: supplierName,
     p_receipt_url: receiptUrl,
     p_supplier_id: supplierId,
@@ -221,12 +228,11 @@ export async function bulkReceiveStockAction(
   const session = await requireAppRole("admin");
   const admin = getSupabaseAdmin();
 
-  let receiptNumber = `RCV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  const { data: generatedNumber, error: generateError } = await admin.rpc("generate_receipt_number", {
+  const { data: receiptNumber, error: generateError } = await admin.rpc("generate_receipt_number", {
     p_organization_id: session.organizationId,
   });
-  if (!generateError && generatedNumber) {
-    receiptNumber = generatedNumber;
+  if (generateError || !receiptNumber) {
+    return { success: false, message: "สร้างเลขใบรับเข้าไม่สำเร็จ กรุณาลองใหม่" };
   }
 
   const { error } = await admin.rpc("create_inventory_receipt", {

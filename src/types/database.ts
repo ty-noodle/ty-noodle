@@ -918,6 +918,32 @@ export type Database = {
           },
         ]
       }
+      inventory_receipt_number_counters: {
+        Row: {
+          last_number: number
+          organization_id: string
+          receipt_date: string
+        }
+        Insert: {
+          last_number: number
+          organization_id: string
+          receipt_date: string
+        }
+        Update: {
+          last_number?: number
+          organization_id?: string
+          receipt_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_receipt_number_counters_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_receipts: {
         Row: {
           created_at: string
